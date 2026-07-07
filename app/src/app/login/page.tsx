@@ -3,6 +3,7 @@ import { ShieldCheck, FileSearch, GitBranch, Sparkles } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { LoginForm } from "@/components/login-form";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 export default async function LoginPage() {
   const user = await getSessionUser();
@@ -66,7 +67,10 @@ export default async function LoginPage() {
         <p className="relative text-[12px] text-brand-200/60">{dict.login.compliance}</p>
       </div>
 
-      <div className="flex flex-1 items-center justify-center bg-[#f6f8fa] px-6 py-12">
+      <div className="relative flex flex-1 items-center justify-center bg-[#f6f8fa] px-6 py-12">
+        <div className="absolute right-6 top-6">
+          <LocaleSwitcher locale={locale} />
+        </div>
         <LoginForm dict={dict} />
       </div>
     </div>

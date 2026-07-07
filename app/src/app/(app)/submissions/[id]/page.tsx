@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
+import { diffParagraphs } from "@/lib/diff";
 import { ReviewWorkspace, type WorkspaceData } from "@/components/review-workspace";
 
 export default async function SubmissionDetailPage(
@@ -86,6 +87,44 @@ export default async function SubmissionDetailPage(
     .filter((a) => a.entityId === sub.id || versionIds.includes(a.entityId))
     .slice(0, 12);
 
+  // Diff vs the immediately preceding version (text-based versions only)
+  const versionIdx = versions.findIndex((v) => v.id === version.id);
+  const prevVersion = versionIdx > 0 ? versions[versionIdx - 1] : null;
+  const diff =
+    prevVersion && prevVersion.textContent && version.textContent
+      ? diffParagraphs(prevVersion.textContent, version.textContent)
+      : null;
+
+  // Open comments from all versions before the one being viewed, with the
+  // element text they were pinned to (elements belong to their own version).
+  const priorVersionIds = versions.slice(0, versionIdx).map((v) => v.id);
+  const prevOpenComments = priorVersionIds.length
+    ? db
+        .select()
+        .from(t.reviewComments)
+        .where(inArray(t.reviewComments.versionId, priorVersionIds))
+        .all()
+        .filter((c) => !c.resolved)
+        .map((c) => {
+          const el = c.elementId
+            ? db
+                .select()
+                .from(t.contentElements)
+                .where(eq(t.contentElements.id, c.elementId))
+                .get()
+            : null;
+          const v = versions.find((x) => x.id === c.versionId);
+          return {
+            id: c.id,
+            reviewerName: userName(c.reviewerId),
+            comment: c.comment,
+            createdAt: c.createdAt.getTime(),
+            versionNumber: v?.versionNumber ?? 0,
+            elementText: el?.extractedText ?? null,
+          };
+        })
+    : [];
+
   const activeStage = stages.find((s) => s.status === "in_progress");
   const canReview =
     isLatest &&
@@ -123,7 +162,10 @@ export default async function SubmissionDetailPage(
       versionNumber: version.versionNumber,
       isLocked: version.isLocked,
       processingStatus: version.processingStatus,
+      changeNote: version.changeNote,
     },
+    diff,
+    prevOpenComments,
     pages: pages.map((p) => ({
       id: p.id,
       pageNumber: p.pageNumber,

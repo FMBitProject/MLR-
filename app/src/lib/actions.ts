@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -259,7 +259,8 @@ export async function resubmitVersion(formData: FormData) {
   const user = await requireUser();
   const submissionId = String(formData.get("submissionId") ?? "");
   const text = String(formData.get("text") ?? "").trim();
-  if (!text) throw new Error("VALIDATION");
+  const changeNote = String(formData.get("changeNote") ?? "").trim();
+  if (!text || !changeNote) throw new Error("VALIDATION");
 
   const sub = db
     .select()
@@ -293,6 +294,10 @@ export async function resubmitVersion(formData: FormData) {
     text,
     fileName: null,
   });
+  db.update(t.contentVersions)
+    .set({ changeNote })
+    .where(eq(t.contentVersions.id, versionId))
+    .run();
 
   // Reset the review workflow: fresh stages from the tenant template
   db.delete(t.reviewStages).where(eq(t.reviewStages.submissionId, submissionId)).run();
@@ -321,7 +326,7 @@ export async function resubmitVersion(formData: FormData) {
     entityId: submissionId,
     action: "resubmitted",
     performedBy: user.id,
-    details: { version: `v${nextVersion}` },
+    details: { version: `v${nextVersion}`, changeNote },
   });
 
   const flags = await runClaimsCheck({
@@ -382,6 +387,20 @@ export async function decideStage(formData: FormData) {
     .orderBy(asc(t.contentVersions.versionNumber))
     .all();
   const currentVersion = versions[versions.length - 1];
+
+  // Follow-up enforcement: a stage cannot be approved while comments from
+  // previous versions are still unresolved (the reviewer must verify each
+  // piece of feedback was actually addressed).
+  if (decision === "approved" && versions.length > 1) {
+    const prevIds = versions.slice(0, -1).map((v) => v.id);
+    const openPrev = db
+      .select()
+      .from(t.reviewComments)
+      .where(inArray(t.reviewComments.versionId, prevIds))
+      .all()
+      .filter((c) => !c.resolved).length;
+    if (openPrev > 0) throw new Error("PREV_COMMENTS_OPEN");
+  }
 
   db.update(t.reviewStages)
     .set({ status: decision, decidedAt: new Date(), decisionNote: note })

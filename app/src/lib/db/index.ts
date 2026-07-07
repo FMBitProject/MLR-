@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS content_submissions (
 CREATE TABLE IF NOT EXISTS content_versions (
   id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES content_submissions(id),
   version_number INTEGER NOT NULL, file_name TEXT, text_content TEXT,
+  change_note TEXT,
   is_locked INTEGER NOT NULL DEFAULT 0, processing_status TEXT NOT NULL DEFAULT 'ready',
   created_at INTEGER NOT NULL
 );
@@ -93,6 +94,12 @@ function createDb(): DB {
   const sqlite = new Database(path.join(DATA_DIR, "mlr.db"));
   sqlite.pragma("journal_mode = WAL");
   sqlite.exec(DDL);
+  // Lightweight migrations for databases created before a column existed
+  try {
+    sqlite.exec("ALTER TABLE content_versions ADD COLUMN change_note TEXT");
+  } catch {
+    /* column already exists */
+  }
   const db = drizzle(sqlite, { schema });
   const row = sqlite.prepare("SELECT COUNT(*) AS n FROM tenants").get() as { n: number };
   if (row.n === 0) seed(db);

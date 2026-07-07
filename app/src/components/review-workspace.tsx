@@ -13,6 +13,9 @@ import {
   History,
   ScanEye,
   RefreshCw,
+  ListChecks,
+  GitCompareArrows,
+  StickyNote,
 } from "lucide-react";
 import {
   addComment,
@@ -52,7 +55,17 @@ export type WorkspaceData = {
     versionNumber: number;
     isLocked: boolean;
     processingStatus: string;
+    changeNote: string | null;
   };
+  diff: Array<{ type: "same" | "added" | "removed"; text: string }> | null;
+  prevOpenComments: Array<{
+    id: string;
+    reviewerName: string;
+    comment: string;
+    createdAt: number;
+    versionNumber: number;
+    elementText: string | null;
+  }>;
   pages: Array<{ id: string; pageNumber: number; width: number; height: number }>;
   elements: Array<{
     id: string;
@@ -257,6 +270,13 @@ export function ReviewWorkspace({
                 placeholder={dict.detail.newText}
                 className={inputCls + " resize-y leading-relaxed"}
               />
+              <textarea
+                name="changeNote"
+                rows={2}
+                required
+                placeholder={dict.detail.changeNotePlaceholder}
+                className={inputCls + " resize-y"}
+              />
               <button
                 type="submit"
                 disabled={pending}
@@ -379,6 +399,49 @@ export function ReviewWorkspace({
             ) : null}
           </Card>
 
+          {/* diff vs previous version */}
+          {currentVersion.versionNumber > 1 ? (
+            <Card className="mt-4">
+              <div className="px-5 py-4">
+                <div className="mb-1 flex items-center gap-2">
+                  <GitCompareArrows className="size-4 text-brand-600" />
+                  <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">
+                    {dict.detail.diffTitle}
+                  </h3>
+                  {data.diff ? (
+                    <span className="ml-auto text-[11px] text-slate-400">
+                      {dict.detail.diffDesc}
+                    </span>
+                  ) : null}
+                </div>
+                {data.diff ? (
+                  <div className="mt-3 space-y-1.5">
+                    {data.diff.map((line, i) => (
+                      <p
+                        key={i}
+                        className={clsx(
+                          "rounded-lg px-3 py-1.5 text-[13px] leading-relaxed",
+                          line.type === "added" &&
+                            "bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200",
+                          line.type === "removed" &&
+                            "bg-rose-50 text-rose-800 line-through decoration-rose-400/60 ring-1 ring-inset ring-rose-200",
+                          line.type === "same" && "text-slate-500",
+                        )}
+                      >
+                        {line.type === "added" ? "+ " : line.type === "removed" ? "− " : ""}
+                        {line.text}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[12.5px] italic text-slate-400">
+                    {dict.detail.diffUnavailable}
+                  </p>
+                )}
+              </div>
+            </Card>
+          ) : null}
+
           {/* selected element detail */}
           {selectedElement ? (
             <Card className="mt-4">
@@ -414,6 +477,107 @@ export function ReviewWorkspace({
 
         {/* --------------------------- right rail --------------------------- */}
         <div className="space-y-5">
+          {/* revision note from marketing */}
+          {currentVersion.changeNote ? (
+            <Card className="border-brand-200 bg-brand-50/40">
+              <div className="flex items-start gap-3 px-5 py-4">
+                <StickyNote className="mt-0.5 size-4 shrink-0 text-brand-600" />
+                <div>
+                  <p className="text-[11.5px] font-semibold uppercase tracking-wider text-brand-800">
+                    {dict.detail.revisionNote} · v{currentVersion.versionNumber}
+                  </p>
+                  <p className="mt-1 text-[13px] leading-relaxed text-slate-700">
+                    {currentVersion.changeNote}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          ) : null}
+
+          {/* follow-up checklist from previous versions */}
+          {currentVersion.versionNumber > 1 && data.isLatest ? (
+            <Card
+              className={
+                data.prevOpenComments.length
+                  ? "border-amber-300 bg-gradient-to-b from-amber-50/70 to-white"
+                  : "border-emerald-200"
+              }
+            >
+              <div className="px-5 py-4">
+                <div className="mb-1 flex items-center gap-2">
+                  <ListChecks
+                    className={clsx(
+                      "size-4",
+                      data.prevOpenComments.length ? "text-amber-600" : "text-emerald-500",
+                    )}
+                  />
+                  <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-500">
+                    {dict.detail.followUp}
+                  </h3>
+                  <span
+                    className={clsx(
+                      "ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold",
+                      data.prevOpenComments.length
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-emerald-100 text-emerald-700",
+                    )}
+                  >
+                    {data.prevOpenComments.length}
+                  </span>
+                </div>
+                {data.prevOpenComments.length ? (
+                  <>
+                    <p className="mb-3 text-[12px] leading-relaxed text-slate-500">
+                      {dict.detail.followUpDesc}
+                    </p>
+                    <div className="space-y-2.5">
+                      {data.prevOpenComments.map((c) => (
+                        <div
+                          key={c.id}
+                          className="rounded-xl border border-amber-200 bg-white p-3"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Avatar name={c.reviewerName} size={22} />
+                            <p className="text-[12.5px] font-semibold text-slate-800">
+                              {c.reviewerName}
+                            </p>
+                            <span className="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-slate-500">
+                              {dict.detail.fromVersion} v{c.versionNumber}
+                            </span>
+                          </div>
+                          {c.elementText ? (
+                            <p className="mt-2 border-l-2 border-slate-200 pl-2.5 text-[11.5px] italic leading-snug text-slate-400">
+                              “{c.elementText}”
+                            </p>
+                          ) : null}
+                          <p className="mt-1.5 text-[12.5px] leading-relaxed text-slate-700">
+                            {c.comment}
+                          </p>
+                          <form
+                            action={(fd) => startTransition(() => resolveComment(fd))}
+                            className="mt-2"
+                          >
+                            <input type="hidden" name="commentId" value={c.id} />
+                            <button
+                              disabled={pending}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[11.5px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
+                            >
+                              ✓ {dict.detail.resolve}
+                            </button>
+                          </form>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[12.5px] font-medium text-emerald-700">
+                    ✓ {dict.detail.allAddressed}
+                  </p>
+                )}
+              </div>
+            </Card>
+          ) : null}
+
           {/* review progress */}
           <Card>
             <div className="px-5 py-4">
@@ -488,12 +652,21 @@ export function ReviewWorkspace({
                     placeholder={dict.detail.decisionNote}
                     className={inputCls + " resize-none"}
                   />
+                  {data.prevOpenComments.length > 0 ? (
+                    <p className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-snug text-amber-800 ring-1 ring-inset ring-amber-200">
+                      <Lock className="mt-0.5 size-3.5 shrink-0" />
+                      {dict.detail.approveBlocked}
+                    </p>
+                  ) : null}
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       name="decision"
                       value="approved"
-                      disabled={pending}
-                      className="rounded-xl bg-emerald-600 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
+                      disabled={pending || data.prevOpenComments.length > 0}
+                      title={
+                        data.prevOpenComments.length > 0 ? dict.detail.approveBlocked : undefined
+                      }
+                      className="rounded-xl bg-emerald-600 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {dict.detail.approve}
                     </button>

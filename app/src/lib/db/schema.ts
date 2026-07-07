@@ -70,6 +70,8 @@ export const contentVersions = sqliteTable("content_versions", {
   versionNumber: integer("version_number").notNull(),
   fileName: text("file_name"),
   textContent: text("text_content"),
+  // Mandatory summary of what changed, required from v2 onward
+  changeNote: text("change_note"),
   isLocked: integer("is_locked", { mode: "boolean" }).notNull().default(false),
   processingStatus: text("processing_status").notNull().default("ready"), // processing | ready
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
