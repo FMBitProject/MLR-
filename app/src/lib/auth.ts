@@ -23,6 +23,15 @@ export const REVIEWER_ROLES: Role[] = [
   "regulatory_reviewer",
 ];
 
+// Who may manage the Approved Claims Library (add/edit/import/expire).
+// Compliance/QA owns it per the PRD; Medical Reviewer co-manages since
+// medical affairs scientifically validates claims.
+export const CLAIM_MANAGER_ROLES: Role[] = [
+  "compliance_admin",
+  "super_admin",
+  "medical_reviewer",
+];
+
 function sign(value: string): string {
   return createHmac("sha256", SECRET).update(value).digest("hex");
 }

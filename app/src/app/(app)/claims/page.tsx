@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { BookCheck, TimerReset } from "lucide-react";
 import { db, t } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, CLAIM_MANAGER_ROLES } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { expireClaim } from "@/lib/actions";
@@ -16,7 +16,9 @@ export default async function ClaimsPage(props: PageProps<"/claims">) {
   const q = typeof sp.q === "string" ? sp.q.toLowerCase() : "";
   const productFilter = typeof sp.product === "string" ? sp.product : "";
 
-  const canManage = ["compliance_admin", "super_admin"].includes(user.role);
+  const canManage = CLAIM_MANAGER_ROLES.includes(
+    user.role as (typeof CLAIM_MANAGER_ROLES)[number],
+  );
 
   const products = db
     .select({ id: t.products.id, name: t.products.name })

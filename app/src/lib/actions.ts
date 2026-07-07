@@ -13,6 +13,7 @@ import {
   requireUser,
   verifyPassword,
   REVIEWER_ROLES,
+  CLAIM_MANAGER_ROLES,
 } from "./auth";
 import { logAudit } from "./audit";
 import { runClaimsCheck } from "./claims-check";
@@ -563,7 +564,8 @@ export async function decideFlag(formData: FormData) {
 
 export async function saveClaim(formData: FormData) {
   const user = await requireUser();
-  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+  if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
+    throw new Error("FORBIDDEN");
 
   const id = String(formData.get("id") ?? "") || null;
   const productId = String(formData.get("productId") ?? "");
@@ -617,7 +619,8 @@ export async function saveClaim(formData: FormData) {
 
 export async function expireClaim(formData: FormData) {
   const user = await requireUser();
-  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+  if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
+    throw new Error("FORBIDDEN");
   const id = String(formData.get("id") ?? "");
   db.update(t.approvedClaims)
     .set({ status: "expired", expiresAt: new Date() })
@@ -644,7 +647,8 @@ export async function extractClaimsFromDoc(
   formData: FormData,
 ): Promise<ExtractState> {
   const user = await requireUser();
-  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+  if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
+    throw new Error("FORBIDDEN");
 
   let text = String(formData.get("docText") ?? "").trim();
   let source = "SOP (teks tempel)";
@@ -661,7 +665,8 @@ export async function extractClaimsFromDoc(
 
 export async function importClaims(formData: FormData) {
   const user = await requireUser();
-  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+  if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
+    throw new Error("FORBIDDEN");
 
   const productId = String(formData.get("productId") ?? "");
   const expiresAt = String(formData.get("expiresAt") ?? "");
