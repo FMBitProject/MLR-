@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/i18n";
 import { expireClaim } from "@/lib/actions";
 import { Card, Chip, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 import { ClaimFormButton, ClaimEditButton } from "@/components/claim-form";
+import { ImportSopButton } from "@/components/claim-import";
 
 export default async function ClaimsPage(props: PageProps<"/claims">) {
   const user = await requireUser();
@@ -48,7 +49,14 @@ export default async function ClaimsPage(props: PageProps<"/claims">) {
       <PageHeader
         title={dict.claims.title}
         subtitle={dict.claims.subtitle}
-        action={canManage ? <ClaimFormButton dict={dict} products={products} /> : undefined}
+        action={
+          canManage ? (
+            <div className="flex items-center gap-2">
+              <ImportSopButton dict={dict} products={products} />
+              <ClaimFormButton dict={dict} products={products} />
+            </div>
+          ) : undefined
+        }
       />
 
       <form className="mb-4 flex flex-wrap gap-2" method="GET">
@@ -101,6 +109,11 @@ export default async function ClaimsPage(props: PageProps<"/claims">) {
                   </div>
                   <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
                     <Chip tone="brand">{productName(claim.productId)}</Chip>
+                    {claim.source ? (
+                      <Chip tone="amber">
+                        {dict.claims.source}: {claim.source}
+                      </Chip>
+                    ) : null}
                     {(claim.channelScope ?? []).map((c) => (
                       <Chip key={c}>
                         {dict.channels[c as keyof typeof dict.channels] ?? c}

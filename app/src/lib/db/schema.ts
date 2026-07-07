@@ -42,6 +42,8 @@ export const approvedClaims = sqliteTable("approved_claims", {
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   productId: text("product_id").notNull().references(() => products.id),
   claimText: text("claim_text").notNull(),
+  // Where the claim came from, e.g. "SOP-PROM-001.txt" for document imports
+  source: text("source"),
   // JSON array, e.g. ["print","digital","hcp_only"]
   channelScope: text("channel_scope", { mode: "json" }).$type<string[]>(),
   approvedBy: text("approved_by").references(() => users.id),

@@ -16,6 +16,8 @@ import {
   ListChecks,
   GitCompareArrows,
   StickyNote,
+  FileDown,
+  Download,
 } from "lucide-react";
 import {
   addComment,
@@ -56,6 +58,8 @@ export type WorkspaceData = {
     isLocked: boolean;
     processingStatus: string;
     changeNote: string | null;
+    fileName: string | null;
+    hasOriginalFile: boolean;
   };
   diff: Array<{ type: "same" | "added" | "removed"; text: string }> | null;
   prevOpenComments: Array<{
@@ -226,6 +230,27 @@ export function ReviewWorkspace({
                   </Link>
                 ))}
               </div>
+            ) : null}
+            {currentVersion.hasOriginalFile ? (
+              <a
+                href={`/api/files/${currentVersion.id}`}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                title={currentVersion.fileName ?? undefined}
+              >
+                <Download className="size-4" />
+                {dict.detail.downloadOriginal}
+              </a>
+            ) : null}
+            {sub.status === "approved" && currentVersion.isLocked ? (
+              <a
+                href={`/submissions/${sub.id}/package`}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-slate-700"
+              >
+                <FileDown className="size-4" />
+                {dict.detail.downloadPackage}
+              </a>
             ) : null}
             {data.canResubmit ? (
               <button

@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS approved_claims (
   id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
   product_id TEXT NOT NULL REFERENCES products(id), claim_text TEXT NOT NULL,
+  source TEXT,
   channel_scope TEXT, approved_by TEXT REFERENCES users(id),
   approved_at INTEGER, expires_at INTEGER, status TEXT NOT NULL DEFAULT 'active'
 );
@@ -97,6 +98,11 @@ function createDb(): DB {
   // Lightweight migrations for databases created before a column existed
   try {
     sqlite.exec("ALTER TABLE content_versions ADD COLUMN change_note TEXT");
+  } catch {
+    /* column already exists */
+  }
+  try {
+    sqlite.exec("ALTER TABLE approved_claims ADD COLUMN source TEXT");
   } catch {
     /* column already exists */
   }

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import fs from "node:fs";
+import path from "node:path";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
@@ -163,6 +165,10 @@ export default async function SubmissionDetailPage(
       isLocked: version.isLocked,
       processingStatus: version.processingStatus,
       changeNote: version.changeNote,
+      fileName: version.fileName,
+      hasOriginalFile:
+        !!version.fileName &&
+        fs.existsSync(path.join(process.cwd(), ".data", "uploads", version.id)),
     },
     diff,
     prevOpenComments,

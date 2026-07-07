@@ -4,6 +4,8 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import fs from "node:fs";
+import path from "node:path";
 import { db, t } from "./db";
 import {
   createSession,
@@ -14,7 +16,10 @@ import {
 } from "./auth";
 import { logAudit } from "./audit";
 import { runClaimsCheck } from "./claims-check";
+import { extractClaimCandidates } from "./claims-extract";
 import { renderTextPages, renderFilePlaceholderPage } from "./svg";
+
+const UPLOAD_DIR = path.join(process.cwd(), ".data", "uploads");
 
 /* ----------------------------- session ----------------------------- */
 
@@ -231,6 +236,16 @@ export async function createSubmission(formData: FormData) {
     text,
     fileName,
   });
+
+  // Persist the original upload so the approved master can be downloaded later
+  // (production: S3/R2 with versioned object keys)
+  if (file instanceof File && file.size > 0) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    fs.writeFileSync(
+      path.join(UPLOAD_DIR, versionId),
+      Buffer.from(await file.arrayBuffer()),
+    );
+  }
 
   logAudit({
     tenantId: user.tenantId,
@@ -615,6 +630,71 @@ export async function expireClaim(formData: FormData) {
     action: "claim_expired",
     performedBy: user.id,
   });
+  revalidatePath("/claims");
+}
+
+export type ExtractState = {
+  candidates: string[];
+  engine: "claude" | "heuristic";
+  source: string;
+} | null;
+
+export async function extractClaimsFromDoc(
+  _prev: ExtractState,
+  formData: FormData,
+): Promise<ExtractState> {
+  const user = await requireUser();
+  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+
+  let text = String(formData.get("docText") ?? "").trim();
+  let source = "SOP (teks tempel)";
+  const file = formData.get("docFile");
+  if (file instanceof File && file.size > 0) {
+    text = `${text}\n${Buffer.from(await file.arrayBuffer()).toString("utf-8")}`.trim();
+    source = file.name;
+  }
+  if (!text) return null;
+
+  const { candidates, engine } = await extractClaimCandidates(text);
+  return { candidates, engine, source };
+}
+
+export async function importClaims(formData: FormData) {
+  const user = await requireUser();
+  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+
+  const productId = String(formData.get("productId") ?? "");
+  const expiresAt = String(formData.get("expiresAt") ?? "");
+  const source = String(formData.get("source") ?? "") || null;
+  const channels = formData.getAll("channels").map(String);
+  const claims = formData.getAll("claims").map(String).filter(Boolean);
+  if (!productId || !expiresAt || !claims.length) throw new Error("VALIDATION");
+
+  for (const claimText of claims) {
+    const id = crypto.randomUUID();
+    db.insert(t.approvedClaims)
+      .values({
+        id,
+        tenantId: user.tenantId,
+        productId,
+        claimText,
+        source,
+        channelScope: channels,
+        approvedBy: user.id,
+        approvedAt: new Date(),
+        expiresAt: new Date(expiresAt),
+        status: "active",
+      })
+      .run();
+    logAudit({
+      tenantId: user.tenantId,
+      entityType: "claim",
+      entityId: id,
+      action: "claim_created",
+      performedBy: user.id,
+      details: { source: source ?? undefined },
+    });
+  }
   revalidatePath("/claims");
 }
 
