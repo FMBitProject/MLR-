@@ -27,6 +27,8 @@ export function SubmissionForm({
     "regulatory_reviewer",
   ];
 
+  const MAX_UPLOAD_MB = 20;
+
   const onSubmit = (formData: FormData) => {
     const text = String(formData.get("text") ?? "").trim();
     const file = formData.get("file");
@@ -35,8 +37,20 @@ export function SubmissionForm({
       setError(dict.newSubmission.needTextOrFile);
       return;
     }
+    if (hasFile && file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      setError(dict.newSubmission.fileTooLarge);
+      return;
+    }
     setError(null);
-    startTransition(() => createSubmission(formData));
+    startTransition(async () => {
+      try {
+        await createSubmission(formData);
+      } catch (e) {
+        // redirect() signals success via a special error — let it through
+        if ((e as { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) throw e;
+        setError(dict.newSubmission.submitFailed);
+      }
+    });
   };
 
   const input =

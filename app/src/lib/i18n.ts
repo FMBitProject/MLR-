@@ -99,6 +99,8 @@ const dictionaries = {
       submit: "Ajukan untuk Review",
       submitting: "Mengajukan…",
       needTextOrFile: "Isi teks konten atau unggah file terlebih dahulu.",
+      fileTooLarge: "File terlalu besar — maksimum 20 MB.",
+      submitFailed: "Gagal mengirim. Periksa koneksi Anda lalu coba lagi.",
     },
     detail: {
       version: "Versi",
@@ -381,6 +383,8 @@ const dictionaries = {
       submit: "Submit for Review",
       submitting: "Submitting…",
       needTextOrFile: "Provide content text or upload a file first.",
+      fileTooLarge: "File is too large — 20 MB max.",
+      submitFailed: "Submission failed. Check your connection and try again.",
     },
     detail: {
       version: "Version",
