@@ -27,6 +27,7 @@ import {
   resolveComment,
   resubmitVersion,
   verifyFlagJournal,
+  rerunClaimsCheck,
 } from "@/lib/actions";
 import type { Dict, Locale } from "@/lib/i18n";
 import { formatDate, relativeDays } from "@/lib/i18n";
@@ -765,6 +766,19 @@ export function ReviewWorkspace({
                     ? ` / ${data.flags.length}`
                     : ""}
                 </span>
+                {data.canReview && !currentVersion.isLocked ? (
+                  <form action={(fd) => startTransition(() => rerunClaimsCheck(fd))}>
+                    <input type="hidden" name="submissionId" value={sub.id} />
+                    <button
+                      disabled={pending}
+                      title={dict.detail.rerunCheckHint}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60"
+                    >
+                      <RefreshCw className={clsx("size-3", pending && "animate-spin")} />
+                      {dict.detail.rerunCheck}
+                    </button>
+                  </form>
+                ) : null}
               </div>
               <p className="mb-4 text-[12px] leading-relaxed text-slate-400">
                 {dict.detail.aiFlagsDesc}

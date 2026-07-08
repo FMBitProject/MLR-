@@ -138,6 +138,9 @@ const dictionaries = {
       },
       journalDisclaimer:
         "Penilaian AI berdasarkan abstrak PubMed — asistif, keputusan tetap di reviewer.",
+      rerunCheck: "Ulangi cek",
+      rerunCheckHint:
+        "Hitung ulang flag AI terhadap Claims Library terkini (dipakai setelah klaim di library diperbaiki).",
       similarity: "kemiripan",
       noMatch: "Tidak ada klaim yang cocok di Claims Library",
       noMatchDesc: "Sistem tidak menemukan klaim yang relevan — bukan berarti salah, tapi wajib diverifikasi.",
@@ -256,6 +259,7 @@ const dictionaries = {
         claim_expired: "Mengedaluwarsakan klaim",
         flag_decided: "Memutuskan flag AI",
         journal_check_completed: "Cek jurnal AI selesai",
+        claims_check_rerun: "Mengulang AI claims check",
         resubmitted: "Mengajukan versi baru",
         comment_resolved: "Menyelesaikan komentar",
         workflow_updated: "Mengubah alur review",
@@ -434,6 +438,9 @@ const dictionaries = {
       },
       journalDisclaimer:
         "AI assessment is based on the PubMed abstract — assistive only; the reviewer decides.",
+      rerunCheck: "Re-run check",
+      rerunCheckHint:
+        "Recompute AI flags against the current Claims Library (use after fixing library claims).",
       similarity: "similarity",
       noMatch: "No matching claim in the Claims Library",
       noMatchDesc: "The system found no relevant claim — not necessarily wrong, but it must be verified.",
@@ -552,6 +559,7 @@ const dictionaries = {
         claim_expired: "Expired claim",
         flag_decided: "Decided AI flag",
         journal_check_completed: "AI journal check completed",
+        claims_check_rerun: "Re-ran AI claims check",
         resubmitted: "Submitted new version",
         comment_resolved: "Resolved comment",
         workflow_updated: "Updated workflow",

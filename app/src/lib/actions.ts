@@ -617,6 +617,54 @@ export async function decideFlag(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
+// Re-run the AI claims check for the latest version against the CURRENT
+// Claims Library — flags are otherwise computed once at submission, so
+// library fixes (better claim wording, new references) never reached
+// existing submissions. Replaces all flags for the version; prior decisions
+// stay in the audit log.
+export async function rerunClaimsCheck(formData: FormData) {
+  const user = await requireUser();
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
+  if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
+
+  const sub = db
+    .select()
+    .from(t.contentSubmissions)
+    .where(
+      and(
+        eq(t.contentSubmissions.id, submissionId),
+        eq(t.contentSubmissions.tenantId, user.tenantId),
+      ),
+    )
+    .get();
+  if (!sub) throw new Error("NOT_FOUND");
+
+  const versions = db
+    .select()
+    .from(t.contentVersions)
+    .where(eq(t.contentVersions.submissionId, submissionId))
+    .all();
+  const latest = versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
+  if (!latest || latest.isLocked) throw new Error("LOCKED");
+
+  db.delete(t.claimFlags).where(eq(t.claimFlags.versionId, latest.id)).run();
+  const flags = await runClaimsCheck({
+    versionId: latest.id,
+    productId: sub.productId,
+    tenantId: user.tenantId,
+  });
+  logAudit({
+    tenantId: user.tenantId,
+    entityType: "version",
+    entityId: latest.id,
+    action: "claims_check_rerun",
+    performedBy: user.id,
+    details: { version: `v${latest.versionNumber}`, flags },
+  });
+  revalidatePath("/", "layout");
+}
+
 // On-demand AI substantiation of a flag against the cited journal: fetches
 // the PubMed abstract (free) and, with ANTHROPIC_API_KEY, lets Claude judge
 // whether the copy stays within what the article reports. Assistive only.
