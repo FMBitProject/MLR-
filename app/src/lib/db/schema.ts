@@ -152,6 +152,11 @@ export const claimFlags = sqliteTable("claim_flags", {
   flagType: text("flag_type").notNull().default("no_match"),
   reviewerDecision: text("reviewer_decision"), // accepted | dismissed | escalated
   decidedBy: text("decided_by").references(() => users.id),
+  // On-demand AI substantiation vs the cited journal's PubMed abstract:
+  // supported | not_supported | unclear | abstract_only (no API key)
+  journalVerdict: text("journal_verdict"),
+  journalNote: text("journal_note"),
+  journalPmid: text("journal_pmid"),
 });
 
 export const auditLog = sqliteTable("audit_log", {

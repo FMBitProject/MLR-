@@ -48,6 +48,21 @@ type ESummaryDoc = {
   articleids?: Array<{ idtype?: string; value?: string }>;
 };
 
+/** Plain-text abstract of an article — also free via E-utilities efetch. */
+export async function fetchAbstract(pmid: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${EUTILS}/efetch.fcgi?db=pubmed&id=${encodeURIComponent(pmid)}&rettype=abstract&retmode=text`,
+      { signal: AbortSignal.timeout(TIMEOUT_MS) },
+    );
+    if (!res.ok) return null;
+    const text = (await res.text()).trim();
+    return text.length > 40 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function lookupPubmed(raw: string): Promise<ClaimReference | null> {
   const parsed = parseInput(raw);
   const pmid = parsed.pmid ?? (parsed.doi ? await doiToPmid(parsed.doi) : null);

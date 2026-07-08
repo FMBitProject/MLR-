@@ -200,6 +200,9 @@ export default async function SubmissionDetailPage(
         flagType: f.flagType,
         reviewerDecision: f.reviewerDecision,
         decidedBy: userName(f.decidedBy),
+        journalVerdict: f.journalVerdict,
+        journalNote: f.journalNote,
+        journalPmid: f.journalPmid,
       };
     }),
     comments: comments.map((c) => ({

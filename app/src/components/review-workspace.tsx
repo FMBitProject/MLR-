@@ -18,6 +18,7 @@ import {
   StickyNote,
   FileDown,
   Download,
+  BookOpenCheck,
 } from "lucide-react";
 import {
   addComment,
@@ -25,6 +26,7 @@ import {
   decideStage,
   resolveComment,
   resubmitVersion,
+  verifyFlagJournal,
 } from "@/lib/actions";
 import type { Dict, Locale } from "@/lib/i18n";
 import { formatDate, relativeDays } from "@/lib/i18n";
@@ -96,6 +98,9 @@ export type WorkspaceData = {
     flagType: string;
     reviewerDecision: string | null;
     decidedBy: string;
+    journalVerdict: string | null;
+    journalNote: string | null;
+    journalPmid: string | null;
   }>;
   comments: Array<{
     id: string;
@@ -853,6 +858,68 @@ export function ReviewWorkspace({
                                 ) : null}
                               </p>
                             ))}
+                            {/* AI substantiation vs the cited journal */}
+                            {f.journalVerdict ? (
+                              <div
+                                className={clsx(
+                                  "mt-2 rounded-lg px-2.5 py-2 ring-1 ring-inset",
+                                  f.journalVerdict === "supported"
+                                    ? "bg-emerald-50 ring-emerald-200"
+                                    : f.journalVerdict === "not_supported"
+                                      ? "bg-rose-50 ring-rose-200"
+                                      : "bg-sky-50 ring-sky-200",
+                                )}
+                              >
+                                <p
+                                  className={clsx(
+                                    "text-[11.5px] font-bold",
+                                    f.journalVerdict === "supported"
+                                      ? "text-emerald-700"
+                                      : f.journalVerdict === "not_supported"
+                                        ? "text-rose-700"
+                                        : "text-sky-800",
+                                  )}
+                                >
+                                  {dict.detail.journalVerdicts[
+                                    f.journalVerdict as keyof typeof dict.detail.journalVerdicts
+                                  ] ?? f.journalVerdict}
+                                  {f.journalPmid ? (
+                                    <a
+                                      href={`https://pubmed.ncbi.nlm.nih.gov/${f.journalPmid}/`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="ml-1.5 font-semibold underline"
+                                    >
+                                      PMID {f.journalPmid}
+                                    </a>
+                                  ) : null}
+                                </p>
+                                {f.journalNote ? (
+                                  <p className="mt-1 text-[11.5px] leading-snug text-slate-600">
+                                    {f.journalNote}
+                                  </p>
+                                ) : null}
+                                <p className="mt-1 text-[10.5px] italic text-slate-400">
+                                  {dict.detail.journalDisclaimer}
+                                </p>
+                              </div>
+                            ) : data.canReview &&
+                              !f.reviewerDecision &&
+                              f.matchedClaimRefs.some((r) => r.pmid) ? (
+                              <form
+                                action={(fd) => startTransition(() => verifyFlagJournal(fd))}
+                                className="mt-2"
+                              >
+                                <input type="hidden" name="flagId" value={f.id} />
+                                <button
+                                  disabled={pending}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11.5px] font-semibold text-sky-800 transition hover:bg-sky-100 disabled:opacity-60"
+                                >
+                                  <BookOpenCheck className="size-3.5" />
+                                  {pending ? dict.detail.journalChecking : dict.detail.journalCheck}
+                                </button>
+                              </form>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>

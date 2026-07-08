@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS claim_flags (
   element_id TEXT REFERENCES content_elements(id), flagged_text TEXT NOT NULL,
   matched_claim_id TEXT REFERENCES approved_claims(id), similarity_score REAL,
   flag_type TEXT NOT NULL DEFAULT 'no_match', reviewer_decision TEXT,
-  decided_by TEXT REFERENCES users(id)
+  decided_by TEXT REFERENCES users(id),
+  journal_verdict TEXT, journal_note TEXT, journal_pmid TEXT
 );
 CREATE TABLE IF NOT EXISTS audit_log (
   id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
@@ -110,6 +111,13 @@ function createDb(): DB {
     sqlite.exec("ALTER TABLE approved_claims ADD COLUMN refs TEXT");
   } catch {
     /* column already exists */
+  }
+  for (const col of ["journal_verdict", "journal_note", "journal_pmid"]) {
+    try {
+      sqlite.exec(`ALTER TABLE claim_flags ADD COLUMN ${col} TEXT`);
+    } catch {
+      /* column already exists */
+    }
   }
   // Backfill demo references for databases seeded before the refs column existed
   const backfillRef = sqlite.prepare(

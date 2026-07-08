@@ -19,6 +19,7 @@ import { logAudit } from "./audit";
 import { runClaimsCheck } from "./claims-check";
 import { extractClaimCandidates } from "./claims-extract";
 import { lookupPubmed } from "./pubmed";
+import { checkAgainstJournal } from "./journal-check";
 import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
@@ -612,6 +613,54 @@ export async function decideFlag(formData: FormData) {
     action: "flag_decided",
     performedBy: user.id,
     details: { decision },
+  });
+  revalidatePath("/", "layout");
+}
+
+// On-demand AI substantiation of a flag against the cited journal: fetches
+// the PubMed abstract (free) and, with ANTHROPIC_API_KEY, lets Claude judge
+// whether the copy stays within what the article reports. Assistive only.
+export async function verifyFlagJournal(formData: FormData) {
+  const user = await requireUser();
+  const flagId = String(formData.get("flagId") ?? "");
+  const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
+  if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
+
+  const flag = db.select().from(t.claimFlags).where(eq(t.claimFlags.id, flagId)).get();
+  if (!flag?.matchedClaimId) throw new Error("NOT_FOUND");
+  const claim = db
+    .select()
+    .from(t.approvedClaims)
+    .where(
+      and(
+        eq(t.approvedClaims.id, flag.matchedClaimId),
+        eq(t.approvedClaims.tenantId, user.tenantId),
+      ),
+    )
+    .get();
+  if (!claim) throw new Error("NOT_FOUND");
+
+  const result = await checkAgainstJournal({
+    flaggedText: flag.flaggedText,
+    claimText: claim.claimText,
+    references: claim.references ?? [],
+  });
+
+  db.update(t.claimFlags)
+    .set(
+      result
+        ? { journalVerdict: result.verdict, journalNote: result.note, journalPmid: result.pmid }
+        : { journalVerdict: "unavailable", journalNote: null, journalPmid: null },
+    )
+    .where(eq(t.claimFlags.id, flagId))
+    .run();
+  logAudit({
+    tenantId: user.tenantId,
+    entityType: "flag",
+    entityId: flagId,
+    action: "journal_check_completed",
+    performedBy: user.id,
+    details: { verdict: result?.verdict ?? "unavailable", pmid: result?.pmid },
   });
   revalidatePath("/", "layout");
 }
