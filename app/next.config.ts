@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for the Docker image (see app/Dockerfile)
+  output: "standalone",
   experimental: {
     serverActions: {
       // Allow Server Actions when the app is accessed through a

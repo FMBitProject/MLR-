@@ -1,0 +1,18 @@
+services:
+  mlr-flow:
+    build: ./app
+    ports:
+      - "3000:3000"
+    environment:
+      # Ganti dengan secret acak Anda sendiri di produksi:
+      #   openssl rand -hex 32
+      AUTH_SECRET: ${AUTH_SECRET:-mlr-demo-secret-change-in-production}
+      # Opsional — isi untuk mengaktifkan AI claims check via Claude Haiku
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      # Database SQLite + file upload bertahan di volume ini
+      - mlr-data:/app/.data
+    restart: unless-stopped
+
+volumes:
+  mlr-data:

@@ -14,6 +14,23 @@ npm run build && npm start
 
 Database SQLite dibuat & di-seed otomatis di `.data/mlr.db` saat pertama dijalankan. Hapus folder `.data/` untuk reset ke data demo.
 
+### Menjalankan dengan Docker
+
+Dari **root repo** (bukan folder `app/`):
+
+```bash
+git pull                     # ambil kode terbaru dari GitHub
+docker compose up --build -d # build image + jalankan di http://localhost:3000
+docker compose logs -f       # lihat log
+docker compose down          # hentikan (data tetap tersimpan)
+```
+
+Database & file upload bertahan di volume Docker `mlr-data` — `docker compose down` tidak menghapusnya (`down -v` baru menghapus). Untuk produksi, set secret sendiri lewat environment:
+
+```bash
+AUTH_SECRET=$(openssl rand -hex 32) ANTHROPIC_API_KEY=sk-ant-... docker compose up -d
+```
+
 ## Akun demo (kata sandi: `demo123`)
 
 | Email | Peran |
