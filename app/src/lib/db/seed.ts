@@ -16,6 +16,42 @@ const daysAhead = (n: number) => new Date(now + n * 86_400_000);
 
 const TENANT = "tn-nusantara";
 
+// Journal references backing the demo claims. Real articles, verified against
+// PubMed — also used by db/index.ts to backfill databases seeded before the
+// refs column existed. "Data on file" shows a non-journal substantiation type.
+export const SEED_CLAIM_REFERENCES: Record<string, t.ClaimReference[]> = {
+  "c-cvx-1": [
+    {
+      citation:
+        "ALLHAT Officers and Coordinators. Major outcomes in high-risk hypertensive patients randomized to angiotensin-converting enzyme inhibitor or calcium channel blocker vs diuretic (ALLHAT). JAMA. 2002;288(23):2981-97.",
+      pmid: "12479763",
+      doi: "10.1001/jama.288.23.2981",
+    },
+  ],
+  "c-cvx-3": [
+    {
+      citation:
+        "Data on file: Laporan keamanan studi klinis fase III Cardiovex, PT Nusantara Pharma, 2024.",
+    },
+  ],
+  "c-glf-1": [
+    {
+      citation:
+        "UK Prospective Diabetes Study (UKPDS) Group. Effect of intensive blood-glucose control with metformin on complications in overweight patients with type 2 diabetes (UKPDS 34). Lancet. 1998;352(9131):854-65.",
+      pmid: "9742977",
+      doi: "10.1016/S0140-6736(98)07037-8",
+    },
+  ],
+  "c-glf-2": [
+    {
+      citation:
+        "Blonde L, Dailey GE, Jabbour SA, et al. Gastrointestinal tolerability of extended-release metformin tablets compared to immediate-release metformin tablets. Curr Med Res Opin. 2004;20(4):565-72.",
+      pmid: "15119994",
+      doi: "10.1185/030079904125003278",
+    },
+  ],
+};
+
 export function seed(db: DB) {
   db.insert(t.tenants).values({
     id: TENANT,
@@ -110,6 +146,7 @@ export function seed(db: DB) {
   for (const c of claims) {
     db.insert(t.approvedClaims).values({
       id: c.id, tenantId: TENANT, productId: c.productId, claimText: c.claimText,
+      references: SEED_CLAIM_REFERENCES[c.id] ?? null,
       channelScope: c.channelScope, approvedBy: "u-sari",
       approvedAt: c.approvedAt ?? daysAgo(90), expiresAt: c.expiresAt,
       status: c.status ?? "active",

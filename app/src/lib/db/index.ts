@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
-import { seed } from "./seed";
+import { seed, SEED_CLAIM_REFERENCES } from "./seed";
 
 const DATA_DIR = path.join(process.cwd(), ".data");
 
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE TABLE IF NOT EXISTS approved_claims (
   id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
   product_id TEXT NOT NULL REFERENCES products(id), claim_text TEXT NOT NULL,
-  source TEXT,
+  source TEXT, refs TEXT,
   channel_scope TEXT, approved_by TEXT REFERENCES users(id),
   approved_at INTEGER, expires_at INTEGER, status TEXT NOT NULL DEFAULT 'active'
 );
@@ -105,6 +105,18 @@ function createDb(): DB {
     sqlite.exec("ALTER TABLE approved_claims ADD COLUMN source TEXT");
   } catch {
     /* column already exists */
+  }
+  try {
+    sqlite.exec("ALTER TABLE approved_claims ADD COLUMN refs TEXT");
+  } catch {
+    /* column already exists */
+  }
+  // Backfill demo references for databases seeded before the refs column existed
+  const backfillRef = sqlite.prepare(
+    "UPDATE approved_claims SET refs = ? WHERE id = ? AND refs IS NULL",
+  );
+  for (const [claimId, refs] of Object.entries(SEED_CLAIM_REFERENCES)) {
+    backfillRef.run(JSON.stringify(refs), claimId);
   }
   const db = drizzle(sqlite, { schema });
   const row = sqlite.prepare("SELECT COUNT(*) AS n FROM tenants").get() as { n: number };

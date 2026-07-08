@@ -188,16 +188,20 @@ export default async function SubmissionDetailPage(
       boundingBox: el.boundingBox,
       requiresManualReview: el.requiresManualReview,
     })),
-    flags: flags.map((f) => ({
-      id: f.id,
-      elementId: f.elementId,
-      flaggedText: f.flaggedText,
-      matchedClaimText: claims.find((c) => c.id === f.matchedClaimId)?.claimText ?? null,
-      similarityScore: f.similarityScore,
-      flagType: f.flagType,
-      reviewerDecision: f.reviewerDecision,
-      decidedBy: userName(f.decidedBy),
-    })),
+    flags: flags.map((f) => {
+      const matched = claims.find((c) => c.id === f.matchedClaimId);
+      return {
+        id: f.id,
+        elementId: f.elementId,
+        flaggedText: f.flaggedText,
+        matchedClaimText: matched?.claimText ?? null,
+        matchedClaimRefs: matched?.references ?? [],
+        similarityScore: f.similarityScore,
+        flagType: f.flagType,
+        reviewerDecision: f.reviewerDecision,
+        decidedBy: userName(f.decidedBy),
+      };
+    }),
     comments: comments.map((c) => ({
       id: c.id,
       elementId: c.elementId,

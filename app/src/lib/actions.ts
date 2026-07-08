@@ -18,6 +18,8 @@ import {
 import { logAudit } from "./audit";
 import { runClaimsCheck } from "./claims-check";
 import { extractClaimCandidates } from "./claims-extract";
+import { lookupPubmed } from "./pubmed";
+import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderFilePlaceholderPage } from "./svg";
 
 const UPLOAD_DIR = path.join(process.cwd(), ".data", "uploads");
@@ -562,6 +564,36 @@ export async function decideFlag(formData: FormData) {
 
 /* ------------------------------ claims ----------------------------- */
 
+// PubMed E-utilities lookup for the claim form: paste a PMID/DOI, get a
+// formatted citation back. Free NCBI service — no API key involved.
+export async function lookupReference(idRaw: string): Promise<ClaimReference | null> {
+  const user = await requireUser();
+  if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
+    throw new Error("FORBIDDEN");
+  return lookupPubmed(idRaw);
+}
+
+function parseReferences(formData: FormData): ClaimReference[] {
+  try {
+    const parsed = JSON.parse(String(formData.get("referencesJson") ?? "[]"));
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (r): r is ClaimReference =>
+          !!r && typeof r.citation === "string" && !!r.citation.trim(),
+      )
+      .map((r) => ({
+        citation: r.citation.trim().slice(0, 600),
+        pmid: typeof r.pmid === "string" && r.pmid ? r.pmid.slice(0, 20) : null,
+        doi: typeof r.doi === "string" && r.doi ? r.doi.slice(0, 120) : null,
+        url: typeof r.url === "string" && r.url ? r.url.slice(0, 500) : null,
+      }))
+      .slice(0, 10);
+  } catch {
+    return [];
+  }
+}
+
 export async function saveClaim(formData: FormData) {
   const user = await requireUser();
   if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
@@ -572,6 +604,7 @@ export async function saveClaim(formData: FormData) {
   const claimText = String(formData.get("claimText") ?? "").trim();
   const expiresAt = String(formData.get("expiresAt") ?? "");
   const channels = formData.getAll("channels").map(String);
+  const references = parseReferences(formData);
   if (!productId || !claimText || !expiresAt) throw new Error("VALIDATION");
 
   if (id) {
@@ -579,6 +612,7 @@ export async function saveClaim(formData: FormData) {
       .set({
         productId,
         claimText,
+        references,
         channelScope: channels,
         expiresAt: new Date(expiresAt),
       })
@@ -599,6 +633,7 @@ export async function saveClaim(formData: FormData) {
         tenantId: user.tenantId,
         productId,
         claimText,
+        references,
         channelScope: channels,
         approvedBy: user.id,
         approvedAt: new Date(),

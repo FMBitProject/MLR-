@@ -86,6 +86,12 @@ export type WorkspaceData = {
     elementId: string | null;
     flaggedText: string;
     matchedClaimText: string | null;
+    matchedClaimRefs: Array<{
+      citation: string;
+      pmid?: string | null;
+      doi?: string | null;
+      url?: string | null;
+    }>;
     similarityScore: number | null;
     flagType: string;
     reviewerDecision: string | null;
@@ -784,6 +790,49 @@ export function ReviewWorkspace({
                             <span className="text-[11px] font-semibold text-slate-500">
                               {Math.round(f.similarityScore * 100)}% {dict.detail.similarity}
                             </span>
+                          </div>
+                        ) : null}
+                        {f.matchedClaimRefs.length ? (
+                          <div className="mt-2 border-t border-slate-100 pt-2">
+                            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">
+                              {dict.detail.supportingRefs}
+                            </p>
+                            {f.matchedClaimRefs.map((r, i) => (
+                              <p
+                                key={i}
+                                className="mt-1 text-[11.5px] leading-snug text-slate-500"
+                              >
+                                {r.citation}{" "}
+                                {r.pmid ? (
+                                  <a
+                                    href={`https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-semibold text-brand-700 hover:underline"
+                                  >
+                                    PMID {r.pmid}
+                                  </a>
+                                ) : r.doi ? (
+                                  <a
+                                    href={`https://doi.org/${r.doi}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-semibold text-brand-700 hover:underline"
+                                  >
+                                    DOI
+                                  </a>
+                                ) : r.url ? (
+                                  <a
+                                    href={r.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-semibold text-brand-700 hover:underline"
+                                  >
+                                    ↗
+                                  </a>
+                                ) : null}
+                              </p>
+                            ))}
                           </div>
                         ) : null}
                       </div>

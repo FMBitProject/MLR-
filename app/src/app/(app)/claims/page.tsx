@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm";
-import { BookCheck, TimerReset } from "lucide-react";
+import { BookCheck, BookMarked, TimerReset } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser, CLAIM_MANAGER_ROLES } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
@@ -109,6 +109,49 @@ export default async function ClaimsPage(props: PageProps<"/claims">) {
                       />
                     </div>
                   </div>
+                  {(claim.references ?? []).length ? (
+                    <ul className="mt-2 space-y-1">
+                      {(claim.references ?? []).map((r, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-1.5 text-[12px] leading-snug text-slate-500"
+                        >
+                          <BookMarked className="mt-0.5 size-3 shrink-0 text-brand-600/70" />
+                          <span>
+                            {r.citation}
+                            {r.pmid ? (
+                              <a
+                                href={`https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-1.5 font-semibold text-brand-700 hover:underline"
+                              >
+                                PMID {r.pmid}
+                              </a>
+                            ) : r.doi ? (
+                              <a
+                                href={`https://doi.org/${r.doi}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-1.5 font-semibold text-brand-700 hover:underline"
+                              >
+                                DOI
+                              </a>
+                            ) : r.url ? (
+                              <a
+                                href={r.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-1.5 font-semibold text-brand-700 hover:underline"
+                              >
+                                ↗
+                              </a>
+                            ) : null}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                   <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
                     <Chip tone="brand">{productName(claim.productId)}</Chip>
                     {claim.source ? (
@@ -145,6 +188,7 @@ export default async function ClaimsPage(props: PageProps<"/claims">) {
                             expiresAt: claim.expiresAt
                               ? claim.expiresAt.toISOString().slice(0, 10)
                               : "",
+                            references: claim.references ?? [],
                           }}
                         />
                         {claim.status === "active" ? (

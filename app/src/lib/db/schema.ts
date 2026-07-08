@@ -37,6 +37,15 @@ export const products = sqliteTable("products", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+// A supporting literature citation attached to an approved claim.
+// pmid links to PubMed, doi to doi.org; url covers data-on-file / other sources.
+export type ClaimReference = {
+  citation: string;
+  pmid?: string | null;
+  doi?: string | null;
+  url?: string | null;
+};
+
 export const approvedClaims = sqliteTable("approved_claims", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
@@ -44,6 +53,8 @@ export const approvedClaims = sqliteTable("approved_claims", {
   claimText: text("claim_text").notNull(),
   // Where the claim came from, e.g. "SOP-PROM-001.txt" for document imports
   source: text("source"),
+  // JSON array of supporting journal references ("refs" in SQL: REFERENCES is a keyword)
+  references: text("refs", { mode: "json" }).$type<ClaimReference[]>(),
   // JSON array, e.g. ["print","digital","hcp_only"]
   channelScope: text("channel_scope", { mode: "json" }).$type<string[]>(),
   approvedBy: text("approved_by").references(() => users.id),
