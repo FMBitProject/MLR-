@@ -20,7 +20,8 @@ import { runClaimsCheck } from "./claims-check";
 import { extractClaimCandidates } from "./claims-extract";
 import { lookupPubmed } from "./pubmed";
 import type { ClaimReference } from "./db/schema";
-import { renderTextPages, renderFilePlaceholderPage } from "./svg";
+import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
+import { extractPptxSlides, extractDocxParagraphs } from "./office";
 
 const UPLOAD_DIR = path.join(process.cwd(), ".data", "uploads");
 
@@ -82,7 +83,7 @@ function defaultAssignee(tenantId: string, role: string): string | null {
   return u?.id ?? null;
 }
 
-function createVersionWithPipeline(opts: {
+async function createVersionWithPipeline(opts: {
   tenantId: string;
   submissionId: string;
   productId: string;
@@ -91,7 +92,8 @@ function createVersionWithPipeline(opts: {
   subtitle: string;
   text: string | null;
   fileName: string | null;
-}): { versionId: string; flags: number } {
+  fileData: Buffer | null;
+}): Promise<{ versionId: string; flags: number }> {
   const versionId = crypto.randomUUID();
   db.insert(t.contentVersions)
     .values({
@@ -106,23 +108,18 @@ function createVersionWithPipeline(opts: {
     })
     .run();
 
-  if (opts.text) {
-    const paragraphs = opts.text
-      .split(/\n{2,}|\r\n{2,}/)
-      .flatMap((p) => p.split(/\n/))
-      .map((p) => p.trim())
-      .filter(Boolean);
-    const { pages, elements } = renderTextPages({
-      title: opts.title,
-      subtitle: opts.subtitle,
-      paragraphs,
-    });
+  let insertedPages = 0;
+  const insertRendered = (
+    pages: import("./svg").RenderedPage[],
+    elements: import("./svg").RenderedElement[],
+  ) => {
+    const offset = insertedPages;
     for (const p of pages) {
       db.insert(t.contentVersionPages)
         .values({
           id: crypto.randomUUID(),
           versionId,
-          pageNumber: p.pageNumber,
+          pageNumber: p.pageNumber + offset,
           renderedSvg: p.svg,
           width: p.width,
           height: p.height,
@@ -134,43 +131,97 @@ function createVersionWithPipeline(opts: {
         .values({
           id: crypto.randomUUID(),
           versionId,
-          pageNumber: el.pageNumber,
+          pageNumber: el.pageNumber + offset,
           elementType: el.elementType,
-          extractionMethod: "native_text",
+          extractionMethod: el.elementType === "image" ? "manual" : "native_text",
           extractedText: el.text,
           boundingBox: el.bbox,
+          requiresManualReview: el.elementType === "image",
         })
         .run();
     }
+    insertedPages += pages.length;
+  };
+
+  if (opts.text) {
+    const paragraphs = opts.text
+      .split(/\n{2,}|\r\n{2,}/)
+      .flatMap((p) => p.split(/\n/))
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const { pages, elements } = renderTextPages({
+      title: opts.title,
+      subtitle: opts.subtitle,
+      paragraphs,
+    });
+    insertRendered(pages, elements);
   }
 
   if (opts.fileName) {
-    const page = renderFilePlaceholderPage(opts.fileName, opts.title);
-    const pageNumber = opts.text
-      ? (db.select().from(t.contentVersionPages).where(eq(t.contentVersionPages.versionId, versionId)).all().length + 1)
-      : 1;
-    db.insert(t.contentVersionPages)
-      .values({
-        id: crypto.randomUUID(),
-        versionId,
-        pageNumber,
-        renderedSvg: page.svg,
-        width: page.width,
-        height: page.height,
-      })
-      .run();
-    db.insert(t.contentElements)
-      .values({
-        id: crypto.randomUUID(),
-        versionId,
-        pageNumber,
-        elementType: "image",
-        extractionMethod: "manual",
-        extractedText: null,
-        boundingBox: { x: 84, y: 200, width: 1072, height: 380 },
-        requiresManualReview: true,
-      })
-      .run();
+    // PPTX/DOCX are ZIPs of XML — extract every slide/paragraph so the whole
+    // deck gets review pages and the claims check. PDFs (and unreadable
+    // files) fall back to the placeholder + mandatory manual review.
+    const lower = opts.fileName.toLowerCase();
+    let rendered: {
+      pages: import("./svg").RenderedPage[];
+      elements: import("./svg").RenderedElement[];
+    } | null = null;
+    let extractedText: string | null = null;
+
+    if (opts.fileData && lower.endsWith(".pptx")) {
+      const slides = await extractPptxSlides(opts.fileData);
+      if (slides) {
+        rendered = renderSlidePages({ title: opts.title, slides });
+        extractedText = slides.map((s) => s.paragraphs.join("\n")).join("\n\n");
+      }
+    } else if (opts.fileData && lower.endsWith(".docx")) {
+      const paras = await extractDocxParagraphs(opts.fileData);
+      if (paras) {
+        rendered = renderTextPages({
+          title: opts.title,
+          subtitle: opts.subtitle,
+          paragraphs: paras,
+        });
+        extractedText = paras.join("\n\n");
+      }
+    }
+
+    if (rendered) {
+      insertRendered(rendered.pages, rendered.elements);
+      // Store extracted text so version diffs work for deck revisions too
+      if (!opts.text && extractedText) {
+        db.update(t.contentVersions)
+          .set({ textContent: extractedText })
+          .where(eq(t.contentVersions.id, versionId))
+          .run();
+      }
+    } else {
+      const page = renderFilePlaceholderPage(opts.fileName, opts.title);
+      const pageNumber = insertedPages + 1;
+      db.insert(t.contentVersionPages)
+        .values({
+          id: crypto.randomUUID(),
+          versionId,
+          pageNumber,
+          renderedSvg: page.svg,
+          width: page.width,
+          height: page.height,
+        })
+        .run();
+      db.insert(t.contentElements)
+        .values({
+          id: crypto.randomUUID(),
+          versionId,
+          pageNumber,
+          elementType: "image",
+          extractionMethod: "manual",
+          extractedText: null,
+          boundingBox: { x: 84, y: 200, width: 1072, height: 380 },
+          requiresManualReview: true,
+        })
+        .run();
+      insertedPages = pageNumber;
+    }
   }
 
   return { versionId, flags: 0 };
@@ -186,6 +237,10 @@ export async function createSubmission(formData: FormData) {
   const file = formData.get("file");
   const fileName =
     file instanceof File && file.size > 0 ? file.name : null;
+  const fileData =
+    file instanceof File && file.size > 0
+      ? Buffer.from(await file.arrayBuffer())
+      : null;
 
   if (!title || !productId || (!text && !fileName)) {
     throw new Error("VALIDATION");
@@ -229,7 +284,7 @@ export async function createSubmission(formData: FormData) {
       .run();
   });
 
-  const { versionId } = createVersionWithPipeline({
+  const { versionId } = await createVersionWithPipeline({
     tenantId: user.tenantId,
     submissionId,
     productId,
@@ -238,16 +293,14 @@ export async function createSubmission(formData: FormData) {
     subtitle: `${product.name} — ${channel}`,
     text,
     fileName,
+    fileData,
   });
 
   // Persist the original upload so the approved master can be downloaded later
   // (production: S3/R2 with versioned object keys)
-  if (file instanceof File && file.size > 0) {
+  if (fileData) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    fs.writeFileSync(
-      path.join(UPLOAD_DIR, versionId),
-      Buffer.from(await file.arrayBuffer()),
-    );
+    fs.writeFileSync(path.join(UPLOAD_DIR, versionId), fileData);
   }
 
   logAudit({
@@ -302,7 +355,7 @@ export async function resubmitVersion(formData: FormData) {
 
   const product = db.select().from(t.products).where(eq(t.products.id, sub.productId)).get();
 
-  const { versionId } = createVersionWithPipeline({
+  const { versionId } = await createVersionWithPipeline({
     tenantId: user.tenantId,
     submissionId,
     productId: sub.productId,
@@ -311,6 +364,7 @@ export async function resubmitVersion(formData: FormData) {
     subtitle: `${product?.name ?? ""} — ${sub.channel ?? ""} — v${nextVersion}`,
     text,
     fileName: null,
+    fileData: null,
   });
   db.update(t.contentVersions)
     .set({ changeNote })

@@ -101,6 +101,9 @@ export async function runClaimsCheck(opts: {
   for (const el of elements) {
     if (!el.extractedText || el.extractionMethod !== "native_text") continue;
     if (el.elementType === "footnote") continue;
+    // Skip fragments too short to be a claim (slide titles, "1x sehari", …)
+    // so full decks don't drown reviewers in meaningless no_match flags
+    if (tokenize(el.extractedText).length < 5) continue;
 
     let best: { id: string; score: number; text: string } | null = null;
     for (const c of claims) {
