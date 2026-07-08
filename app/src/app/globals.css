@@ -47,12 +47,18 @@ body {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* "none", not translateY(0): a retained transform would turn the page
+       wrapper into the containing block for position:fixed modals, trapping
+       their backdrop inside the content column instead of the viewport. */
+    transform: none;
   }
 }
 
 .animate-fade-up {
-  animation: fade-up 0.35s ease-out both;
+  /* No fill-mode: a retained fill value computes to an identity transform
+     matrix, which would make the element the containing block for
+     position:fixed descendants (modal backdrops would shrink to this box). */
+  animation: fade-up 0.35s ease-out;
 }
 
 @keyframes pulse-ring {

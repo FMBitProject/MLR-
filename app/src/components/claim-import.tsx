@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { FileScan, Sparkles, UploadCloud, X } from "lucide-react";
 import { extractClaimsFromDoc, importClaims, type ExtractState } from "@/lib/actions";
 import type { Dict } from "@/lib/i18n";
@@ -54,7 +55,9 @@ function ImportModal({
     "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10";
   const label = "mb-1.5 block text-[13px] font-medium text-slate-700";
 
-  return (
+  // Portal to <body>: keeps the fixed backdrop sized to the viewport even if
+  // an ancestor ever gains a transform/filter (which would trap it otherwise).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
       <div className="max-h-[90vh] w-full max-w-2xl animate-fade-up overflow-y-auto rounded-2xl bg-white p-6 shadow-pop">
         <div className="mb-1 flex items-center justify-between">
@@ -219,6 +222,7 @@ function ImportModal({
           )
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

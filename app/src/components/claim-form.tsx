@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { BookMarked, Plus, Search, X } from "lucide-react";
 import { saveClaim, lookupReference } from "@/lib/actions";
 import type { ClaimReference } from "@/lib/db/schema";
@@ -119,7 +120,9 @@ function ClaimModal({
     setManualOpen(false);
   };
 
-  return (
+  // Portal to <body>: keeps the fixed backdrop sized to the viewport even if
+  // an ancestor ever gains a transform/filter (which would trap it otherwise).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
       <div className="max-h-[90vh] w-full max-w-lg animate-fade-up overflow-y-auto rounded-2xl bg-white p-6 shadow-pop">
         <div className="mb-4 flex items-center justify-between">
@@ -328,6 +331,7 @@ function ClaimModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
