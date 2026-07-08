@@ -49,7 +49,9 @@ export async function extractPptxSlides(buf: Buffer): Promise<PptxSlide[] | null
       const paragraphs: string[] = [];
       for (const p of xml.matchAll(/<a:p(?:\s[^>]*)?>[\s\S]*?<\/a:p>/g)) {
         const text = paragraphsFrom(p[0], "a:t");
-        if (text) paragraphs.push(text);
+        // Drop layout noise (slide numbers, lone symbols) that would bloat
+        // the rendered pages without being reviewable content
+        if (text && text.length > 1 && !/^\d{1,4}$/.test(text)) paragraphs.push(text);
       }
       const hasMedia = /<a:blip\b|<p:pic\b|<c:chart\b|<p:graphicFrame\b|<mc:AlternateContent\b/.test(xml);
       slides.push({ paragraphs, hasMedia });

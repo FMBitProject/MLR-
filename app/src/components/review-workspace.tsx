@@ -163,9 +163,21 @@ export function ReviewWorkspace({
   }, [data.comments]);
 
   const selectedElement = data.elements.find((el) => el.id === selectedElementId) ?? null;
+  // On multi-page decks, scope the flag list to the open page so a 45-slide
+  // deck doesn't dump hundreds of flags into one list; small docs show all.
+  const scopeFlagsToPage = data.pages.length > 3;
+  const pageElementIds = useMemo(
+    () =>
+      new Set(
+        data.elements.filter((e) => e.pageNumber === pageNumber).map((e) => e.id),
+      ),
+    [data.elements, pageNumber],
+  );
   const visibleFlags = selectedElement
     ? data.flags.filter((f) => f.elementId === selectedElement.id)
-    : data.flags;
+    : scopeFlagsToPage
+      ? data.flags.filter((f) => !f.elementId || pageElementIds.has(f.elementId))
+      : data.flags;
   const visibleComments = selectedElement
     ? data.comments.filter((c) => c.elementId === selectedElement.id)
     : data.comments;
@@ -325,20 +337,25 @@ export function ReviewWorkspace({
         <div>
           <Card className="overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-              <div className="flex items-center gap-1.5">
+              <div className="flex max-h-[76px] flex-wrap items-center gap-1.5 overflow-y-auto pr-2">
                 {data.pages.map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setPageNumber(p.pageNumber)}
                     className={clsx(
-                      "rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition",
+                      "rounded-lg font-semibold transition",
+                      data.pages.length > 10
+                        ? "min-w-8 px-2 py-1 text-[12px]"
+                        : "px-3 py-1.5 text-[12.5px]",
                       p.pageNumber === pageNumber
                         ? "bg-brand-700 text-white shadow-sm"
                         : "text-slate-500 hover:bg-slate-100",
                     )}
                   >
-                    {dict.detail.page} {p.pageNumber}
+                    {data.pages.length > 10
+                      ? p.pageNumber
+                      : `${dict.detail.page} ${p.pageNumber}`}
                   </button>
                 ))}
               </div>
@@ -739,6 +756,9 @@ export function ReviewWorkspace({
                 </h3>
                 <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
                   {visibleFlags.length}
+                  {scopeFlagsToPage && !selectedElement
+                    ? ` / ${data.flags.length}`
+                    : ""}
                 </span>
               </div>
               <p className="mb-4 text-[12px] leading-relaxed text-slate-400">

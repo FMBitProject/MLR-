@@ -54,12 +54,12 @@ export function wrapText(text: string, maxChars = MAX_CHARS): string[] {
   return lines.length ? lines : [""];
 }
 
-function pageShell(inner: string, footer: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W}" height="${PAGE_H}" viewBox="0 0 ${PAGE_W} ${PAGE_H}" font-family="Georgia, 'Times New Roman', serif">
-<rect width="${PAGE_W}" height="${PAGE_H}" fill="#fdfcf9"/>
+function pageShell(inner: string, footer: string, height: number = PAGE_H): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_W}" height="${height}" viewBox="0 0 ${PAGE_W} ${height}" font-family="Georgia, 'Times New Roman', serif">
+<rect width="${PAGE_W}" height="${height}" fill="#fdfcf9"/>
 <rect x="0" y="0" width="${PAGE_W}" height="10" fill="#0f766e"/>
 ${inner}
-<text x="${MARGIN}" y="${PAGE_H - 34}" font-size="15" fill="#94a3b8" font-family="Arial, sans-serif">${footer}</text>
+<text x="${MARGIN}" y="${height - 34}" font-size="15" fill="#94a3b8" font-family="Arial, sans-serif">${footer}</text>
 </svg>`;
 }
 
@@ -131,10 +131,11 @@ export function renderTextPages(opts: {
 }
 
 /**
- * One page per deck slide: extracted text laid out with the first paragraph
- * as the slide title. Slides containing media get a dashed manual-review
- * strip (the text extractor cannot read pictures/charts). Overflowing slides
- * continue onto "Slide N (cont.)" pages.
+ * Exactly one page per deck slide — the page grows vertically to fit dense
+ * slides (the viewer scales by each page's own aspect ratio), so page N is
+ * always slide N. First paragraph renders as the slide title; slides
+ * containing media get a dashed manual-review strip since the text
+ * extractor cannot read pictures/charts.
  */
 export function renderSlidePages(opts: {
   title: string;
@@ -143,54 +144,32 @@ export function renderSlidePages(opts: {
   const pages: RenderedPage[] = [];
   const elements: RenderedElement[] = [];
   const BADGE_H = 64;
-  let pageNumber = 0;
+  // Denser metrics than the prose renderer: real decks carry many short bullets
+  const BODY_FONT = 18;
+  const BODY_LINE = 26;
+  const BODY_GAP = 14;
 
   for (let s = 0; s < opts.slides.length; s++) {
     const slide = opts.slides[s];
-    const slideNo = s + 1;
-    let cont = false;
-    let inner = "";
-    let cursorY = 0;
-
-    const startPage = () => {
-      pageNumber += 1;
-      cursorY = MARGIN + 8;
-      const label = `SLIDE ${slideNo}${cont ? " (CONT.)" : ""}`;
-      inner = `<text x="${MARGIN}" y="${cursorY}" font-size="16" letter-spacing="3" fill="#0f766e" font-family="Arial, sans-serif" font-weight="bold">${label}</text>\n`;
-      cursorY += 18;
-      inner += `<line x1="${MARGIN}" y1="${cursorY}" x2="${PAGE_W - MARGIN}" y2="${cursorY}" stroke="#e2e8f0" stroke-width="2"/>\n`;
-      cursorY += 52;
-    };
-
-    const flushPage = () => {
-      pages.push({
-        pageNumber,
-        svg: pageShell(inner, `${escapeXml(opts.title)} — slide ${slideNo}, page ${pageNumber}`),
-        width: PAGE_W,
-        height: PAGE_H,
-      });
-    };
-
-    startPage();
-    const bottomLimit = () => PAGE_H - MARGIN - (slide.hasMedia ? BADGE_H + 28 : 0);
+    const pageNumber = s + 1;
+    let cursorY = MARGIN + 8;
+    let inner = `<text x="${MARGIN}" y="${cursorY}" font-size="16" letter-spacing="3" fill="#0f766e" font-family="Arial, sans-serif" font-weight="bold">SLIDE ${pageNumber}</text>\n`;
+    cursorY += 18;
+    inner += `<line x1="${MARGIN}" y1="${cursorY}" x2="${PAGE_W - MARGIN}" y2="${cursorY}" stroke="#e2e8f0" stroke-width="2"/>\n`;
+    cursorY += 52;
 
     for (let i = 0; i < slide.paragraphs.length; i++) {
       const para = slide.paragraphs[i];
-      const isTitle = i === 0 && !cont;
-      const fontSize = isTitle ? 32 : FONT_SIZE;
-      const lineH = isTitle ? 46 : LINE_H;
-      const lines = wrapText(para, isTitle ? 58 : MAX_CHARS);
-      const blockH = lines.length * lineH + 8;
-      if (cursorY + blockH > bottomLimit()) {
-        flushPage();
-        cont = true;
-        startPage();
-      }
+      const isTitle = i === 0;
+      const fontSize = isTitle ? 27 : BODY_FONT;
+      const lineH = isTitle ? 38 : BODY_LINE;
+      const lines = wrapText(para, isTitle ? 68 : 104);
+      const blockH = lines.length * lineH + 6;
       const bbox: Bbox = {
         x: MARGIN - 12,
-        y: cursorY - 26,
+        y: cursorY - 22,
         width: PAGE_W - 2 * (MARGIN - 12),
-        height: blockH + 14,
+        height: blockH + 12,
       };
       let tspan = "";
       lines.forEach((ln, j) => {
@@ -198,11 +177,17 @@ export function renderSlidePages(opts: {
       });
       inner += `<text x="${MARGIN}" y="${cursorY}" font-size="${fontSize}"${isTitle ? ' font-weight="bold" fill="#0f172a"' : ' fill="#1e293b"'}>${tspan}</text>\n`;
       elements.push({ pageNumber, text: para, bbox, elementType: "text_block" });
-      cursorY += blockH + (isTitle ? BLOCK_GAP + 6 : BLOCK_GAP);
+      cursorY += blockH + (isTitle ? BODY_GAP + 10 : BODY_GAP);
     }
 
+    // Page height adapts to content; short slides keep the standard canvas
+    const pageH = Math.max(
+      PAGE_H,
+      cursorY + (slide.hasMedia ? BADGE_H + 24 : 0) + MARGIN,
+    );
+
     if (slide.hasMedia) {
-      const by = PAGE_H - MARGIN - BADGE_H;
+      const by = pageH - MARGIN - BADGE_H;
       inner += `<rect x="${MARGIN - 12}" y="${by}" width="620" height="${BADGE_H}" rx="12" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="2" stroke-dasharray="8 6"/>
 <text x="${MARGIN + 8}" y="${by + 27}" font-size="17" fill="#6d28d9" font-family="Arial, sans-serif" font-weight="bold">Contains images/charts not readable by text extraction</text>
 <text x="${MARGIN + 8}" y="${by + 50}" font-size="15" fill="#7c3aed" font-family="Arial, sans-serif">Review this slide manually in the original file.</text>\n`;
@@ -213,7 +198,13 @@ export function renderSlidePages(opts: {
         elementType: "image",
       });
     }
-    flushPage();
+
+    pages.push({
+      pageNumber,
+      svg: pageShell(inner, `${escapeXml(opts.title)} — slide ${pageNumber}`, pageH),
+      width: PAGE_W,
+      height: pageH,
+    });
   }
 
   return { pages, elements };
