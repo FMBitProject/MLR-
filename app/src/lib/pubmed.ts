@@ -48,6 +48,47 @@ type ESummaryDoc = {
   articleids?: Array<{ idtype?: string; value?: string }>;
 };
 
+/**
+ * Full text from PubMed Central for open-access articles — also free.
+ * PMID → PMCID via the id-converter, then efetch the article XML and strip
+ * tags. Returns null when the article isn't in PMC (paywalled journals).
+ */
+export async function fetchPmcFullText(pmid: string): Promise<string | null> {
+  try {
+    const conv = await getJson(
+      `https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/?ids=${encodeURIComponent(pmid)}&format=json`,
+    );
+    const records = conv?.records as Array<{ pmcid?: string }> | undefined;
+    const pmcid = records?.[0]?.pmcid;
+    if (!pmcid) return null;
+
+    const res = await fetch(
+      `${EUTILS}/efetch.fcgi?db=pmc&id=${encodeURIComponent(pmcid)}&retmode=xml`,
+      { signal: AbortSignal.timeout(15_000) },
+    );
+    if (!res.ok) return null;
+    const xml = await res.text();
+    // Only the article body (skip references list); fall back to whole doc
+    const body = xml.match(/<body[\s>][\s\S]*?<\/body>/)?.[0] ?? xml;
+    const text = body
+      .replace(/<!--[\s\S]*?-->/g, " ")
+      .replace(/<title(?:\s[^>]*)?>/g, "\n## ")
+      .replace(/<\/?(?:p|sec|table-wrap|caption|tr|li)(?:\s[^>]*)?>/g, "\n")
+      .replace(/<td(?:\s[^>]*)?>/g, " | ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    // A real body should be far longer than an abstract
+    return text.length > 2000 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Plain-text abstract of an article — also free via E-utilities efetch. */
 export async function fetchAbstract(pmid: string): Promise<string | null> {
   try {

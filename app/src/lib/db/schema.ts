@@ -38,12 +38,15 @@ export const products = sqliteTable("products", {
 });
 
 // A supporting literature citation attached to an approved claim.
-// pmid links to PubMed, doi to doi.org; url covers data-on-file / other sources.
+// pmid links to PubMed, doi to doi.org; url covers data-on-file / other
+// sources; docId points at an ingested full-text document (uploaded PDF)
+// in journal_documents so the AI can read the article body, not just cite it.
 export type ClaimReference = {
   citation: string;
   pmid?: string | null;
   doi?: string | null;
   url?: string | null;
+  docId?: string | null;
 };
 
 export const approvedClaims = sqliteTable("approved_claims", {
@@ -61,6 +64,21 @@ export const approvedClaims = sqliteTable("approved_claims", {
   approvedAt: integer("approved_at", { mode: "timestamp_ms" }),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
   status: text("status").notNull().default("active"), // active | expired | withdrawn
+});
+
+// Journal corpus for RAG substantiation: the readable text of every article
+// the tenant has provided (uploaded PDF) or that could be fetched free
+// (PubMed Central full text, else the PubMed abstract). Chunking/retrieval
+// happen at query time — at library scale a table of chunks is unnecessary.
+export const journalDocuments = sqliteTable("journal_documents", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  pmid: text("pmid"),
+  citation: text("citation").notNull(),
+  // pdf_upload | pmc_fulltext | pubmed_abstract
+  source: text("source").notNull(),
+  content: text("content").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
 export const contentSubmissions = sqliteTable("content_submissions", {

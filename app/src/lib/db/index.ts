@@ -78,6 +78,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
   entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, action TEXT NOT NULL,
   performed_by TEXT NOT NULL REFERENCES users(id), details TEXT, created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS journal_documents (
+  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  pmid TEXT, citation TEXT NOT NULL, source TEXT NOT NULL,
+  content TEXT NOT NULL, created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS workflow_templates (
   id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
   channel TEXT NOT NULL, stages TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'sequential'
