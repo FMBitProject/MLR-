@@ -665,9 +665,10 @@ export async function rerunClaimsCheck(formData: FormData) {
   revalidatePath("/", "layout");
 }
 
-// On-demand AI substantiation of a flag against the cited journal: fetches
-// the PubMed abstract (free) and, with ANTHROPIC_API_KEY, lets Claude judge
-// whether the copy stays within what the article reports. Assistive only.
+// On-demand AI substantiation of a flag against the product's library
+// journals: fetches PubMed abstracts (free) for the closest claims carrying a
+// PMID and lets the configured LLM judge whether any supports the copy — works
+// even when no claim lexically matched. Assistive only; the reviewer decides.
 export async function verifyFlagJournal(formData: FormData) {
   const user = await requireUser();
   const flagId = String(formData.get("flagId") ?? "");
@@ -675,24 +676,47 @@ export async function verifyFlagJournal(formData: FormData) {
   if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
 
   const flag = db.select().from(t.claimFlags).where(eq(t.claimFlags.id, flagId)).get();
-  if (!flag?.matchedClaimId) throw new Error("NOT_FOUND");
-  const claim = db
+  if (!flag) throw new Error("NOT_FOUND");
+
+  // Resolve the submission's product so we check against its claims library
+  const version = db
+    .select()
+    .from(t.contentVersions)
+    .where(eq(t.contentVersions.id, flag.versionId))
+    .get();
+  const sub = version
+    ? db
+        .select()
+        .from(t.contentSubmissions)
+        .where(
+          and(
+            eq(t.contentSubmissions.id, version.submissionId),
+            eq(t.contentSubmissions.tenantId, user.tenantId),
+          ),
+        )
+        .get()
+    : null;
+  if (!sub) throw new Error("NOT_FOUND");
+
+  // Every active claim's PMID-bearing reference becomes a candidate journal.
+  const claims = db
     .select()
     .from(t.approvedClaims)
     .where(
       and(
-        eq(t.approvedClaims.id, flag.matchedClaimId),
         eq(t.approvedClaims.tenantId, user.tenantId),
+        eq(t.approvedClaims.productId, sub.productId),
+        eq(t.approvedClaims.status, "active"),
       ),
     )
-    .get();
-  if (!claim) throw new Error("NOT_FOUND");
+    .all();
+  const candidates = claims.flatMap((c) =>
+    (c.references ?? [])
+      .filter((r) => r.pmid)
+      .map((r) => ({ pmid: r.pmid!, citation: r.citation, claimText: c.claimText })),
+  );
 
-  const result = await checkAgainstJournal({
-    flaggedText: flag.flaggedText,
-    claimText: claim.claimText,
-    references: claim.references ?? [],
-  });
+  const result = await checkAgainstJournal({ flaggedText: flag.flaggedText, candidates });
 
   db.update(t.claimFlags)
     .set(

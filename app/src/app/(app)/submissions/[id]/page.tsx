@@ -79,6 +79,23 @@ export default async function SubmissionDetailPage(
     ? db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, claimIds)).all()
     : [];
 
+  // Does this product's library carry any journal (PMID)? Drives whether the
+  // "check against journal" action is offered on flags — including no-match.
+  const productClaims = db
+    .select({ references: t.approvedClaims.references })
+    .from(t.approvedClaims)
+    .where(
+      and(
+        eq(t.approvedClaims.tenantId, user.tenantId),
+        eq(t.approvedClaims.productId, sub.productId),
+        eq(t.approvedClaims.status, "active"),
+      ),
+    )
+    .all();
+  const libraryHasJournals = productClaims.some((c) =>
+    (c.references ?? []).some((r) => r.pmid),
+  );
+
   const versionIds = versions.map((v) => v.id);
   const audit = db
     .select()
@@ -171,6 +188,7 @@ export default async function SubmissionDetailPage(
         fs.existsSync(path.join(process.cwd(), ".data", "uploads", version.id)),
     },
     diff,
+    libraryHasJournals,
     prevOpenComments,
     pages: pages.map((p) => ({
       id: p.id,
