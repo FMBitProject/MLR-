@@ -133,7 +133,7 @@ const dictionaries = {
         supported: "✓ Didukung isi jurnal",
         not_supported: "✗ Tidak didukung isi jurnal",
         unclear: "Abstrak tidak cukup untuk menilai — cek manual",
-        abstract_only: "Abstrak jurnal (set ANTHROPIC_API_KEY untuk penilaian AI)",
+        abstract_only: "Abstrak jurnal (set GROQ_API_KEY untuk penilaian AI otomatis)",
         unavailable: "Abstrak tidak tersedia di PubMed",
       },
       journalDisclaimer:
@@ -434,7 +434,7 @@ const dictionaries = {
         supported: "✓ Supported by the journal",
         not_supported: "✗ Not supported by the journal",
         unclear: "Abstract insufficient to judge — check manually",
-        abstract_only: "Journal abstract (set ANTHROPIC_API_KEY for AI verdict)",
+        abstract_only: "Journal abstract (set GROQ_API_KEY for an automatic AI verdict)",
         unavailable: "Abstract not available on PubMed",
       },
       journalDisclaimer:
