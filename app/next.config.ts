@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Self-contained server bundle for the Docker image (see app/Dockerfile)
-  output: "standalone",
+  // Standalone bundle only for the Docker image (Dockerfile sets BUILD_STANDALONE);
+  // plain `next start` is incompatible with it, so keep it off for local/dev runs.
+  output: process.env.BUILD_STANDALONE ? "standalone" : undefined,
   experimental: {
     serverActions: {
       // Uploaded decks (PPTX/PDF) far exceed the 1 MB default; the form caps

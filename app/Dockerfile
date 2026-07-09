@@ -11,7 +11,7 @@ FROM node:22-slim AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 BUILD_STANDALONE=1
 RUN npm run build
 
 FROM node:22-slim AS runner
