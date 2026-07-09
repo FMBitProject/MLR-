@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db, t } from "./db";
+import { llmComplete } from "./llm";
 
 // AI-assisted claims cross-check (PRD 9.4).
 // Role is strictly assistive flagging: compare extracted element text against the
@@ -38,34 +39,20 @@ export function similarity(a: string, b: string): number {
 const MATCH_THRESHOLD = 0.72; // above: consistent with library, no flag
 const RELATED_THRESHOLD = 0.35; // between: flag with closest claim for review
 
-async function refineWithClaude(
+async function refineWithLlm(
   flaggedText: string,
   claimText: string,
 ): Promise<"consistent" | "mismatch" | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  try {
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 256,
-      system:
-        "You compare pharmaceutical promotional copy against an approved claim. Answer with exactly one word: CONSISTENT if the copy stays within what the approved claim supports (same or weaker assertion), or MISMATCH if it exaggerates, broadens, or contradicts it. You never approve content; a human reviewer decides.",
-      messages: [
-        {
-          role: "user",
-          content: `Approved claim:\n"""${claimText}"""\n\nPromotional copy:\n"""${flaggedText}"""`,
-        },
-      ],
-    });
-    const block = response.content[0];
-    const text = block?.type === "text" ? block.text.trim().toUpperCase() : "";
-    if (text.includes("CONSISTENT")) return "consistent";
-    if (text.includes("MISMATCH")) return "mismatch";
-    return null;
-  } catch {
-    return null; // fall back silently to the lexical verdict
-  }
+  const raw = await llmComplete({
+    maxTokens: 256,
+    system:
+      "You compare pharmaceutical promotional copy against an approved claim. Answer with exactly one word: CONSISTENT if the copy stays within what the approved claim supports (same or weaker assertion), or MISMATCH if it exaggerates, broadens, or contradicts it. You never approve content; a human reviewer decides.",
+    user: `Approved claim:\n"""${claimText}"""\n\nPromotional copy:\n"""${flaggedText}"""`,
+  });
+  const text = (raw ?? "").trim().toUpperCase();
+  if (text.includes("CONSISTENT")) return "consistent";
+  if (text.includes("MISMATCH")) return "mismatch";
+  return null; // fall back silently to the lexical verdict
 }
 
 /**
@@ -122,9 +109,9 @@ export async function runClaimsCheck(opts: {
     let flagType: "matched" | "no_match" =
       best && best.score >= RELATED_THRESHOLD ? "matched" : "no_match";
 
-    // Borderline: let Claude Haiku take a second look (assistive only)
+    // Borderline: let the configured LLM take a second look (assistive only)
     if (best && flagType === "matched") {
-      const verdict = await refineWithClaude(el.extractedText, best.text);
+      const verdict = await refineWithLlm(el.extractedText, best.text);
       if (verdict === "consistent") continue;
       if (verdict === "mismatch") flagType = "matched"; // keep flag, human decides
     }

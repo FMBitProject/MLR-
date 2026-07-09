@@ -51,7 +51,28 @@ Halaman login menyediakan tombol quick-login untuk tiap persona.
 - **Workflow review terkonfigurasi** (§9.2) — urutan tahap per kanal diatur di Settings; routing otomatis ke tahap berikutnya saat disetujui, kembali ke marketing saat revisi/tolak.
 - **Review visual per halaman** (§9.7) — setiap versi dirender menjadi halaman SVG; elemen punya bounding box sehingga **flag AI dan komentar ter-pin tepat di posisinya** pada render halaman. Elemen chart/OCR rendah ditandai `requiresManualReview` dan disurface terpisah.
 - **Approved Claims Library** (§9.3) — CRUD klaim per produk dengan cakupan kanal, tanggal kedaluwarsa, peringatan "segera kedaluwarsa", dan aksi expire.
-- **AI-assisted claims check** (§9.4) — teks tiap elemen dibandingkan dengan klaim aktif produk. Default: cosine similarity leksikal yang transparan; jika `ANTHROPIC_API_KEY` di-set, kasus borderline diadili **Claude Haiku** (`claude-haiku-4-5`, sesuai §6). AI **hanya menandai** — keputusan (terima/abaikan/eskalasi) selalu aksi reviewer manusia dan tercatat di audit log.
+- **AI-assisted claims check** (§9.4) — teks tiap elemen dibandingkan dengan klaim aktif produk (termasuk teks sitasi jurnal yang terlampir). Default: cosine similarity leksikal yang transparan; jika sebuah provider AI di-set, kasus borderline diadili LLM. AI **hanya menandai** — keputusan (terima/abaikan/eskalasi) selalu aksi reviewer manusia dan tercatat di audit log.
+- **Substansiasi jurnal (AI)** — pada flag yang klaim terdekatnya punya PMID, reviewer bisa klik **"Cek terhadap Jurnal"**: abstrak ditarik gratis dari PubMed (efetch) lalu LLM menilai apakah copy didukung isi jurnal (didukung / tidak didukung / tidak jelas). Tanpa provider AI, abstraknya tetap ditampilkan inline.
+
+### Mengaktifkan AI (opsional, gratis)
+
+Fitur AI mati secara default (aplikasi jalan penuh dengan mesin leksikal). Untuk mengaktifkan, set **salah satu** environment variable — provider terdeteksi otomatis:
+
+| Provider | Env var | Biaya | Model default (override `AI_MODEL`) |
+|---|---|---|---|
+| **Groq** (disarankan) | `GROQ_API_KEY` | **Gratis** (tier gratis, tanpa kartu) | `llama-3.3-70b-versatile` |
+| xAI Grok | `XAI_API_KEY` | Berbayar (kredit) | `grok-3-mini` |
+| OpenAI | `OPENAI_API_KEY` | Berbayar | `gpt-4o-mini` |
+| Anthropic | `ANTHROPIC_API_KEY` | Berbayar | `claude-haiku-4-5` |
+| OpenAI-compatible lain | `AI_BASE_URL` + `AI_API_KEY` + `AI_MODEL` | — | — |
+
+Dapatkan kunci Groq gratis di `console.groq.com` → API Keys, lalu jalankan:
+
+```bash
+GROQ_API_KEY=gsk_... npm start -- -p 3000
+```
+
+Status provider aktif tampil di halaman **Settings**.
 - **Audit trail** (§9.5) — append-only, setiap aksi dicatat dengan user + timestamp + referensi versi; filter produk/rentang tanggal + **ekspor CSV** untuk inspeksi.
 - **Dashboard** (§9.6) — KPI, rata-rata waktu review per tahap dengan penanda bottleneck, klaim mendekati kedaluwarsa, aktivitas terbaru.
 - **Bilingual ID/EN** — toggle di topbar (cookie `NEXT_LOCALE`).
@@ -64,11 +85,11 @@ Halaman login menyediakan tombol quick-login untuk tiap persona.
 | Database | SQLite lokal (Drizzle ORM) | PostgreSQL Neon + pgvector (skema Drizzle identik secara struktur) |
 | Auth | Session cookie HMAC + scrypt | Better Auth |
 | Rendering/OCR | Layout teks → SVG sinkron; file upload jadi placeholder | LibreOffice/unoconv + OCR sebagai job async (Inngest/Trigger.dev) |
-| Claims matching | Cosine leksikal + opsi Claude Haiku | Embedding pgvector + Claude Haiku (eskalasi Sonnet) |
+| Claims matching | Cosine leksikal + opsi LLM (Groq/xAI/OpenAI/Anthropic) | Embedding pgvector + LLM (eskalasi model lebih besar) |
 | File storage | Metadata saja | Cloudflare R2 / S3 dengan versioned keys |
 | Billing/Analytics | — | Xendit, PostHog |
 
-Set `AUTH_SECRET` dan (opsional) `ANTHROPIC_API_KEY` melalui environment variable.
+Set `AUTH_SECRET` dan (opsional) kunci provider AI — mis. `GROQ_API_KEY` yang gratis — melalui environment variable.
 
 ## Catatan kepatuhan (PRD §11)
 

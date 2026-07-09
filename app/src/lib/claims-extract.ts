@@ -3,6 +3,8 @@
 // strictly propositional: the system only PROPOSES candidates — a human picks
 // which ones become approved claims (consistent with PRD §6 AI positioning).
 
+import { llmComplete } from "./llm";
+
 function heuristicCandidates(text: string): string[] {
   const sentences = text
     .split(/\n+|(?<=[.!?])\s+/)
@@ -25,21 +27,16 @@ function heuristicCandidates(text: string): string[] {
   return out;
 }
 
-async function claudeCandidates(text: string): Promise<string[] | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
+async function llmCandidates(text: string): Promise<string[] | null> {
+  const raw = await llmComplete({
+    maxTokens: 2048,
+    system:
+      'Extract product claims from a pharmaceutical SOP/label/reference document. A claim is a statement about a product\'s efficacy, safety, indication, dosing, or usage that promotional material might reference. Return ONLY a JSON array of strings, each a single self-contained claim in the document\'s original language, verbatim or minimally normalized. Maximum 20. If none, return []. Do not invent claims that are not in the document.',
+    user: text.slice(0, 30_000),
+  });
+  if (!raw) return null;
   try {
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const client = new Anthropic();
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 2048,
-      system:
-        'Extract product claims from a pharmaceutical SOP/label/reference document. A claim is a statement about a product\'s efficacy, safety, indication, dosing, or usage that promotional material might reference. Return ONLY a JSON array of strings, each a single self-contained claim in the document\'s original language, verbatim or minimally normalized. Maximum 20. If none, return []. Do not invent claims that are not in the document.',
-      messages: [{ role: "user", content: text.slice(0, 30_000) }],
-    });
-    const block = response.content[0];
-    if (block?.type !== "text") return null;
-    const match = block.text.match(/\[[\s\S]*\]/);
+    const match = raw.match(/\[[\s\S]*\]/);
     if (!match) return null;
     const arr = JSON.parse(match[0]);
     if (!Array.isArray(arr)) return null;
@@ -53,7 +50,8 @@ export async function extractClaimCandidates(text: string): Promise<{
   candidates: string[];
   engine: "claude" | "heuristic";
 }> {
-  const viaClaude = await claudeCandidates(text);
-  if (viaClaude && viaClaude.length) return { candidates: viaClaude, engine: "claude" };
+  const viaLlm = await llmCandidates(text);
+  // "claude" label kept for existing UI copy; it means "AI engine used"
+  if (viaLlm && viaLlm.length) return { candidates: viaLlm, engine: "claude" };
   return { candidates: heuristicCandidates(text), engine: "heuristic" };
 }

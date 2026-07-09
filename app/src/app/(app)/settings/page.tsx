@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { saveWorkflow } from "@/lib/actions";
+import { getLlmProvider } from "@/lib/llm";
 import { Avatar, Card, CardHeader, Chip, PageHeader } from "@/components/ui";
 
 const CHANNELS = ["print", "digital", "e-detail", "social"] as const;
@@ -24,7 +25,7 @@ export default async function SettingsPage() {
     .where(eq(t.workflowTemplates.tenantId, user.tenantId))
     .all();
 
-  const hasClaude = !!process.env.ANTHROPIC_API_KEY;
+  const aiProvider = getLlmProvider();
 
   return (
     <div className="animate-fade-up">
@@ -113,11 +114,11 @@ export default async function SettingsPage() {
             </div>
           </Card>
 
-          <Card className={hasClaude ? "border-emerald-200" : "border-amber-200"}>
+          <Card className={aiProvider ? "border-emerald-200" : "border-amber-200"}>
             <div className="flex items-start gap-3 px-6 py-4">
               <Sparkles
                 className={
-                  "mt-0.5 size-4 shrink-0 " + (hasClaude ? "text-emerald-500" : "text-amber-500")
+                  "mt-0.5 size-4 shrink-0 " + (aiProvider ? "text-emerald-500" : "text-amber-500")
                 }
               />
               <div>
@@ -125,7 +126,9 @@ export default async function SettingsPage() {
                   {dict.settings.aiProvider}
                 </p>
                 <p className="mt-0.5 text-[12.5px] text-slate-500">
-                  {hasClaude ? dict.settings.aiClaude : dict.settings.aiLocal}
+                  {aiProvider
+                    ? `${dict.settings.aiActive}: ${aiProvider.label} · ${aiProvider.model}`
+                    : dict.settings.aiLocal}
                 </p>
               </div>
             </div>
