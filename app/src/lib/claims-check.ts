@@ -107,7 +107,13 @@ export async function runClaimsCheck(opts: {
 
     let best: { id: string; score: number; text: string } | null = null;
     for (const c of claims) {
-      const score = similarity(el.extractedText, c.claimText);
+      // Match against the claim text AND its journal citations, so attaching a
+      // reference makes the article's own wording (drug names, trial names,
+      // indications) findable even when the claim text itself is terse.
+      let score = similarity(el.extractedText, c.claimText);
+      for (const ref of c.references ?? []) {
+        if (ref.citation) score = Math.max(score, similarity(el.extractedText, ref.citation));
+      }
       if (!best || score > best.score) best = { id: c.id, score, text: c.claimText };
     }
 
