@@ -12,8 +12,10 @@ import {
   destroySession,
   requireUser,
   verifyPassword,
+  hashPassword,
   REVIEWER_ROLES,
   CLAIM_MANAGER_ROLES,
+  SUBMITTER_ROLES,
 } from "./auth";
 import { logAudit } from "./audit";
 import { runClaimsCheck } from "./claims-check";
@@ -44,6 +46,71 @@ export async function login(_prev: { error: string } | null, formData: FormData)
     action: "logged_in",
     performedBy: user.id,
   });
+  redirect("/dashboard");
+}
+
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "workspace"
+  );
+}
+
+export async function register(
+  _prev: { error: string } | null,
+  formData: FormData,
+) {
+  const companyName = String(formData.get("companyName") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+
+  if (!companyName || !name || !email || password.length < 8) {
+    return { error: "validation" };
+  }
+  if (db.select().from(t.users).where(eq(t.users.email, email)).get()) {
+    return { error: "email_taken" };
+  }
+
+  const base = slugify(companyName);
+  let slug = base;
+  let n = 1;
+  while (db.select().from(t.tenants).where(eq(t.tenants.slug, slug)).get()) {
+    n += 1;
+    slug = `${base}-${n}`;
+  }
+
+  const tenantId = crypto.randomUUID();
+  const userId = crypto.randomUUID();
+
+  db.insert(t.tenants)
+    .values({ id: tenantId, name: companyName, slug, plan: "starter", createdAt: new Date() })
+    .run();
+  db.insert(t.users)
+    .values({
+      id: userId,
+      tenantId,
+      email,
+      name,
+      role: "super_admin",
+      passwordHash: hashPassword(password),
+      createdAt: new Date(),
+    })
+    .run();
+
+  logAudit({
+    tenantId,
+    entityType: "tenant",
+    entityId: tenantId,
+    action: "workspace_registered",
+    performedBy: userId,
+    details: { companyName, slug },
+  });
+
+  await createSession(userId);
   redirect("/dashboard");
 }
 
@@ -231,6 +298,9 @@ async function createVersionWithPipeline(opts: {
 
 export async function createSubmission(formData: FormData) {
   const user = await requireUser();
+  if (!SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number])) {
+    throw new Error("FORBIDDEN");
+  }
   const title = String(formData.get("title") ?? "").trim();
   const productId = String(formData.get("productId") ?? "");
   const channel = String(formData.get("channel") ?? "print");
@@ -330,6 +400,9 @@ export async function createSubmission(formData: FormData) {
 
 export async function resubmitVersion(formData: FormData) {
   const user = await requireUser();
+  if (!SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number])) {
+    throw new Error("FORBIDDEN");
+  }
   const submissionId = String(formData.get("submissionId") ?? "");
   const text = String(formData.get("text") ?? "").trim();
   const changeNote = String(formData.get("changeNote") ?? "").trim();
@@ -552,6 +625,16 @@ export async function addComment(formData: FormData) {
   const comment = String(formData.get("comment") ?? "").trim();
   if (!comment) throw new Error("VALIDATION");
 
+  const version = db
+    .select({ sub: t.contentSubmissions })
+    .from(t.contentVersions)
+    .innerJoin(t.contentSubmissions, eq(t.contentVersions.submissionId, t.contentSubmissions.id))
+    .where(
+      and(eq(t.contentVersions.id, versionId), eq(t.contentSubmissions.tenantId, user.tenantId)),
+    )
+    .get();
+  if (!version) throw new Error("NOT_FOUND");
+
   const id = crypto.randomUUID();
   db.insert(t.reviewComments)
     .values({
@@ -579,6 +662,18 @@ export async function addComment(formData: FormData) {
 export async function resolveComment(formData: FormData) {
   const user = await requireUser();
   const commentId = String(formData.get("commentId") ?? "");
+
+  const owned = db
+    .select({ id: t.reviewComments.id })
+    .from(t.reviewComments)
+    .innerJoin(t.contentVersions, eq(t.reviewComments.versionId, t.contentVersions.id))
+    .innerJoin(t.contentSubmissions, eq(t.contentVersions.submissionId, t.contentSubmissions.id))
+    .where(
+      and(eq(t.reviewComments.id, commentId), eq(t.contentSubmissions.tenantId, user.tenantId)),
+    )
+    .get();
+  if (!owned) throw new Error("NOT_FOUND");
+
   db.update(t.reviewComments)
     .set({ resolved: true })
     .where(eq(t.reviewComments.id, commentId))
@@ -602,6 +697,15 @@ export async function decideFlag(formData: FormData) {
   }
   const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
   if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
+
+  const owned = db
+    .select({ id: t.claimFlags.id })
+    .from(t.claimFlags)
+    .innerJoin(t.contentVersions, eq(t.claimFlags.versionId, t.contentVersions.id))
+    .innerJoin(t.contentSubmissions, eq(t.contentVersions.submissionId, t.contentSubmissions.id))
+    .where(and(eq(t.claimFlags.id, flagId), eq(t.contentSubmissions.tenantId, user.tenantId)))
+    .get();
+  if (!owned) throw new Error("NOT_FOUND");
 
   db.update(t.claimFlags)
     .set({ reviewerDecision: decision, decidedBy: user.id })
@@ -1028,6 +1132,60 @@ export async function saveWorkflow(formData: FormData) {
     action: "workflow_updated",
     performedBy: user.id,
     details: { stages },
+  });
+  revalidatePath("/settings");
+}
+
+const TEAMMATE_ROLES = [
+  "marketing",
+  "medical_reviewer",
+  "legal_reviewer",
+  "regulatory_reviewer",
+  "compliance_admin",
+  "super_admin",
+] as const;
+
+export async function createTeammate(formData: FormData) {
+  const user = await requireUser();
+  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const role = String(formData.get("role") ?? "");
+  const password = String(formData.get("password") ?? "");
+
+  if (
+    !name ||
+    !email ||
+    password.length < 8 ||
+    !TEAMMATE_ROLES.includes(role as (typeof TEAMMATE_ROLES)[number])
+  ) {
+    throw new Error("VALIDATION");
+  }
+  if (db.select().from(t.users).where(eq(t.users.email, email)).get()) {
+    throw new Error("EMAIL_TAKEN");
+  }
+
+  const teammateId = crypto.randomUUID();
+  db.insert(t.users)
+    .values({
+      id: teammateId,
+      tenantId: user.tenantId,
+      email,
+      name,
+      role,
+      passwordHash: hashPassword(password),
+      createdAt: new Date(),
+    })
+    .run();
+
+  logAudit({
+    tenantId: user.tenantId,
+    entityType: "user",
+    entityId: teammateId,
+    action: "teammate_added",
+    performedBy: user.id,
+    details: { email, role },
   });
   revalidatePath("/settings");
 }

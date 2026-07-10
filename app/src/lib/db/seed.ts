@@ -1,14 +1,9 @@
-import { randomBytes, scryptSync } from "node:crypto";
 import type { drizzle } from "drizzle-orm/better-sqlite3";
 import * as t from "./schema";
 import { renderTextPages } from "../svg";
+import { hashPassword } from "../auth";
 
 type DB = ReturnType<typeof drizzle<typeof t>>;
-
-export function hashPassword(password: string, salt?: string): string {
-  const s = salt ?? randomBytes(8).toString("hex");
-  return `${s}:${scryptSync(password, s, 32).toString("hex")}`;
-}
 
 const now = Date.now();
 const daysAgo = (n: number) => new Date(now - n * 86_400_000);

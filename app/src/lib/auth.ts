@@ -1,4 +1,4 @@
-import { createHmac, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
@@ -23,6 +23,10 @@ export const REVIEWER_ROLES: Role[] = [
   "regulatory_reviewer",
 ];
 
+// Who may create/upload content submissions. Medical/Legal/Regulatory
+// reviewers only review — they never author or upload content for review.
+export const SUBMITTER_ROLES: Role[] = ["marketing", "super_admin"];
+
 // Who may manage the Approved Claims Library (add/edit/import/expire).
 // Compliance/QA owns it per the PRD; Medical Reviewer co-manages since
 // medical affairs scientifically validates claims.
@@ -34,6 +38,11 @@ export const CLAIM_MANAGER_ROLES: Role[] = [
 
 function sign(value: string): string {
   return createHmac("sha256", SECRET).update(value).digest("hex");
+}
+
+export function hashPassword(password: string, salt?: string): string {
+  const s = salt ?? randomBytes(8).toString("hex");
+  return `${s}:${scryptSync(password, s, 32).toString("hex")}`;
 }
 
 export function verifyPassword(password: string, stored: string): boolean {

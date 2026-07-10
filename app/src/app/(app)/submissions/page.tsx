@@ -2,7 +2,7 @@ import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Plus, Inbox } from "lucide-react";
 import { db, t } from "@/lib/db";
-import { requireUser, REVIEWER_ROLES } from "@/lib/auth";
+import { requireUser, REVIEWER_ROLES, SUBMITTER_ROLES } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { relativeDays } from "@/lib/i18n";
 import { Avatar, Card, EmptyState, PageHeader, StatusBadge, Chip } from "@/components/ui";
@@ -55,6 +55,7 @@ export default async function SubmissionsPage(props: PageProps<"/submissions">) 
       .sort((a, b) => a.stageOrder - b.stageOrder);
 
   const isReviewer = REVIEWER_ROLES.includes(user.role as (typeof REVIEWER_ROLES)[number]);
+  const canSubmit = SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number]);
   const myQueue = isReviewer
     ? subs.filter(
         (s) => s.sub.status === "in_review" && s.sub.currentStage === user.role,
@@ -123,13 +124,15 @@ export default async function SubmissionsPage(props: PageProps<"/submissions">) 
         title={dict.submissions.title}
         subtitle={dict.submissions.subtitle}
         action={
-          <Link
-            href="/submissions/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99]"
-          >
-            <Plus className="size-4" />
-            {dict.submissions.newSubmission}
-          </Link>
+          canSubmit ? (
+            <Link
+              href="/submissions/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99]"
+            >
+              <Plus className="size-4" />
+              {dict.submissions.newSubmission}
+            </Link>
+          ) : undefined
         }
       />
 

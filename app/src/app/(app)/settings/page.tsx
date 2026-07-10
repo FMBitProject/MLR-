@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/i18n";
 import { saveWorkflow } from "@/lib/actions";
 import { getLlmProvider } from "@/lib/llm";
 import { Avatar, Card, CardHeader, Chip, PageHeader } from "@/components/ui";
+import { TeammateForm } from "@/components/teammate-form";
 
 const CHANNELS = ["print", "digital", "e-detail", "social"] as const;
 const ROLES = ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"] as const;
@@ -158,6 +159,12 @@ export default async function SettingsPage() {
                   </Chip>
                 </div>
               ))}
+            </div>
+            <div className="border-t border-slate-100">
+              <p className="px-6 pt-4 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">
+                {dict.settings.addTeammate}
+              </p>
+              <TeammateForm dict={dict} />
             </div>
           </Card>
 
