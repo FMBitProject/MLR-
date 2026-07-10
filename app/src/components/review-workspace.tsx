@@ -147,6 +147,7 @@ export function ReviewWorkspace({
   const [pageNumber, setPageNumber] = useState(data.pages[0]?.pageNumber ?? 1);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showResubmit, setShowResubmit] = useState(false);
+  const [decisionNote, setDecisionNote] = useState("");
   const [pending, startTransition] = useTransition();
 
   const page = data.pages.find((p) => p.pageNumber === pageNumber) ?? data.pages[0];
@@ -704,6 +705,8 @@ export function ReviewWorkspace({
                   <textarea
                     name="note"
                     rows={2}
+                    value={decisionNote}
+                    onChange={(e) => setDecisionNote(e.target.value)}
                     placeholder={dict.detail.decisionNote}
                     className={inputCls + " resize-none"}
                   />
@@ -728,8 +731,9 @@ export function ReviewWorkspace({
                     <button
                       name="decision"
                       value="changes_requested"
-                      disabled={pending}
-                      className="rounded-xl bg-amber-500 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-60"
+                      disabled={pending || !decisionNote.trim()}
+                      title={!decisionNote.trim() ? dict.detail.noteRequired : undefined}
+                      className="rounded-xl bg-amber-500 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
                       formNoValidate
                     >
                       {dict.detail.requestChanges}
@@ -737,8 +741,9 @@ export function ReviewWorkspace({
                     <button
                       name="decision"
                       value="rejected"
-                      disabled={pending}
-                      className="rounded-xl bg-rose-600 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-60"
+                      disabled={pending || !decisionNote.trim()}
+                      title={!decisionNote.trim() ? dict.detail.noteRequired : undefined}
+                      className="rounded-xl bg-rose-600 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
                       formNoValidate
                     >
                       {dict.detail.reject}
