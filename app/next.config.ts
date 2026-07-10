@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   // Standalone bundle only for the Docker image (Dockerfile sets BUILD_STANDALONE);
   // plain `next start` is incompatible with it, so keep it off for local/dev runs.
   output: process.env.BUILD_STANDALONE ? "standalone" : undefined,
+  // pdf-parse (pdfjs-dist) loads its worker + Node built-ins at runtime and
+  // breaks when bundled; keep it external so it's required from node_modules.
+  serverExternalPackages: ["pdf-parse"],
   experimental: {
     serverActions: {
       // Uploaded decks (PPTX/PDF) far exceed the 1 MB default; the form caps

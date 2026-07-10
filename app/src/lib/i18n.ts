@@ -137,7 +137,7 @@ const dictionaries = {
         unavailable: "Abstrak tidak tersedia di PubMed",
       },
       journalDisclaimer:
-        "Penilaian AI berdasarkan abstrak PubMed — asistif, keputusan tetap di reviewer.",
+        "Penilaian AI berdasarkan teks jurnal yang tersedia (PDF/PMC/abstrak) — asistif, keputusan tetap di reviewer.",
       rerunCheck: "Ulangi cek",
       rerunCheckHint:
         "Hitung ulang flag AI terhadap Claims Library terkini (dipakai setelah klaim di library diperbaiki).",
@@ -235,6 +235,12 @@ const dictionaries = {
       refUrl: "Tautan (opsional)",
       refAdd: "Tambah",
       refRemove: "Hapus referensi",
+      refUploadPdf: "Upload PDF jurnal (teks lengkap)",
+      refPdfUploading: "Membaca PDF…",
+      refPdfHint:
+        "PDF artikel berlisensi milik perusahaan — AI akan membaca isi lengkapnya (termasuk tabel) saat substansiasi. Artikel open-access terbaca otomatis dari PubMed Central tanpa upload.",
+      refPdfFailed: "PDF tidak terbaca — pastikan bukan hasil scan gambar, atau isi sitasi manual.",
+      refPdfFullText: "teks lengkap",
     },
     audit: {
       title: "Audit Trail",
@@ -260,6 +266,7 @@ const dictionaries = {
         flag_decided: "Memutuskan flag AI",
         journal_check_completed: "Cek jurnal AI selesai",
         claims_check_rerun: "Mengulang AI claims check",
+        journal_pdf_ingested: "Mengunggah PDF jurnal ke korpus",
         resubmitted: "Mengajukan versi baru",
         comment_resolved: "Menyelesaikan komentar",
         workflow_updated: "Mengubah alur review",
@@ -438,7 +445,7 @@ const dictionaries = {
         unavailable: "Abstract not available on PubMed",
       },
       journalDisclaimer:
-        "AI assessment is based on the PubMed abstract — assistive only; the reviewer decides.",
+        "AI assessment is based on the available journal text (PDF/PMC/abstract) — assistive only; the reviewer decides.",
       rerunCheck: "Re-run check",
       rerunCheckHint:
         "Recompute AI flags against the current Claims Library (use after fixing library claims).",
@@ -536,6 +543,12 @@ const dictionaries = {
       refUrl: "Link (optional)",
       refAdd: "Add",
       refRemove: "Remove reference",
+      refUploadPdf: "Upload journal PDF (full text)",
+      refPdfUploading: "Reading PDF…",
+      refPdfHint:
+        "The company's licensed article PDF — the AI reads its full text (tables included) during substantiation. Open-access articles are read automatically from PubMed Central without an upload.",
+      refPdfFailed: "Could not read the PDF — make sure it isn't a scanned image, or add a manual citation.",
+      refPdfFullText: "full text",
     },
     audit: {
       title: "Audit Trail",
@@ -561,6 +574,7 @@ const dictionaries = {
         flag_decided: "Decided AI flag",
         journal_check_completed: "AI journal check completed",
         claims_check_rerun: "Re-ran AI claims check",
+        journal_pdf_ingested: "Ingested journal PDF into corpus",
         resubmitted: "Submitted new version",
         comment_resolved: "Resolved comment",
         workflow_updated: "Updated workflow",

@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { BookMarked, Plus, Search, X } from "lucide-react";
-import { saveClaim, lookupReference } from "@/lib/actions";
+import { BookMarked, Plus, Search, UploadCloud, X } from "lucide-react";
+import { saveClaim, lookupReference, uploadJournalPdf } from "@/lib/actions";
 import type { ClaimReference } from "@/lib/db/schema";
 import type { Dict } from "@/lib/i18n";
 
@@ -120,6 +120,23 @@ function ClaimModal({
     setManualOpen(false);
   };
 
+  const [pdfUploading, startPdfUpload] = useTransition();
+  const [pdfError, setPdfError] = useState(false);
+  const onPdfPicked = (file: File | undefined) => {
+    if (!file || pdfUploading) return;
+    setPdfError(false);
+    startPdfUpload(async () => {
+      const fd = new FormData();
+      fd.set("file", file);
+      const res = await uploadJournalPdf(fd);
+      if ("docId" in res) {
+        setRefs((r) => [...r, { citation: res.citation, docId: res.docId }]);
+      } else {
+        setPdfError(true);
+      }
+    });
+  };
+
   // Portal to <body>: keeps the fixed backdrop sized to the viewport even if
   // an ancestor ever gains a transform/filter (which would trap it otherwise).
   return createPortal(
@@ -204,6 +221,11 @@ function ClaimModal({
                           PMID {r.pmid}
                         </span>
                       ) : null}
+                      {r.docId ? (
+                        <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">
+                          PDF · {dict.claims.refPdfFullText}
+                        </span>
+                      ) : null}
                     </span>
                     <button
                       type="button"
@@ -245,6 +267,24 @@ function ClaimModal({
             </div>
             {lookupFailed ? (
               <p className="mt-1.5 text-[11.5px] text-rose-600">{dict.claims.refNotFound}</p>
+            ) : null}
+            <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-violet-300 bg-violet-50/50 px-3 py-2 text-[12px] font-semibold text-violet-800 transition hover:bg-violet-50">
+              <UploadCloud className="size-4" />
+              {pdfUploading ? dict.claims.refPdfUploading : dict.claims.refUploadPdf}
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                className="hidden"
+                disabled={pdfUploading}
+                onChange={(e) => {
+                  onPdfPicked(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <p className="mt-1 text-[11px] text-slate-400">{dict.claims.refPdfHint}</p>
+            {pdfError ? (
+              <p className="mt-1 text-[11.5px] text-rose-600">{dict.claims.refPdfFailed}</p>
             ) : null}
             {manualOpen ? (
               <div className="mt-2 space-y-2 rounded-xl border border-dashed border-slate-300 p-3">

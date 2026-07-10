@@ -1,18 +1,24 @@
-// On-demand AI substantiation: does the flagged promotional copy stay within
-// what the journals in the Claims Library actually report? Works for ANY flag
-// (even those with no matching claim): it ranks every product claim that
-// carries a PMID, fetches those abstracts free from PubMed (efetch), and asks
-// the configured LLM whether any of them supports the copy — or whether the
-// reviewer should verify manually. Strictly assistive (PRD §6).
+// RAG substantiation: does the flagged promotional copy stay within what the
+// journals in the Claims Library actually report? Works for ANY flag (even
+// those with no matching claim). Pipeline per check:
+//   1. Gather every reference of the product's active claims (PMID or an
+//      uploaded-PDF docId).
+//   2. Let the LLM pick which cited articles plausibly relate (semantic —
+//      "Post-ACS" matches "after Acute Coronary Syndromes"); lexical fallback.
+//   3. Resolve those to corpus documents (uploaded PDF > free PMC full text >
+//      PubMed abstract) and retrieve the most relevant chunks.
+//   4. Judge the copy against the retrieved evidence; when the evidence
+//      doesn't cover the topic, answer UNCLEAR and remind the reviewer to
+//      verify manually. Strictly assistive (PRD §6).
 
-import { fetchAbstract } from "./pubmed";
 import { llmComplete } from "./llm";
 import { similarity } from "./claims-check";
+import { ensureJournalDocument, retrieveChunks, type JournalDoc } from "./journal-corpus";
+import type { ClaimReference } from "./db/schema";
 
 // One candidate journal drawn from a library claim's reference.
 export type JournalCandidate = {
-  pmid: string;
-  citation: string;
+  ref: ClaimReference;
   claimText: string;
 };
 
@@ -20,31 +26,28 @@ export type JournalCheckResult = {
   // supported | not_supported | unclear | abstract_only (no API key)
   verdict: string;
   note: string;
-  pmid: string;
+  pmid: string | null;
 } | null;
 
-const MAX_ARTICLES = 3; // cap PubMed fetches + prompt size per check
+const MAX_DOCS = 3; // documents resolved/fetched per check
+const MAX_CHUNKS = 6; // evidence chunks shown to the judge
 
-// Stage 1 — semantic selection: the LLM picks which cited articles could
-// plausibly substantiate the copy, from citations alone (cheap, no abstracts).
-// Lexical ranking fails on fragments like "n=18,144 · Post-ACS patients"
-// whose wording shares nothing with the right citation; the model knows that
-// "Post-ACS" and "after Acute Coronary Syndromes" are the same study domain.
-async function selectRelevantPmids(
+// Stage 2 — semantic selection from citations alone (cheap, no fetching).
+async function selectRelevant(
   flaggedText: string,
   candidates: JournalCandidate[],
-): Promise<string[] | null> {
+): Promise<number[] | null> {
   const list = candidates
     .map(
       (c, i) =>
-        `${i + 1}. PMID ${c.pmid} — ${c.citation} (approved claim: ${c.claimText.slice(0, 100)})`,
+        `${i + 1}. ${c.ref.citation}${c.ref.pmid ? ` [PMID ${c.ref.pmid}]` : " [uploaded PDF]"} (approved claim: ${c.claimText.slice(0, 100)})`,
     )
     .join("\n");
   const raw = await llmComplete({
     json: true,
-    maxTokens: 150,
+    maxTokens: 120,
     system:
-      'You select which cited journal articles most plausibly substantiate a piece of pharmaceutical promotional copy, judging from the citations (study names, populations, drugs, outcomes). Reply with JSON only: {"pmids":["..."]} — up to 3 PMIDs from the list ordered most-relevant first, or an empty array if none plausibly relate.',
+      'You select which cited journal articles most plausibly substantiate a piece of pharmaceutical promotional copy, judging from the citations (study names, populations, drugs, outcomes). Reply with JSON only: {"picks":[1,2]} — up to 3 list numbers ordered most-relevant first, or an empty array if none plausibly relate.',
     user: `Candidate citations:\n${list}\n\nPromotional copy:\n"""${flaggedText}"""`,
   });
   if (!raw) return null;
@@ -52,34 +55,40 @@ async function selectRelevantPmids(
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
     const parsed = JSON.parse(match[0]);
-    if (!Array.isArray(parsed.pmids)) return null;
-    const known = new Set(candidates.map((c) => c.pmid));
-    return parsed.pmids
-      .map((p: unknown) => String(p).replace(/\D/g, ""))
-      .filter((p: string) => known.has(p))
-      .slice(0, MAX_ARTICLES);
+    if (!Array.isArray(parsed.picks)) return null;
+    return parsed.picks
+      .map((n: unknown) => Number(n) - 1)
+      .filter((i: number) => Number.isInteger(i) && i >= 0 && i < candidates.length)
+      .slice(0, MAX_DOCS);
   } catch {
     return null;
   }
 }
 
+const SOURCE_LABEL: Record<string, string> = {
+  pdf_upload: "full text (uploaded PDF)",
+  pmc_fulltext: "full text (PubMed Central)",
+  pubmed_abstract: "abstract only",
+};
+
 async function judgeWithLlm(
   flaggedText: string,
-  articles: Array<{ pmid: string; citation: string; abstract: string }>,
-): Promise<{ verdict: string; note: string; pmid: string } | null> {
-  const journalsBlock = articles
-    .map(
-      (a, i) =>
-        `[Article ${i + 1} · PMID ${a.pmid}] ${a.citation}\nAbstract: ${a.abstract.slice(0, 3500)}`,
-    )
+  chunks: ReturnType<typeof retrieveChunks>,
+  docs: Map<string, JournalDoc>,
+): Promise<{ verdict: string; note: string; pmid: string | null } | null> {
+  const evidence = chunks
+    .map((ch, i) => {
+      const label = SOURCE_LABEL[ch.source] ?? ch.source;
+      return `[Excerpt ${i + 1} · ${ch.citation}${ch.pmid ? ` · PMID ${ch.pmid}` : ""} · ${label}]\n${ch.text}`;
+    })
     .join("\n\n");
 
   const text = await llmComplete({
     json: true,
     maxTokens: 350,
     system:
-      'You verify pharmaceutical promotional copy against candidate journal abstracts drawn from the approved claims library. Decide whether any provided article substantiates the copy. Reply with JSON only: {"verdict":"SUPPORTED|NOT_SUPPORTED|UNCLEAR","pmid":"<PMID of the most relevant article, or empty>","reason":"<one short sentence in Indonesian>"}. SUPPORTED = an article clearly reports the same or stronger evidence than the copy asserts (the copy stays within it). NOT_SUPPORTED = an article IS about this copy\'s topic but the copy exaggerates, broadens, or contradicts what it reports. UNCLEAR = none of the provided articles is actually about this copy\'s subject/study, or the abstract lacks the detail to judge — do NOT answer NOT_SUPPORTED merely because the right article is absent; answer UNCLEAR and your reason MUST remind the reviewer to locate and verify the correct source manually. You never approve content; a human reviewer decides.',
-    user: `Candidate journal articles:\n${journalsBlock}\n\nPromotional copy to verify:\n"""${flaggedText}"""`,
+      'You verify pharmaceutical promotional copy against excerpts retrieved from the cited journal articles (full text when available, otherwise abstracts). Reply with JSON only: {"verdict":"SUPPORTED|NOT_SUPPORTED|UNCLEAR","excerpt":<number of the decisive excerpt or 0>,"reason":"<one short sentence in Indonesian, quoting the key figure/finding when possible>"}. SUPPORTED = the excerpts clearly report the same or stronger evidence than the copy asserts. NOT_SUPPORTED = the excerpts cover this copy\'s topic but the copy exaggerates, broadens, or contradicts them. UNCLEAR = the excerpts are not about this copy\'s subject or lack the detail to judge — do NOT answer NOT_SUPPORTED merely because the right evidence is absent; answer UNCLEAR and your reason MUST remind the reviewer to verify against the correct source manually. You never approve content; a human reviewer decides.',
+    user: `Retrieved journal excerpts:\n${evidence}\n\nPromotional copy to verify:\n"""${flaggedText}"""`,
   });
   if (!text) return null;
   try {
@@ -88,9 +97,17 @@ async function judgeWithLlm(
     const parsed = JSON.parse(match[0]);
     const verdict = String(parsed.verdict ?? "").toLowerCase();
     if (!["supported", "not_supported", "unclear"].includes(verdict)) return null;
-    const cleanPmid = String(parsed.pmid ?? "").replace(/\D/g, "");
-    const pmid = articles.some((a) => a.pmid === cleanPmid) ? cleanPmid : articles[0].pmid;
-    return { verdict, note: String(parsed.reason ?? "").slice(0, 400), pmid };
+
+    const idx = Number(parsed.excerpt);
+    const decisive =
+      Number.isInteger(idx) && idx >= 1 && idx <= chunks.length ? chunks[idx - 1] : chunks[0];
+    const doc = docs.get(decisive.docId);
+    const sourceNote = doc ? ` (sumber: ${SOURCE_LABEL[doc.source] ?? doc.source})` : "";
+    return {
+      verdict,
+      note: String(parsed.reason ?? "").slice(0, 380) + sourceNote,
+      pmid: decisive.pmid,
+    };
   } catch {
     return null;
   }
@@ -98,52 +115,56 @@ async function judgeWithLlm(
 
 export async function checkAgainstJournal(opts: {
   flaggedText: string;
+  tenantId: string;
   candidates: JournalCandidate[];
 }): Promise<JournalCheckResult> {
-  if (!opts.candidates.length) return null;
+  // Deduplicate by identity (pmid or docId)
+  const seen = new Set<string>();
+  const unique = opts.candidates.filter((c) => {
+    const key = c.ref.docId ?? c.ref.pmid ?? "";
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!unique.length) return null;
 
-  // Deduplicate candidates by PMID (same article can back several claims).
-  const byPmid = new Map<string, JournalCandidate>();
-  for (const c of opts.candidates) if (!byPmid.has(c.pmid)) byPmid.set(c.pmid, c);
-  const unique = [...byPmid.values()];
+  // Pick relevant articles semantically; lexical fallback without an LLM.
+  const picked = await selectRelevant(opts.flaggedText, unique);
+  const order =
+    picked && picked.length
+      ? picked.map((i) => unique[i])
+      : [...unique]
+          .map((c) => ({
+            c,
+            score: Math.max(
+              similarity(opts.flaggedText, c.claimText),
+              similarity(opts.flaggedText, c.ref.citation),
+            ),
+          }))
+          .sort((a, b) => b.score - a.score)
+          .map((x) => x.c);
 
-  // Stage 1 — let the LLM pick the semantically relevant articles (handles
-  // "n=18,144 · Post-ACS" → "after Acute Coronary Syndromes"). Fall back to
-  // lexical ranking when no AI provider is configured.
-  const chosenPmids = await selectRelevantPmids(opts.flaggedText, unique);
-  let order: JournalCandidate[];
-  if (chosenPmids && chosenPmids.length) {
-    order = chosenPmids.map((p) => byPmid.get(p)!).filter(Boolean);
-  } else {
-    order = [...unique]
-      .map((c) => ({
-        c,
-        score: Math.max(
-          similarity(opts.flaggedText, c.claimText),
-          similarity(opts.flaggedText, c.citation),
-        ),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .map((x) => x.c);
-  }
-
-  const articles: Array<{ pmid: string; citation: string; abstract: string }> = [];
+  // Resolve to corpus documents (PDF > PMC full text > abstract), cached.
+  const docs = new Map<string, JournalDoc>();
   for (const c of order) {
-    if (articles.length >= MAX_ARTICLES) break;
-    const abstract = await fetchAbstract(c.pmid);
-    if (abstract) articles.push({ pmid: c.pmid, citation: c.citation, abstract });
+    if (docs.size >= MAX_DOCS) break;
+    const doc = await ensureJournalDocument(opts.tenantId, c.ref);
+    if (doc) docs.set(doc.id, doc);
   }
-  if (!articles.length) return null;
+  if (!docs.size) return null;
 
-  const judged = await judgeWithLlm(opts.flaggedText, articles);
+  const chunks = retrieveChunks(opts.flaggedText, [...docs.values()], MAX_CHUNKS);
+  if (!chunks.length) return null;
+
+  const judged = await judgeWithLlm(opts.flaggedText, chunks, docs);
   if (judged) return judged;
 
-  // No API key (or model unavailable): still valuable — surface the closest
-  // abstract inline so the reviewer can verify without leaving the app.
-  const top = articles[0];
+  // No AI provider: surface the best-matching excerpt so the reviewer can
+  // verify inline without leaving the app.
+  const top = chunks[0];
   return {
     verdict: "abstract_only",
-    note: top.abstract.replace(/\s+/g, " ").slice(0, 420),
+    note: top.text.replace(/\s+/g, " ").slice(0, 420),
     pmid: top.pmid,
   };
 }

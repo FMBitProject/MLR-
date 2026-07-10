@@ -93,7 +93,7 @@ export default async function SubmissionDetailPage(
     )
     .all();
   const libraryHasJournals = productClaims.some((c) =>
-    (c.references ?? []).some((r) => r.pmid),
+    (c.references ?? []).some((r) => r.pmid || r.docId),
   );
 
   const versionIds = versions.map((v) => v.id);

@@ -19,6 +19,7 @@ import { logAudit } from "./audit";
 import { runClaimsCheck } from "./claims-check";
 import { extractClaimCandidates } from "./claims-extract";
 import { lookupPubmed } from "./pubmed";
+import { llmComplete } from "./llm";
 import { checkAgainstJournal } from "./journal-check";
 import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
@@ -712,11 +713,15 @@ export async function verifyFlagJournal(formData: FormData) {
     .all();
   const candidates = claims.flatMap((c) =>
     (c.references ?? [])
-      .filter((r) => r.pmid)
-      .map((r) => ({ pmid: r.pmid!, citation: r.citation, claimText: c.claimText })),
+      .filter((r) => r.pmid || r.docId)
+      .map((r) => ({ ref: r, claimText: c.claimText })),
   );
 
-  const result = await checkAgainstJournal({ flaggedText: flag.flaggedText, candidates });
+  const result = await checkAgainstJournal({
+    flaggedText: flag.flaggedText,
+    tenantId: user.tenantId,
+    candidates,
+  });
 
   db.update(t.claimFlags)
     .set(
@@ -738,6 +743,70 @@ export async function verifyFlagJournal(formData: FormData) {
 }
 
 /* ------------------------------ claims ----------------------------- */
+
+// Ingest an uploaded journal PDF (the tenant's licensed copy) into the RAG
+// corpus so the AI can read the article's full text, tables included. The
+// citation line is derived by the LLM from the first page when available.
+export async function uploadJournalPdf(
+  formData: FormData,
+): Promise<{ docId: string; citation: string } | { error: string }> {
+  const user = await requireUser();
+  if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
+    throw new Error("FORBIDDEN");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "NO_FILE" };
+  if (file.size > 15 * 1024 * 1024) return { error: "TOO_LARGE" };
+
+  let content = "";
+  try {
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: new Uint8Array(await file.arrayBuffer()) });
+    const result = await parser.getText();
+    await parser.destroy();
+    content = String(result.text ?? "")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  } catch {
+    return { error: "PARSE_FAILED" };
+  }
+  if (content.length < 500) return { error: "PARSE_FAILED" };
+
+  // Ask the LLM for a proper citation line; fall back to the file name
+  let citation = file.name.replace(/\.pdf$/i, "");
+  const derived = await llmComplete({
+    maxTokens: 150,
+    system:
+      "Extract the bibliographic citation of this journal article from the beginning of its text. Reply with ONLY the citation in the form: Authors. Title. Journal. Year;Volume(Issue):Pages. If you cannot identify it, reply UNKNOWN.",
+    user: content.slice(0, 2500),
+  });
+  if (derived && !/UNKNOWN/i.test(derived) && derived.trim().length > 20) {
+    citation = derived.trim().replace(/\s+/g, " ").slice(0, 300);
+  }
+
+  const docId = crypto.randomUUID();
+  db.insert(t.journalDocuments)
+    .values({
+      id: docId,
+      tenantId: user.tenantId,
+      pmid: null,
+      citation,
+      source: "pdf_upload",
+      content,
+      createdAt: new Date(),
+    })
+    .run();
+  logAudit({
+    tenantId: user.tenantId,
+    entityType: "claim",
+    entityId: docId,
+    action: "journal_pdf_ingested",
+    performedBy: user.id,
+    details: { fileName: file.name, chars: content.length },
+  });
+  return { docId, citation };
+}
 
 // PubMed E-utilities lookup for the claim form: paste a PMID/DOI, get a
 // formatted citation back. Free NCBI service — no API key involved.
@@ -762,6 +831,7 @@ function parseReferences(formData: FormData): ClaimReference[] {
         pmid: typeof r.pmid === "string" && r.pmid ? r.pmid.slice(0, 20) : null,
         doi: typeof r.doi === "string" && r.doi ? r.doi.slice(0, 120) : null,
         url: typeof r.url === "string" && r.url ? r.url.slice(0, 500) : null,
+        docId: typeof r.docId === "string" && r.docId ? r.docId.slice(0, 40) : null,
       }))
       .slice(0, 10);
   } catch {
