@@ -1,13 +1,19 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { eq } from "drizzle-orm";
+import { db, t } from "./db";
 
-// Object storage for uploaded content files, behind a driver interface so the
-// app code never touches the filesystem or S3 directly.
+// Storage for uploaded content files, behind a driver interface so the app
+// code never touches the filesystem or database column directly.
 //
-//   STORAGE_DRIVER=local  -> .data/uploads/<key> (dev; ephemeral on Vercel)
-//   STORAGE_DRIVER=s3     -> S3 / Cloudflare R2 (production)
+//   STORAGE_DRIVER=local  -> .data/uploads/<key> (ephemeral; local dev only —
+//                             never durable on Vercel's serverless filesystem)
+//   STORAGE_DRIVER=db     -> Postgres bytea column on content_versions (default;
+//                             files are capped at 20MB client-side, so storing
+//                             them inline avoids needing a separate object
+//                             storage account)
 //
-// Keys are opaque strings (we use the content version id).
+// Keys are content version ids.
 
 export interface Storage {
   put(key: string, data: Buffer, contentType?: string): Promise<void>;
@@ -39,70 +45,31 @@ const localStorage: Storage = {
   },
 };
 
-function createS3Storage(): Storage {
-  const bucket = process.env.S3_BUCKET;
-  if (!bucket) throw new Error("STORAGE_DRIVER=s3 but S3_BUCKET is not set");
+// key == content version id. put() is only ever called right after the
+// version row is inserted (see createVersionWithPipeline), so an update here
+// is safe — the row always already exists.
+const dbStorage: Storage = {
+  async put(key, data) {
+    await db.update(t.contentVersions).set({ fileData: data }).where(eq(t.contentVersions.id, key));
+  },
+  async get(key) {
+    const row = (
+      await db
+        .select({ fileData: t.contentVersions.fileData })
+        .from(t.contentVersions)
+        .where(eq(t.contentVersions.id, key))
+    )[0];
+    return row?.fileData ?? null;
+  },
+  async exists(key) {
+    const row = (
+      await db
+        .select({ fileData: t.contentVersions.fileData })
+        .from(t.contentVersions)
+        .where(eq(t.contentVersions.id, key))
+    )[0];
+    return !!row?.fileData;
+  },
+};
 
-  // Imported lazily so the local driver never pulls in the AWS SDK.
-  type S3Module = typeof import("@aws-sdk/client-s3");
-  let clientPromise: Promise<{ mod: S3Module; client: InstanceType<S3Module["S3Client"]> }> | null =
-    null;
-  const load = () => {
-    clientPromise ??= import("@aws-sdk/client-s3").then((mod) => ({
-      mod,
-      client: new mod.S3Client({
-        region: process.env.S3_REGION ?? "auto",
-        endpoint: process.env.S3_ENDPOINT, // e.g. R2: https://<acct>.r2.cloudflarestorage.com
-        credentials:
-          process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
-            ? {
-                accessKeyId: process.env.S3_ACCESS_KEY_ID,
-                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-              }
-            : undefined,
-      }),
-    }));
-    return clientPromise;
-  };
-
-  const keyFor = (key: string) => `${process.env.S3_PREFIX ?? "uploads"}/${key}`;
-
-  return {
-    async put(key, data, contentType) {
-      const { mod, client } = await load();
-      await client.send(
-        new mod.PutObjectCommand({
-          Bucket: bucket,
-          Key: keyFor(key),
-          Body: data,
-          ContentType: contentType,
-        }),
-      );
-    },
-    async get(key) {
-      const { mod, client } = await load();
-      try {
-        const res = await client.send(
-          new mod.GetObjectCommand({ Bucket: bucket, Key: keyFor(key) }),
-        );
-        const bytes = await res.Body?.transformToByteArray();
-        return bytes ? Buffer.from(bytes) : null;
-      } catch (e) {
-        if ((e as { name?: string }).name === "NoSuchKey") return null;
-        throw e;
-      }
-    },
-    async exists(key) {
-      const { mod, client } = await load();
-      try {
-        await client.send(new mod.HeadObjectCommand({ Bucket: bucket, Key: keyFor(key) }));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-  };
-}
-
-export const storage: Storage =
-  process.env.STORAGE_DRIVER === "s3" ? createS3Storage() : localStorage;
+export const storage: Storage = process.env.STORAGE_DRIVER === "local" ? localStorage : dbStorage;

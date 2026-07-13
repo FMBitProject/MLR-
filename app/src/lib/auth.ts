@@ -7,6 +7,16 @@ import { hashPassword, verifyPassword } from "./password";
 
 export { hashPassword, verifyPassword };
 
+// Fails fast in production if AUTH_SECRET is missing — silently falling back
+// to a hardcoded value would let anyone who's read this (public) repo forge
+// a valid session cookie for any user. Dev keeps the fallback for friction-free
+// `npm run dev` with no env setup.
+if (!process.env.AUTH_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error(
+    "AUTH_SECRET is not set. Generate one with `openssl rand -hex 32` and " +
+      "set it in your deployment's environment variables.",
+  );
+}
 const SECRET = process.env.AUTH_SECRET ?? "mlr-demo-secret-change-in-production";
 const COOKIE = "mlr_session";
 

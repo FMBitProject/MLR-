@@ -6,7 +6,13 @@ import {
   boolean,
   jsonb,
   timestamp,
+  customType,
 } from "drizzle-orm/pg-core";
+
+// Postgres bytea — drizzle-orm's pg-core has no built-in binary column type.
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 // Multi-tenant: every table carries tenantId (directly or via its parent).
 // Runs on Postgres (Neon in production, local Postgres in dev) via the
@@ -104,6 +110,10 @@ export const contentVersions = pgTable("content_versions", {
   submissionId: text("submission_id").notNull().references(() => contentSubmissions.id),
   versionNumber: integer("version_number").notNull(),
   fileName: text("file_name"),
+  // The original uploaded file (PPTX/PDF/DOCX), stored inline — content is
+  // capped at 20MB client-side, so Postgres bytea avoids needing a separate
+  // object storage service. See src/lib/storage.ts.
+  fileData: bytea("file_data"),
   textContent: text("text_content"),
   // Mandatory summary of what changed, required from v2 onward
   changeNote: text("change_note"),

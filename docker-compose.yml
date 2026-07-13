@@ -32,9 +32,8 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgres://mlr:${POSTGRES_PASSWORD:-mlr}@postgres:5432/mlr
-      # Uploaded files: local disk (persisted in the mlr-data volume below).
-      # For cloud storage set STORAGE_DRIVER=s3 + the S3_* vars (see app/.env.example).
-      STORAGE_DRIVER: local
+      # Uploaded files are stored inline in Postgres (default "db" driver) —
+      # persisted in the mlr-pgdata volume above, no separate volume needed.
       # Ganti dengan secret acak Anda sendiri di produksi:
       #   openssl rand -hex 32
       AUTH_SECRET: ${AUTH_SECRET:-mlr-demo-secret-change-in-production}
@@ -44,9 +43,6 @@ services:
       XAI_API_KEY: ${XAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-}
-    volumes:
-      # Uploaded content files persist here (local storage driver)
-      - mlr-data:/app/.data
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -54,4 +50,3 @@ services:
 
 volumes:
   mlr-pgdata:
-  mlr-data:
