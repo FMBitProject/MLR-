@@ -18,13 +18,12 @@ export default async function AuditPage(props: PageProps<"/audit">) {
   const to =
     typeof sp.to === "string" && sp.to ? new Date(new Date(sp.to).getTime() + 86_399_000) : null;
 
-  const products = db
+  const products = await db
     .select({ id: t.products.id, name: t.products.name })
     .from(t.products)
-    .where(eq(t.products.tenantId, user.tenantId))
-    .all();
+    .where(eq(t.products.tenantId, user.tenantId));
 
-  const rows = queryAudit({ tenantId: user.tenantId, productId, from, to }).slice(0, 200);
+  const rows = (await queryAudit({ tenantId: user.tenantId, productId, from, to })).slice(0, 200);
 
   const exportUrl = `/audit/export?product=${productId ?? ""}&from=${
     typeof sp.from === "string" ? sp.from : ""

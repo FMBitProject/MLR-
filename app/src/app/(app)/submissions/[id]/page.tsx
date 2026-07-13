@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import fs from "node:fs";
-import path from "node:path";
+import { storage } from "@/lib/storage";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
@@ -16,72 +15,65 @@ export default async function SubmissionDetailPage(
   const { id } = await props.params;
   const sp = await props.searchParams;
 
-  const sub = db
+  const sub = (await db
     .select()
     .from(t.contentSubmissions)
     .where(
       and(eq(t.contentSubmissions.id, id), eq(t.contentSubmissions.tenantId, user.tenantId)),
     )
-    .get();
+    )[0];
   if (!sub) notFound();
 
-  const product = db.select().from(t.products).where(eq(t.products.id, sub.productId)).get();
-  const tenantUsers = db
+  const product = (await db.select().from(t.products).where(eq(t.products.id, sub.productId)))[0];
+  const tenantUsers = await db
     .select()
     .from(t.users)
-    .where(eq(t.users.tenantId, user.tenantId))
-    .all();
+    .where(eq(t.users.tenantId, user.tenantId));
   const userName = (uid: string | null) =>
     tenantUsers.find((u) => u.id === uid)?.name ?? "—";
 
-  const versions = db
+  const versions = await db
     .select()
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, sub.id))
-    .orderBy(asc(t.contentVersions.versionNumber))
-    .all();
+    .orderBy(asc(t.contentVersions.versionNumber));
   const requestedV = typeof sp.v === "string" ? Number(sp.v) : NaN;
   const version =
     versions.find((v) => v.versionNumber === requestedV) ?? versions[versions.length - 1];
   const isLatest = version.id === versions[versions.length - 1].id;
 
-  const pages = db
+  const pages = await db
     .select()
     .from(t.contentVersionPages)
     .where(eq(t.contentVersionPages.versionId, version.id))
-    .orderBy(asc(t.contentVersionPages.pageNumber))
-    .all();
-  const elements = db
+    .orderBy(asc(t.contentVersionPages.pageNumber));
+  const elements = await db
     .select()
     .from(t.contentElements)
-    .where(eq(t.contentElements.versionId, version.id))
-    .all();
-  const flags = db
+    .where(eq(t.contentElements.versionId, version.id));
+  const flags = await db
     .select()
     .from(t.claimFlags)
-    .where(eq(t.claimFlags.versionId, version.id))
-    .all();
-  const comments = db
+    .where(eq(t.claimFlags.versionId, version.id));
+  const comments = await db
     .select()
     .from(t.reviewComments)
     .where(eq(t.reviewComments.versionId, version.id))
-    .orderBy(asc(t.reviewComments.createdAt))
-    .all();
-  const stages = db
+    .orderBy(asc(t.reviewComments.createdAt));
+  const stages = await db
     .select()
     .from(t.reviewStages)
     .where(eq(t.reviewStages.submissionId, sub.id))
-    .orderBy(asc(t.reviewStages.stageOrder))
-    .all();
+    .orderBy(asc(t.reviewStages.stageOrder));
 
   const claimIds = flags.map((f) => f.matchedClaimId).filter((x): x is string => !!x);
   const claims = claimIds.length
-    ? db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, claimIds)).all()
+    ? await db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, claimIds))
     : [];
 
   // Does this product's library carry any journal (PMID)? Drives whether the
   // "check against journal" action is offered on flags — including no-match.
-  const productClaims = db
+  const productClaims = await db
     .select({ references: t.approvedClaims.references })
     .from(t.approvedClaims)
     .where(
@@ -90,19 +82,19 @@ export default async function SubmissionDetailPage(
         eq(t.approvedClaims.productId, sub.productId),
         eq(t.approvedClaims.status, "active"),
       ),
-    )
-    .all();
+    );
   const libraryHasJournals = productClaims.some((c) =>
     (c.references ?? []).some((r) => r.pmid || r.docId),
   );
 
   const versionIds = versions.map((v) => v.id);
-  const audit = db
-    .select()
-    .from(t.auditLog)
-    .where(eq(t.auditLog.tenantId, user.tenantId))
-    .orderBy(desc(t.auditLog.createdAt))
-    .all()
+  const audit = (
+    await db
+      .select()
+      .from(t.auditLog)
+      .where(eq(t.auditLog.tenantId, user.tenantId))
+      .orderBy(desc(t.auditLog.createdAt))
+  )
     .filter((a) => a.entityId === sub.id || versionIds.includes(a.entityId))
     .slice(0, 12);
 
@@ -117,32 +109,35 @@ export default async function SubmissionDetailPage(
   // Open comments from all versions before the one being viewed, with the
   // element text they were pinned to (elements belong to their own version).
   const priorVersionIds = versions.slice(0, versionIdx).map((v) => v.id);
-  const prevOpenComments = priorVersionIds.length
-    ? db
-        .select()
-        .from(t.reviewComments)
-        .where(inArray(t.reviewComments.versionId, priorVersionIds))
-        .all()
-        .filter((c) => !c.resolved)
-        .map((c) => {
-          const el = c.elementId
-            ? db
-                .select()
-                .from(t.contentElements)
-                .where(eq(t.contentElements.id, c.elementId))
-                .get()
-            : null;
-          const v = versions.find((x) => x.id === c.versionId);
-          return {
-            id: c.id,
-            reviewerName: userName(c.reviewerId),
-            comment: c.comment,
-            createdAt: c.createdAt.getTime(),
-            versionNumber: v?.versionNumber ?? 0,
-            elementText: el?.extractedText ?? null,
-          };
-        })
+  const priorComments = priorVersionIds.length
+    ? (
+        await db
+          .select()
+          .from(t.reviewComments)
+          .where(inArray(t.reviewComments.versionId, priorVersionIds))
+      ).filter((c) => !c.resolved)
     : [];
+  const prevOpenComments = await Promise.all(
+    priorComments.map(async (c) => {
+      const el = c.elementId
+        ? (
+            await db
+              .select()
+              .from(t.contentElements)
+              .where(eq(t.contentElements.id, c.elementId))
+          )[0]
+        : null;
+      const v = versions.find((x) => x.id === c.versionId);
+      return {
+        id: c.id,
+        reviewerName: userName(c.reviewerId),
+        comment: c.comment,
+        createdAt: c.createdAt.getTime(),
+        versionNumber: v?.versionNumber ?? 0,
+        elementText: el?.extractedText ?? null,
+      };
+    }),
+  );
 
   const activeStage = stages.find((s) => s.status === "in_progress");
   const canReview =
@@ -183,9 +178,7 @@ export default async function SubmissionDetailPage(
       processingStatus: version.processingStatus,
       changeNote: version.changeNote,
       fileName: version.fileName,
-      hasOriginalFile:
-        !!version.fileName &&
-        fs.existsSync(path.join(process.cwd(), ".data", "uploads", version.id)),
+      hasOriginalFile: !!version.fileName && (await storage.exists(version.id)),
     },
     diff,
     libraryHasJournals,

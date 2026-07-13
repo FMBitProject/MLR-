@@ -1,9 +1,40 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mlr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlr}
+      POSTGRES_DB: mlr
+    volumes:
+      - mlr-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlr -d mlr"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # One-shot: apply migrations + seed demo data, then exit. The app waits for it.
+  migrate:
+    build:
+      context: ./app
+      target: build
+    environment:
+      DATABASE_URL: postgres://mlr:${POSTGRES_PASSWORD:-mlr}@postgres:5432/mlr
+    command: sh -c "npm run db:migrate && npm run db:seed"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   mlr-flow:
     build: ./app
     ports:
       - "3000:3000"
     environment:
+      DATABASE_URL: postgres://mlr:${POSTGRES_PASSWORD:-mlr}@postgres:5432/mlr
+      # Uploaded files: local disk (persisted in the mlr-data volume below).
+      # For cloud storage set STORAGE_DRIVER=s3 + the S3_* vars (see app/.env.example).
+      STORAGE_DRIVER: local
       # Ganti dengan secret acak Anda sendiri di produksi:
       #   openssl rand -hex 32
       AUTH_SECRET: ${AUTH_SECRET:-mlr-demo-secret-change-in-production}
@@ -14,9 +45,13 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-}
     volumes:
-      # Database SQLite + file upload bertahan di volume ini
+      # Uploaded content files persist here (local storage driver)
       - mlr-data:/app/.data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
+  mlr-pgdata:
   mlr-data:

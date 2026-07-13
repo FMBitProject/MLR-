@@ -4,9 +4,9 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import fs from "node:fs";
-import path from "node:path";
 import { db, t } from "./db";
+import { storage } from "./storage";
+import { mimeForFileName } from "./mime";
 import {
   createSession,
   destroySession,
@@ -27,19 +27,17 @@ import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
 
-const UPLOAD_DIR = path.join(process.cwd(), ".data", "uploads");
-
 /* ----------------------------- session ----------------------------- */
 
 export async function login(_prev: { error: string } | null, formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const user = db.select().from(t.users).where(eq(t.users.email, email)).get();
+  const user = (await db.select().from(t.users).where(eq(t.users.email, email)))[0];
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return { error: "invalid" };
   }
   await createSession(user.id);
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "user",
     entityId: user.id,
@@ -71,14 +69,14 @@ export async function register(
   if (!companyName || !name || !email || password.length < 8) {
     return { error: "validation" };
   }
-  if (db.select().from(t.users).where(eq(t.users.email, email)).get()) {
+  if ((await db.select().from(t.users).where(eq(t.users.email, email)))[0]) {
     return { error: "email_taken" };
   }
 
   const base = slugify(companyName);
   let slug = base;
   let n = 1;
-  while (db.select().from(t.tenants).where(eq(t.tenants.slug, slug)).get()) {
+  while ((await db.select().from(t.tenants).where(eq(t.tenants.slug, slug)))[0]) {
     n += 1;
     slug = `${base}-${n}`;
   }
@@ -86,10 +84,9 @@ export async function register(
   const tenantId = crypto.randomUUID();
   const userId = crypto.randomUUID();
 
-  db.insert(t.tenants)
-    .values({ id: tenantId, name: companyName, slug, plan: "starter", createdAt: new Date() })
-    .run();
-  db.insert(t.users)
+  await db.insert(t.tenants)
+    .values({ id: tenantId, name: companyName, slug, plan: "starter", createdAt: new Date() });
+  await db.insert(t.users)
     .values({
       id: userId,
       tenantId,
@@ -98,10 +95,9 @@ export async function register(
       role: "super_admin",
       passwordHash: hashPassword(password),
       createdAt: new Date(),
-    })
-    .run();
+    });
 
-  logAudit({
+  await logAudit({
     tenantId,
     entityType: "tenant",
     entityId: tenantId,
@@ -129,8 +125,8 @@ export async function setLocale(locale: "id" | "en") {
 
 const DEFAULT_STAGES = ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"];
 
-function stagesForChannel(tenantId: string, channel: string): string[] {
-  const wf = db
+async function stagesForChannel(tenantId: string, channel: string): Promise<string[]> {
+  const wf = (await db
     .select()
     .from(t.workflowTemplates)
     .where(
@@ -139,16 +135,16 @@ function stagesForChannel(tenantId: string, channel: string): string[] {
         eq(t.workflowTemplates.channel, channel),
       ),
     )
-    .get();
+    )[0];
   return wf?.stages ?? DEFAULT_STAGES;
 }
 
-function defaultAssignee(tenantId: string, role: string): string | null {
-  const u = db
+async function defaultAssignee(tenantId: string, role: string): Promise<string | null> {
+  const u = (await db
     .select()
     .from(t.users)
     .where(and(eq(t.users.tenantId, tenantId), eq(t.users.role, role)))
-    .get();
+    )[0];
   return u?.id ?? null;
 }
 
@@ -164,7 +160,7 @@ async function createVersionWithPipeline(opts: {
   fileData: Buffer | null;
 }): Promise<{ versionId: string; flags: number }> {
   const versionId = crypto.randomUUID();
-  db.insert(t.contentVersions)
+  await db.insert(t.contentVersions)
     .values({
       id: versionId,
       submissionId: opts.submissionId,
@@ -174,17 +170,16 @@ async function createVersionWithPipeline(opts: {
       isLocked: false,
       processingStatus: "ready",
       createdAt: new Date(),
-    })
-    .run();
+    });
 
   let insertedPages = 0;
-  const insertRendered = (
+  const insertRendered = async (
     pages: import("./svg").RenderedPage[],
     elements: import("./svg").RenderedElement[],
   ) => {
     const offset = insertedPages;
     for (const p of pages) {
-      db.insert(t.contentVersionPages)
+      await db.insert(t.contentVersionPages)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -192,11 +187,10 @@ async function createVersionWithPipeline(opts: {
           renderedSvg: p.svg,
           width: p.width,
           height: p.height,
-        })
-        .run();
+        });
     }
     for (const el of elements) {
-      db.insert(t.contentElements)
+      await db.insert(t.contentElements)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -206,8 +200,7 @@ async function createVersionWithPipeline(opts: {
           extractedText: el.text,
           boundingBox: el.bbox,
           requiresManualReview: el.elementType === "image",
-        })
-        .run();
+        });
     }
     insertedPages += pages.length;
   };
@@ -223,7 +216,7 @@ async function createVersionWithPipeline(opts: {
       subtitle: opts.subtitle,
       paragraphs,
     });
-    insertRendered(pages, elements);
+    await insertRendered(pages, elements);
   }
 
   if (opts.fileName) {
@@ -256,18 +249,17 @@ async function createVersionWithPipeline(opts: {
     }
 
     if (rendered) {
-      insertRendered(rendered.pages, rendered.elements);
+      await insertRendered(rendered.pages, rendered.elements);
       // Store extracted text so version diffs work for deck revisions too
       if (!opts.text && extractedText) {
-        db.update(t.contentVersions)
+        await db.update(t.contentVersions)
           .set({ textContent: extractedText })
-          .where(eq(t.contentVersions.id, versionId))
-          .run();
+          .where(eq(t.contentVersions.id, versionId));
       }
     } else {
       const page = renderFilePlaceholderPage(opts.fileName, opts.title);
       const pageNumber = insertedPages + 1;
-      db.insert(t.contentVersionPages)
+      await db.insert(t.contentVersionPages)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -275,9 +267,8 @@ async function createVersionWithPipeline(opts: {
           renderedSvg: page.svg,
           width: page.width,
           height: page.height,
-        })
-        .run();
-      db.insert(t.contentElements)
+        });
+      await db.insert(t.contentElements)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -287,8 +278,7 @@ async function createVersionWithPipeline(opts: {
           extractedText: null,
           boundingBox: { x: 84, y: 200, width: 1072, height: 380 },
           requiresManualReview: true,
-        })
-        .run();
+        });
       insertedPages = pageNumber;
     }
   }
@@ -318,17 +308,17 @@ export async function createSubmission(formData: FormData) {
     throw new Error("VALIDATION");
   }
 
-  const product = db
+  const product = (await db
     .select()
     .from(t.products)
     .where(and(eq(t.products.id, productId), eq(t.products.tenantId, user.tenantId)))
-    .get();
+    )[0];
   if (!product) throw new Error("NOT_FOUND");
 
   const submissionId = crypto.randomUUID();
-  const stageRoles = stagesForChannel(user.tenantId, channel);
+  const stageRoles = await stagesForChannel(user.tenantId, channel);
 
-  db.insert(t.contentSubmissions)
+  await db.insert(t.contentSubmissions)
     .values({
       id: submissionId,
       tenantId: user.tenantId,
@@ -340,21 +330,19 @@ export async function createSubmission(formData: FormData) {
       status: "in_review",
       currentStage: stageRoles[0],
       createdAt: new Date(),
-    })
-    .run();
+    });
 
-  stageRoles.forEach((role, i) => {
-    db.insert(t.reviewStages)
+  for (const [i, role] of stageRoles.entries()) {
+    await db.insert(t.reviewStages)
       .values({
         id: crypto.randomUUID(),
         submissionId,
         stageOrder: i + 1,
         reviewerRole: role,
-        assignedTo: defaultAssignee(user.tenantId, role),
+        assignedTo: await defaultAssignee(user.tenantId, role),
         status: i === 0 ? "in_progress" : "pending",
-      })
-      .run();
-  });
+      });
+  }
 
   const { versionId } = await createVersionWithPipeline({
     tenantId: user.tenantId,
@@ -368,14 +356,13 @@ export async function createSubmission(formData: FormData) {
     fileData,
   });
 
-  // Persist the original upload so the approved master can be downloaded later
-  // (production: S3/R2 with versioned object keys)
+  // Persist the original upload (keyed by version id) so the approved master
+  // can be downloaded later. Storage driver: local disk in dev, S3/R2 in prod.
   if (fileData) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    fs.writeFileSync(path.join(UPLOAD_DIR, versionId), fileData);
+    await storage.put(versionId, fileData, mimeForFileName(fileName));
   }
 
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "submission",
     entityId: submissionId,
@@ -385,7 +372,7 @@ export async function createSubmission(formData: FormData) {
   });
 
   const flags = await runClaimsCheck({ versionId, productId, tenantId: user.tenantId });
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "version",
     entityId: versionId,
@@ -408,7 +395,7 @@ export async function resubmitVersion(formData: FormData) {
   const changeNote = String(formData.get("changeNote") ?? "").trim();
   if (!text || !changeNote) throw new Error("VALIDATION");
 
-  const sub = db
+  const sub = (await db
     .select()
     .from(t.contentSubmissions)
     .where(
@@ -417,18 +404,17 @@ export async function resubmitVersion(formData: FormData) {
         eq(t.contentSubmissions.tenantId, user.tenantId),
       ),
     )
-    .get();
+    )[0];
   if (!sub) throw new Error("NOT_FOUND");
   if (sub.status === "approved") throw new Error("LOCKED");
 
-  const versions = db
+  const versions = await db
     .select()
     .from(t.contentVersions)
-    .where(eq(t.contentVersions.submissionId, submissionId))
-    .all();
+    .where(eq(t.contentVersions.submissionId, submissionId));
   const nextVersion = Math.max(...versions.map((v) => v.versionNumber)) + 1;
 
-  const product = db.select().from(t.products).where(eq(t.products.id, sub.productId)).get();
+  const product = (await db.select().from(t.products).where(eq(t.products.id, sub.productId)))[0];
 
   const { versionId } = await createVersionWithPipeline({
     tenantId: user.tenantId,
@@ -441,33 +427,30 @@ export async function resubmitVersion(formData: FormData) {
     fileName: null,
     fileData: null,
   });
-  db.update(t.contentVersions)
+  await db.update(t.contentVersions)
     .set({ changeNote })
-    .where(eq(t.contentVersions.id, versionId))
-    .run();
+    .where(eq(t.contentVersions.id, versionId));
 
   // Reset the review workflow: fresh stages from the tenant template
-  db.delete(t.reviewStages).where(eq(t.reviewStages.submissionId, submissionId)).run();
-  const stageRoles = stagesForChannel(user.tenantId, sub.channel ?? "print");
-  stageRoles.forEach((role, i) => {
-    db.insert(t.reviewStages)
+  await db.delete(t.reviewStages).where(eq(t.reviewStages.submissionId, submissionId));
+  const stageRoles = await stagesForChannel(user.tenantId, sub.channel ?? "print");
+  for (const [i, role] of stageRoles.entries()) {
+    await db.insert(t.reviewStages)
       .values({
         id: crypto.randomUUID(),
         submissionId,
         stageOrder: i + 1,
         reviewerRole: role,
-        assignedTo: defaultAssignee(user.tenantId, role),
+        assignedTo: await defaultAssignee(user.tenantId, role),
         status: i === 0 ? "in_progress" : "pending",
-      })
-      .run();
-  });
+      });
+  }
 
-  db.update(t.contentSubmissions)
+  await db.update(t.contentSubmissions)
     .set({ status: "in_review", currentStage: stageRoles[0], decidedAt: null })
-    .where(eq(t.contentSubmissions.id, submissionId))
-    .run();
+    .where(eq(t.contentSubmissions.id, submissionId));
 
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "submission",
     entityId: submissionId,
@@ -481,7 +464,7 @@ export async function resubmitVersion(formData: FormData) {
     productId: sub.productId,
     tenantId: user.tenantId,
   });
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "version",
     entityId: versionId,
@@ -506,10 +489,10 @@ export async function decideStage(formData: FormData) {
   }
   if (decision !== "approved" && !note) throw new Error("NOTE_REQUIRED");
 
-  const stage = db.select().from(t.reviewStages).where(eq(t.reviewStages.id, stageId)).get();
+  const stage = (await db.select().from(t.reviewStages).where(eq(t.reviewStages.id, stageId)))[0];
   if (!stage) throw new Error("NOT_FOUND");
 
-  const sub = db
+  const sub = (await db
     .select()
     .from(t.contentSubmissions)
     .where(
@@ -518,7 +501,7 @@ export async function decideStage(formData: FormData) {
         eq(t.contentSubmissions.tenantId, user.tenantId),
       ),
     )
-    .get();
+    )[0];
   if (!sub) throw new Error("NOT_FOUND");
 
   const canDecide =
@@ -527,12 +510,11 @@ export async function decideStage(formData: FormData) {
     user.role === "compliance_admin";
   if (!canDecide || stage.status === "approved") throw new Error("FORBIDDEN");
 
-  const versions = db
+  const versions = await db
     .select()
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, sub.id))
-    .orderBy(asc(t.contentVersions.versionNumber))
-    .all();
+    .orderBy(asc(t.contentVersions.versionNumber));
   const currentVersion = versions[versions.length - 1];
 
   // Follow-up enforcement: a stage cannot be approved while comments from
@@ -540,48 +522,42 @@ export async function decideStage(formData: FormData) {
   // piece of feedback was actually addressed).
   if (decision === "approved" && versions.length > 1) {
     const prevIds = versions.slice(0, -1).map((v) => v.id);
-    const openPrev = db
-      .select()
-      .from(t.reviewComments)
-      .where(inArray(t.reviewComments.versionId, prevIds))
-      .all()
-      .filter((c) => !c.resolved).length;
+    const openPrev = (
+      await db
+        .select()
+        .from(t.reviewComments)
+        .where(inArray(t.reviewComments.versionId, prevIds))
+    ).filter((c) => !c.resolved).length;
     if (openPrev > 0) throw new Error("PREV_COMMENTS_OPEN");
   }
 
-  db.update(t.reviewStages)
+  await db.update(t.reviewStages)
     .set({ status: decision, decidedAt: new Date(), decisionNote: note })
-    .where(eq(t.reviewStages.id, stageId))
-    .run();
+    .where(eq(t.reviewStages.id, stageId));
 
   if (decision === "approved") {
-    const stages = db
+    const stages = await db
       .select()
       .from(t.reviewStages)
       .where(eq(t.reviewStages.submissionId, sub.id))
-      .orderBy(asc(t.reviewStages.stageOrder))
-      .all();
+      .orderBy(asc(t.reviewStages.stageOrder));
     const next = stages.find((s) => s.status === "pending");
     if (next) {
-      db.update(t.reviewStages)
+      await db.update(t.reviewStages)
         .set({ status: "in_progress" })
-        .where(eq(t.reviewStages.id, next.id))
-        .run();
-      db.update(t.contentSubmissions)
+        .where(eq(t.reviewStages.id, next.id));
+      await db.update(t.contentSubmissions)
         .set({ currentStage: next.reviewerRole })
-        .where(eq(t.contentSubmissions.id, sub.id))
-        .run();
+        .where(eq(t.contentSubmissions.id, sub.id));
     } else {
       // Final approval: lock the version (immutability NFR)
-      db.update(t.contentSubmissions)
+      await db.update(t.contentSubmissions)
         .set({ status: "approved", currentStage: null, decidedAt: new Date() })
-        .where(eq(t.contentSubmissions.id, sub.id))
-        .run();
-      db.update(t.contentVersions)
+        .where(eq(t.contentSubmissions.id, sub.id));
+      await db.update(t.contentVersions)
         .set({ isLocked: true })
-        .where(eq(t.contentVersions.id, currentVersion.id))
-        .run();
-      logAudit({
+        .where(eq(t.contentVersions.id, currentVersion.id));
+      await logAudit({
         tenantId: user.tenantId,
         entityType: "version",
         entityId: currentVersion.id,
@@ -591,18 +567,16 @@ export async function decideStage(formData: FormData) {
       });
     }
   } else if (decision === "changes_requested") {
-    db.update(t.contentSubmissions)
+    await db.update(t.contentSubmissions)
       .set({ status: "changes_requested" })
-      .where(eq(t.contentSubmissions.id, sub.id))
-      .run();
+      .where(eq(t.contentSubmissions.id, sub.id));
   } else {
-    db.update(t.contentSubmissions)
+    await db.update(t.contentSubmissions)
       .set({ status: "rejected", currentStage: null, decidedAt: new Date() })
-      .where(eq(t.contentSubmissions.id, sub.id))
-      .run();
+      .where(eq(t.contentSubmissions.id, sub.id));
   }
 
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "submission",
     entityId: sub.id,
@@ -625,18 +599,18 @@ export async function addComment(formData: FormData) {
   const comment = String(formData.get("comment") ?? "").trim();
   if (!comment) throw new Error("VALIDATION");
 
-  const version = db
+  const version = (await db
     .select({ sub: t.contentSubmissions })
     .from(t.contentVersions)
     .innerJoin(t.contentSubmissions, eq(t.contentVersions.submissionId, t.contentSubmissions.id))
     .where(
       and(eq(t.contentVersions.id, versionId), eq(t.contentSubmissions.tenantId, user.tenantId)),
     )
-    .get();
+    )[0];
   if (!version) throw new Error("NOT_FOUND");
 
   const id = crypto.randomUUID();
-  db.insert(t.reviewComments)
+  await db.insert(t.reviewComments)
     .values({
       id,
       versionId,
@@ -645,10 +619,9 @@ export async function addComment(formData: FormData) {
       comment,
       resolved: false,
       createdAt: new Date(),
-    })
-    .run();
+    });
 
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "comment",
     entityId: id,
@@ -663,7 +636,7 @@ export async function resolveComment(formData: FormData) {
   const user = await requireUser();
   const commentId = String(formData.get("commentId") ?? "");
 
-  const owned = db
+  const owned = (await db
     .select({ id: t.reviewComments.id })
     .from(t.reviewComments)
     .innerJoin(t.contentVersions, eq(t.reviewComments.versionId, t.contentVersions.id))
@@ -671,14 +644,13 @@ export async function resolveComment(formData: FormData) {
     .where(
       and(eq(t.reviewComments.id, commentId), eq(t.contentSubmissions.tenantId, user.tenantId)),
     )
-    .get();
+    )[0];
   if (!owned) throw new Error("NOT_FOUND");
 
-  db.update(t.reviewComments)
+  await db.update(t.reviewComments)
     .set({ resolved: true })
-    .where(eq(t.reviewComments.id, commentId))
-    .run();
-  logAudit({
+    .where(eq(t.reviewComments.id, commentId));
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "comment",
     entityId: commentId,
@@ -698,20 +670,19 @@ export async function decideFlag(formData: FormData) {
   const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
   if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
 
-  const owned = db
+  const owned = (await db
     .select({ id: t.claimFlags.id })
     .from(t.claimFlags)
     .innerJoin(t.contentVersions, eq(t.claimFlags.versionId, t.contentVersions.id))
     .innerJoin(t.contentSubmissions, eq(t.contentVersions.submissionId, t.contentSubmissions.id))
     .where(and(eq(t.claimFlags.id, flagId), eq(t.contentSubmissions.tenantId, user.tenantId)))
-    .get();
+    )[0];
   if (!owned) throw new Error("NOT_FOUND");
 
-  db.update(t.claimFlags)
+  await db.update(t.claimFlags)
     .set({ reviewerDecision: decision, decidedBy: user.id })
-    .where(eq(t.claimFlags.id, flagId))
-    .run();
-  logAudit({
+    .where(eq(t.claimFlags.id, flagId));
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "flag",
     entityId: flagId,
@@ -733,7 +704,7 @@ export async function rerunClaimsCheck(formData: FormData) {
   const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
   if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
 
-  const sub = db
+  const sub = (await db
     .select()
     .from(t.contentSubmissions)
     .where(
@@ -742,24 +713,23 @@ export async function rerunClaimsCheck(formData: FormData) {
         eq(t.contentSubmissions.tenantId, user.tenantId),
       ),
     )
-    .get();
+    )[0];
   if (!sub) throw new Error("NOT_FOUND");
 
-  const versions = db
+  const versions = await db
     .select()
     .from(t.contentVersions)
-    .where(eq(t.contentVersions.submissionId, submissionId))
-    .all();
+    .where(eq(t.contentVersions.submissionId, submissionId));
   const latest = versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
   if (!latest || latest.isLocked) throw new Error("LOCKED");
 
-  db.delete(t.claimFlags).where(eq(t.claimFlags.versionId, latest.id)).run();
+  await db.delete(t.claimFlags).where(eq(t.claimFlags.versionId, latest.id));
   const flags = await runClaimsCheck({
     versionId: latest.id,
     productId: sub.productId,
     tenantId: user.tenantId,
   });
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "version",
     entityId: latest.id,
@@ -780,17 +750,17 @@ export async function verifyFlagJournal(formData: FormData) {
   const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
   if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
 
-  const flag = db.select().from(t.claimFlags).where(eq(t.claimFlags.id, flagId)).get();
+  const flag = (await db.select().from(t.claimFlags).where(eq(t.claimFlags.id, flagId)))[0];
   if (!flag) throw new Error("NOT_FOUND");
 
   // Resolve the submission's product so we check against its claims library
-  const version = db
+  const version = (await db
     .select()
     .from(t.contentVersions)
     .where(eq(t.contentVersions.id, flag.versionId))
-    .get();
+    )[0];
   const sub = version
-    ? db
+    ? (await db
         .select()
         .from(t.contentSubmissions)
         .where(
@@ -799,12 +769,12 @@ export async function verifyFlagJournal(formData: FormData) {
             eq(t.contentSubmissions.tenantId, user.tenantId),
           ),
         )
-        .get()
+        )[0]
     : null;
   if (!sub) throw new Error("NOT_FOUND");
 
   // Every active claim's PMID-bearing reference becomes a candidate journal.
-  const claims = db
+  const claims = await db
     .select()
     .from(t.approvedClaims)
     .where(
@@ -813,8 +783,7 @@ export async function verifyFlagJournal(formData: FormData) {
         eq(t.approvedClaims.productId, sub.productId),
         eq(t.approvedClaims.status, "active"),
       ),
-    )
-    .all();
+    );
   const candidates = claims.flatMap((c) =>
     (c.references ?? [])
       .filter((r) => r.pmid || r.docId)
@@ -827,15 +796,14 @@ export async function verifyFlagJournal(formData: FormData) {
     candidates,
   });
 
-  db.update(t.claimFlags)
+  await db.update(t.claimFlags)
     .set(
       result
         ? { journalVerdict: result.verdict, journalNote: result.note, journalPmid: result.pmid }
         : { journalVerdict: "unavailable", journalNote: null, journalPmid: null },
     )
-    .where(eq(t.claimFlags.id, flagId))
-    .run();
-  logAudit({
+    .where(eq(t.claimFlags.id, flagId));
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "flag",
     entityId: flagId,
@@ -890,7 +858,7 @@ export async function uploadJournalPdf(
   }
 
   const docId = crypto.randomUUID();
-  db.insert(t.journalDocuments)
+  await db.insert(t.journalDocuments)
     .values({
       id: docId,
       tenantId: user.tenantId,
@@ -899,9 +867,8 @@ export async function uploadJournalPdf(
       source: "pdf_upload",
       content,
       createdAt: new Date(),
-    })
-    .run();
-  logAudit({
+    });
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "claim",
     entityId: docId,
@@ -957,7 +924,7 @@ export async function saveClaim(formData: FormData) {
   if (!productId || !claimText || !expiresAt) throw new Error("VALIDATION");
 
   if (id) {
-    db.update(t.approvedClaims)
+    await db.update(t.approvedClaims)
       .set({
         productId,
         claimText,
@@ -965,9 +932,8 @@ export async function saveClaim(formData: FormData) {
         channelScope: channels,
         expiresAt: new Date(expiresAt),
       })
-      .where(and(eq(t.approvedClaims.id, id), eq(t.approvedClaims.tenantId, user.tenantId)))
-      .run();
-    logAudit({
+      .where(and(eq(t.approvedClaims.id, id), eq(t.approvedClaims.tenantId, user.tenantId)));
+    await logAudit({
       tenantId: user.tenantId,
       entityType: "claim",
       entityId: id,
@@ -976,7 +942,7 @@ export async function saveClaim(formData: FormData) {
     });
   } else {
     const newId = crypto.randomUUID();
-    db.insert(t.approvedClaims)
+    await db.insert(t.approvedClaims)
       .values({
         id: newId,
         tenantId: user.tenantId,
@@ -988,9 +954,8 @@ export async function saveClaim(formData: FormData) {
         approvedAt: new Date(),
         expiresAt: new Date(expiresAt),
         status: "active",
-      })
-      .run();
-    logAudit({
+      });
+    await logAudit({
       tenantId: user.tenantId,
       entityType: "claim",
       entityId: newId,
@@ -1006,11 +971,10 @@ export async function expireClaim(formData: FormData) {
   if (!CLAIM_MANAGER_ROLES.includes(user.role as (typeof CLAIM_MANAGER_ROLES)[number]))
     throw new Error("FORBIDDEN");
   const id = String(formData.get("id") ?? "");
-  db.update(t.approvedClaims)
+  await db.update(t.approvedClaims)
     .set({ status: "expired", expiresAt: new Date() })
-    .where(and(eq(t.approvedClaims.id, id), eq(t.approvedClaims.tenantId, user.tenantId)))
-    .run();
-  logAudit({
+    .where(and(eq(t.approvedClaims.id, id), eq(t.approvedClaims.tenantId, user.tenantId)));
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "claim",
     entityId: id,
@@ -1061,7 +1025,7 @@ export async function importClaims(formData: FormData) {
 
   for (const claimText of claims) {
     const id = crypto.randomUUID();
-    db.insert(t.approvedClaims)
+    await db.insert(t.approvedClaims)
       .values({
         id,
         tenantId: user.tenantId,
@@ -1073,9 +1037,8 @@ export async function importClaims(formData: FormData) {
         approvedAt: new Date(),
         expiresAt: new Date(expiresAt),
         status: "active",
-      })
-      .run();
-    logAudit({
+      });
+    await logAudit({
       tenantId: user.tenantId,
       entityType: "claim",
       entityId: id,
@@ -1097,7 +1060,7 @@ export async function saveWorkflow(formData: FormData) {
   const stages = formData.getAll("stages").map(String).filter(Boolean);
   if (!channel || !stages.length) throw new Error("VALIDATION");
 
-  const existing = db
+  const existing = (await db
     .select()
     .from(t.workflowTemplates)
     .where(
@@ -1106,26 +1069,24 @@ export async function saveWorkflow(formData: FormData) {
         eq(t.workflowTemplates.channel, channel),
       ),
     )
-    .get();
+    )[0];
 
   if (existing) {
-    db.update(t.workflowTemplates)
+    await db.update(t.workflowTemplates)
       .set({ stages })
-      .where(eq(t.workflowTemplates.id, existing.id))
-      .run();
+      .where(eq(t.workflowTemplates.id, existing.id));
   } else {
-    db.insert(t.workflowTemplates)
+    await db.insert(t.workflowTemplates)
       .values({
         id: crypto.randomUUID(),
         tenantId: user.tenantId,
         channel,
         stages,
         mode: "sequential",
-      })
-      .run();
+      });
   }
 
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "workflow",
     entityId: channel,
@@ -1162,12 +1123,12 @@ export async function createTeammate(formData: FormData) {
   ) {
     throw new Error("VALIDATION");
   }
-  if (db.select().from(t.users).where(eq(t.users.email, email)).get()) {
+  if ((await db.select().from(t.users).where(eq(t.users.email, email)))[0]) {
     throw new Error("EMAIL_TAKEN");
   }
 
   const teammateId = crypto.randomUUID();
-  db.insert(t.users)
+  await db.insert(t.users)
     .values({
       id: teammateId,
       tenantId: user.tenantId,
@@ -1176,10 +1137,9 @@ export async function createTeammate(formData: FormData) {
       role,
       passwordHash: hashPassword(password),
       createdAt: new Date(),
-    })
-    .run();
+    });
 
-  logAudit({
+  await logAudit({
     tenantId: user.tenantId,
     entityType: "user",
     entityId: teammateId,

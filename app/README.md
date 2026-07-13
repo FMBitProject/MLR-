@@ -4,15 +4,32 @@ Implementasi webapp dari **PRD: MLR Review Workflow Tool (Lite)** — platform B
 
 ## Menjalankan
 
+Aplikasi butuh **PostgreSQL** (Neon di produksi, Postgres lokal untuk dev). Salin `.env.example` → `.env.local` dan isi `DATABASE_URL` + `AUTH_SECRET`.
+
 ```bash
 cd app
 npm install
-npm run dev        # http://localhost:3000
+cp .env.example .env.local        # lalu isi DATABASE_URL & AUTH_SECRET
+
+# Postgres lokal cepat via Docker (opsional):
+docker run -d --name mlr-pg -e POSTGRES_PASSWORD=mlr -e POSTGRES_DB=mlr \
+  -p 5433:5432 postgres:16-alpine
+# → DATABASE_URL=postgres://postgres:mlr@localhost:5433/mlr
+
+npm run db:migrate                # terapkan skema (drizzle-kit)
+npm run db:seed                   # isi data demo (idempotent; no-op jika sudah ada)
+npm run dev                       # http://localhost:3000
 # atau produksi:
 npm run build && npm start
 ```
 
-Database SQLite dibuat & di-seed otomatis di `.data/mlr.db` saat pertama dijalankan. Hapus folder `.data/` untuk reset ke data demo.
+Skema dikelola sebagai migrasi drizzle-kit di `src/lib/db/migrations/` (`npm run db:generate` untuk membuat migrasi baru setelah mengubah `schema.ts`). Untuk reset penuh: drop database, lalu `db:migrate` + `db:seed` lagi.
+
+### Deploy ke Vercel + Neon
+
+1. Buat database di [Neon](https://neon.tech), ambil **pooled connection string** (host berakhiran `-pooler`).
+2. Di Vercel set env: `DATABASE_URL` (pooled Neon), `AUTH_SECRET` (`openssl rand -hex 32`), `STORAGE_DRIVER=s3` + kredensial S3/R2 (lihat `.env.example`), dan (opsional) kunci provider AI.
+3. Jalankan migrasi terhadap Neon sekali: `DATABASE_URL=<neon> npm run db:migrate` (lokal atau sebagai deploy step), lalu `db:seed` bila ingin data demo.
 
 ### Menjalankan dengan Docker
 
@@ -82,11 +99,11 @@ Status provider aktif tampil di halaman **Settings**.
 
 | Aspek | Demo ini | Produksi per PRD |
 |---|---|---|
-| Database | SQLite lokal (Drizzle ORM) | PostgreSQL Neon + pgvector (skema Drizzle identik secara struktur) |
+| Database | **PostgreSQL** (Drizzle ORM + node-postgres); Postgres lokal via Docker | **PostgreSQL Neon** (pooled) — kode identik, cukup ganti `DATABASE_URL`; pgvector menyusul |
+| File storage | **Driver storage** (`STORAGE_DRIVER=local`) di disk `.data/uploads` | `STORAGE_DRIVER=s3` → Cloudflare R2 / S3 dengan versioned keys (kode sama) |
 | Auth | Session cookie HMAC + scrypt | Better Auth |
 | Rendering/OCR | Layout teks → SVG sinkron; file upload jadi placeholder | LibreOffice/unoconv + OCR sebagai job async (Inngest/Trigger.dev) |
 | Claims matching | Cosine leksikal + opsi LLM (Groq/xAI/OpenAI/Anthropic) | Embedding pgvector + LLM (eskalasi model lebih besar) |
-| File storage | Metadata saja | Cloudflare R2 / S3 dengan versioned keys |
 | Billing/Analytics | — | Xendit, PostHog |
 
 Set `AUTH_SECRET` dan (opsional) kunci provider AI — mis. `GROQ_API_KEY` yang gratis — melalui environment variable.

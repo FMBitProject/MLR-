@@ -1,8 +1,11 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db, t } from "./db";
+import { hashPassword, verifyPassword } from "./password";
+
+export { hashPassword, verifyPassword };
 
 const SECRET = process.env.AUTH_SECRET ?? "mlr-demo-secret-change-in-production";
 const COOKIE = "mlr_session";
@@ -40,19 +43,6 @@ function sign(value: string): string {
   return createHmac("sha256", SECRET).update(value).digest("hex");
 }
 
-export function hashPassword(password: string, salt?: string): string {
-  const s = salt ?? randomBytes(8).toString("hex");
-  return `${s}:${scryptSync(password, s, 32).toString("hex")}`;
-}
-
-export function verifyPassword(password: string, stored: string): boolean {
-  const [salt, hash] = stored.split(":");
-  if (!salt || !hash) return false;
-  const candidate = scryptSync(password, salt, 32);
-  const expected = Buffer.from(hash, "hex");
-  return candidate.length === expected.length && timingSafeEqual(candidate, expected);
-}
-
 export async function createSession(userId: string) {
   const store = await cookies();
   store.set(COOKIE, `${userId}.${sign(userId)}`, {
@@ -76,7 +66,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   if (dot < 0) return null;
   const userId = raw.slice(0, dot);
   if (sign(userId) !== raw.slice(dot + 1)) return null;
-  const user = db.select().from(t.users).where(eq(t.users.id, userId)).get();
+  const user = (await db.select().from(t.users).where(eq(t.users.id, userId)))[0];
   return user ?? null;
 });
 

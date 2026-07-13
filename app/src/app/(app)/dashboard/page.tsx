@@ -13,11 +13,10 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const { dict, locale } = await getDict();
 
-  const subs = db
+  const subs = await db
     .select()
     .from(t.contentSubmissions)
-    .where(eq(t.contentSubmissions.tenantId, user.tenantId))
-    .all();
+    .where(eq(t.contentSubmissions.tenantId, user.tenantId));
 
   const inReview = subs.filter((s) => s.status === "in_review").length;
   const cutoff30 = new Date(Date.now() - 30 * 86_400_000);
@@ -35,17 +34,17 @@ export default async function DashboardPage() {
 
   const subIds = subs.map((s) => s.id);
   const versions = subIds.length
-    ? db.select().from(t.contentVersions).where(inArray(t.contentVersions.submissionId, subIds)).all()
+    ? await db.select().from(t.contentVersions).where(inArray(t.contentVersions.submissionId, subIds))
     : [];
   const versionIds = versions.map((v) => v.id);
   const flags = versionIds.length
-    ? db.select().from(t.claimFlags).where(inArray(t.claimFlags.versionId, versionIds)).all()
+    ? await db.select().from(t.claimFlags).where(inArray(t.claimFlags.versionId, versionIds))
     : [];
   const flagRate = subs.length ? flags.length / subs.length : 0;
 
   // Average days spent per stage (decided stages only); longest = bottleneck
   const stages = subIds.length
-    ? db.select().from(t.reviewStages).where(inArray(t.reviewStages.submissionId, subIds)).all()
+    ? await db.select().from(t.reviewStages).where(inArray(t.reviewStages.submissionId, subIds))
     : [];
   const stageRoles = ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"] as const;
   const stageDays = stageRoles.map((role) => {
@@ -71,31 +70,30 @@ export default async function DashboardPage() {
   const maxAvg = Math.max(...stageDays.map((s) => s.avg), 1);
   const bottleneck = stageDays.reduce((a, b) => (b.avg > a.avg ? b : a));
 
-  const expiring = db
-    .select({ claim: t.approvedClaims, product: t.products })
-    .from(t.approvedClaims)
-    .innerJoin(t.products, eq(t.approvedClaims.productId, t.products.id))
-    .where(
-      and(
-        eq(t.approvedClaims.tenantId, user.tenantId),
-        eq(t.approvedClaims.status, "active"),
-        gte(t.approvedClaims.expiresAt, new Date()),
-      ),
-    )
-    .all()
-    .filter(
-      ({ claim }) =>
-        claim.expiresAt && claim.expiresAt.getTime() - Date.now() < 30 * 86_400_000,
-    );
+  const expiring = (
+    await db
+      .select({ claim: t.approvedClaims, product: t.products })
+      .from(t.approvedClaims)
+      .innerJoin(t.products, eq(t.approvedClaims.productId, t.products.id))
+      .where(
+        and(
+          eq(t.approvedClaims.tenantId, user.tenantId),
+          eq(t.approvedClaims.status, "active"),
+          gte(t.approvedClaims.expiresAt, new Date()),
+        ),
+      )
+  ).filter(
+    ({ claim }) =>
+      claim.expiresAt && claim.expiresAt.getTime() - Date.now() < 30 * 86_400_000,
+  );
 
-  const recent = db
+  const recent = await db
     .select({ log: t.auditLog, actor: t.users })
     .from(t.auditLog)
     .innerJoin(t.users, eq(t.auditLog.performedBy, t.users.id))
     .where(eq(t.auditLog.tenantId, user.tenantId))
     .orderBy(desc(t.auditLog.createdAt))
-    .limit(8)
-    .all();
+    .limit(8);
 
   const nf = new Intl.NumberFormat(locale === "id" ? "id-ID" : "en-US", {
     maximumFractionDigits: 1,

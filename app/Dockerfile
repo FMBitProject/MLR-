@@ -1,6 +1,7 @@
 # MLR Flow — production image
 # Build:  docker compose up --build   (from the repo root)
-# Data (SQLite DB + uploaded files) persists in the volume mounted at /app/.data
+# Postgres runs as a separate compose service; uploaded files (local storage
+# driver) persist in the volume mounted at /app/.data
 
 FROM node:22-slim AS deps
 WORKDIR /app
@@ -20,7 +21,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
-# Non-root user; .data must stay writable for SQLite + uploads
+# Non-root user; .data must stay writable for uploaded files (local storage)
 RUN groupadd -r mlr && useradd -r -g mlr mlr && mkdir -p /app/.data && chown -R mlr:mlr /app
 COPY --from=build --chown=mlr:mlr /app/.next/standalone ./
 COPY --from=build --chown=mlr:mlr /app/.next/static ./.next/static

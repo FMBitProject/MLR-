@@ -24,17 +24,15 @@ export default async function NewSubmissionPage() {
     );
   }
 
-  const products = db
+  const products = await db
     .select({ id: t.products.id, name: t.products.name })
     .from(t.products)
-    .where(eq(t.products.tenantId, user.tenantId))
-    .all();
+    .where(eq(t.products.tenantId, user.tenantId));
 
-  const templates = db
+  const templates = await db
     .select()
     .from(t.workflowTemplates)
-    .where(eq(t.workflowTemplates.tenantId, user.tenantId))
-    .all();
+    .where(eq(t.workflowTemplates.tenantId, user.tenantId));
   const workflows = Object.fromEntries(templates.map((w) => [w.channel, w.stages]));
 
   return (

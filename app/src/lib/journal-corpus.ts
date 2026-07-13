@@ -23,25 +23,25 @@ export async function ensureJournalDocument(
   ref: ClaimReference,
 ): Promise<JournalDoc | null> {
   if (ref.docId) {
-    const doc = db
+    const doc = (await db
       .select()
       .from(t.journalDocuments)
       .where(
         and(eq(t.journalDocuments.id, ref.docId), eq(t.journalDocuments.tenantId, tenantId)),
       )
-      .get();
+      )[0];
     if (doc) return doc;
   }
 
   if (!ref.pmid) return null;
 
-  const cached = db
+  const cached = (await db
     .select()
     .from(t.journalDocuments)
     .where(
       and(eq(t.journalDocuments.pmid, ref.pmid), eq(t.journalDocuments.tenantId, tenantId)),
     )
-    .get();
+    )[0];
   if (cached) return cached;
 
   const fullText = await fetchPmcFullText(ref.pmid);
@@ -57,7 +57,7 @@ export async function ensureJournalDocument(
     content,
     createdAt: new Date(),
   };
-  db.insert(t.journalDocuments).values(doc).run();
+  await db.insert(t.journalDocuments).values(doc);
   return doc;
 }
 

@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const fromP = url.searchParams.get("from");
   const toP = url.searchParams.get("to");
 
-  const rows = queryAudit({
+  const rows = await queryAudit({
     tenantId: user.tenantId,
     productId,
     from: fromP ? new Date(fromP) : null,

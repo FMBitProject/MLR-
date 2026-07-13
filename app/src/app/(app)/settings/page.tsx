@@ -18,13 +18,12 @@ export default async function SettingsPage() {
   if (!["compliance_admin", "super_admin"].includes(user.role)) redirect("/dashboard");
   const { dict, locale } = await getDict();
 
-  const tenant = db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)).get();
-  const users = db.select().from(t.users).where(eq(t.users.tenantId, user.tenantId)).all();
-  const templates = db
+  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  const users = await db.select().from(t.users).where(eq(t.users.tenantId, user.tenantId));
+  const templates = await db
     .select()
     .from(t.workflowTemplates)
-    .where(eq(t.workflowTemplates.tenantId, user.tenantId))
-    .all();
+    .where(eq(t.workflowTemplates.tenantId, user.tenantId));
 
   const aiProvider = getLlmProvider();
 

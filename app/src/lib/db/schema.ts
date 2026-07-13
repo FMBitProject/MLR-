@@ -1,23 +1,27 @@
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
   real,
-} from "drizzle-orm/sqlite-core";
+  boolean,
+  jsonb,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
-// Multi-tenant: every table carries tenantId (directly or via its parent),
-// mirroring the PRD's Postgres schema. SQLite is used for the local demo;
-// swap the dialect imports for pg-core + Neon in production.
+// Multi-tenant: every table carries tenantId (directly or via its parent).
+// Runs on Postgres (Neon in production, local Postgres in dev) via the
+// node-postgres driver — see db/index.ts. Every query is filtered by
+// tenantId from the authenticated session at the application layer.
 
-export const tenants = sqliteTable("tenants", {
+export const tenants = pgTable("tenants", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   plan: text("plan").notNull().default("starter"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   email: text("email").notNull().unique(),
@@ -26,15 +30,15 @@ export const users = sqliteTable("users", {
   role: text("role").notNull(),
   locale: text("locale").notNull().default("id"),
   passwordHash: text("password_hash").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
-export const products = sqliteTable("products", {
+export const products = pgTable("products", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name").notNull(),
   bpomRegistrationNo: text("bpom_registration_no"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
 // A supporting literature citation attached to an approved claim.
@@ -49,7 +53,7 @@ export type ClaimReference = {
   docId?: string | null;
 };
 
-export const approvedClaims = sqliteTable("approved_claims", {
+export const approvedClaims = pgTable("approved_claims", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   productId: text("product_id").notNull().references(() => products.id),
@@ -57,12 +61,12 @@ export const approvedClaims = sqliteTable("approved_claims", {
   // Where the claim came from, e.g. "SOP-PROM-001.txt" for document imports
   source: text("source"),
   // JSON array of supporting journal references ("refs" in SQL: REFERENCES is a keyword)
-  references: text("refs", { mode: "json" }).$type<ClaimReference[]>(),
+  references: jsonb("refs").$type<ClaimReference[]>(),
   // JSON array, e.g. ["print","digital","hcp_only"]
-  channelScope: text("channel_scope", { mode: "json" }).$type<string[]>(),
+  channelScope: jsonb("channel_scope").$type<string[]>(),
   approvedBy: text("approved_by").references(() => users.id),
-  approvedAt: integer("approved_at", { mode: "timestamp_ms" }),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
   status: text("status").notNull().default("active"), // active | expired | withdrawn
 });
 
@@ -70,7 +74,7 @@ export const approvedClaims = sqliteTable("approved_claims", {
 // the tenant has provided (uploaded PDF) or that could be fetched free
 // (PubMed Central full text, else the PubMed abstract). Chunking/retrieval
 // happen at query time — at library scale a table of chunks is unnecessary.
-export const journalDocuments = sqliteTable("journal_documents", {
+export const journalDocuments = pgTable("journal_documents", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   pmid: text("pmid"),
@@ -78,10 +82,10 @@ export const journalDocuments = sqliteTable("journal_documents", {
   // pdf_upload | pmc_fulltext | pubmed_abstract
   source: text("source").notNull(),
   content: text("content").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
-export const contentSubmissions = sqliteTable("content_submissions", {
+export const contentSubmissions = pgTable("content_submissions", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   productId: text("product_id").notNull().references(() => products.id),
@@ -91,11 +95,11 @@ export const contentSubmissions = sqliteTable("content_submissions", {
   submittedBy: text("submitted_by").notNull().references(() => users.id),
   status: text("status").notNull().default("in_review"), // in_review | changes_requested | approved | rejected | withdrawn
   currentStage: text("current_stage"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-  decidedAt: integer("decided_at", { mode: "timestamp_ms" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
 });
 
-export const contentVersions = sqliteTable("content_versions", {
+export const contentVersions = pgTable("content_versions", {
   id: text("id").primaryKey(),
   submissionId: text("submission_id").notNull().references(() => contentSubmissions.id),
   versionNumber: integer("version_number").notNull(),
@@ -103,12 +107,12 @@ export const contentVersions = sqliteTable("content_versions", {
   textContent: text("text_content"),
   // Mandatory summary of what changed, required from v2 onward
   changeNote: text("change_note"),
-  isLocked: integer("is_locked", { mode: "boolean" }).notNull().default(false),
+  isLocked: boolean("is_locked").notNull().default(false),
   processingStatus: text("processing_status").notNull().default("ready"), // processing | ready
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
-export const contentVersionPages = sqliteTable("content_version_pages", {
+export const contentVersionPages = pgTable("content_version_pages", {
   id: text("id").primaryKey(),
   versionId: text("version_id").notNull().references(() => contentVersions.id),
   pageNumber: integer("page_number").notNull(),
@@ -118,7 +122,7 @@ export const contentVersionPages = sqliteTable("content_version_pages", {
   height: integer("height").notNull(),
 });
 
-export const contentElements = sqliteTable("content_elements", {
+export const contentElements = pgTable("content_elements", {
   id: text("id").primaryKey(),
   versionId: text("version_id").notNull().references(() => contentVersions.id),
   pageNumber: integer("page_number").notNull(),
@@ -127,39 +131,37 @@ export const contentElements = sqliteTable("content_elements", {
   extractedText: text("extracted_text"),
   ocrConfidence: real("ocr_confidence"),
   // { x, y, width, height } relative to the rendered page (same units as page width/height)
-  boundingBox: text("bounding_box", { mode: "json" }).$type<{
+  boundingBox: jsonb("bounding_box").$type<{
     x: number;
     y: number;
     width: number;
     height: number;
   }>(),
-  requiresManualReview: integer("requires_manual_review", { mode: "boolean" })
-    .notNull()
-    .default(false),
+  requiresManualReview: boolean("requires_manual_review").notNull().default(false),
 });
 
-export const reviewStages = sqliteTable("review_stages", {
+export const reviewStages = pgTable("review_stages", {
   id: text("id").primaryKey(),
   submissionId: text("submission_id").notNull().references(() => contentSubmissions.id),
   stageOrder: integer("stage_order").notNull(),
   reviewerRole: text("reviewer_role").notNull(), // medical_reviewer | legal_reviewer | regulatory_reviewer
   assignedTo: text("assigned_to").references(() => users.id),
   status: text("status").notNull().default("pending"), // pending | in_progress | approved | rejected | changes_requested | skipped
-  decidedAt: integer("decided_at", { mode: "timestamp_ms" }),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
   decisionNote: text("decision_note"),
 });
 
-export const reviewComments = sqliteTable("review_comments", {
+export const reviewComments = pgTable("review_comments", {
   id: text("id").primaryKey(),
   versionId: text("version_id").notNull().references(() => contentVersions.id),
   elementId: text("element_id").references(() => contentElements.id),
   reviewerId: text("reviewer_id").notNull().references(() => users.id),
   comment: text("comment").notNull(),
-  resolved: integer("resolved", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  resolved: boolean("resolved").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
-export const claimFlags = sqliteTable("claim_flags", {
+export const claimFlags = pgTable("claim_flags", {
   id: text("id").primaryKey(),
   versionId: text("version_id").notNull().references(() => contentVersions.id),
   elementId: text("element_id").references(() => contentElements.id),
@@ -177,22 +179,22 @@ export const claimFlags = sqliteTable("claim_flags", {
   journalPmid: text("journal_pmid"),
 });
 
-export const auditLog = sqliteTable("audit_log", {
+export const auditLog = pgTable("audit_log", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   entityType: text("entity_type").notNull(), // submission | version | claim | user | flag | comment
   entityId: text("entity_id").notNull(),
   action: text("action").notNull(),
   performedBy: text("performed_by").notNull().references(() => users.id),
-  details: text("details", { mode: "json" }).$type<Record<string, unknown>>(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
-export const workflowTemplates = sqliteTable("workflow_templates", {
+export const workflowTemplates = pgTable("workflow_templates", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   channel: text("channel").notNull(), // per content type/channel
   // ordered list of reviewer roles
-  stages: text("stages", { mode: "json" }).$type<string[]>().notNull(),
+  stages: jsonb("stages").$type<string[]>().notNull(),
   mode: text("mode").notNull().default("sequential"), // sequential | parallel
 });

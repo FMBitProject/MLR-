@@ -1,144 +1,38 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
-import { seed, SEED_CLAIM_REFERENCES } from "./seed";
 
-const DATA_DIR = path.join(process.cwd(), ".data");
+// Postgres (Neon in production via its pooled connection string, local
+// Postgres in dev). Schema changes ship as drizzle-kit migrations in
+// ./migrations — applied with `npm run db:migrate`, never at runtime.
 
-const DDL = `
-CREATE TABLE IF NOT EXISTS tenants (
-  id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE,
-  plan TEXT NOT NULL DEFAULT 'starter', created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, role TEXT NOT NULL,
-  locale TEXT NOT NULL DEFAULT 'id', password_hash TEXT NOT NULL, created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS products (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  name TEXT NOT NULL, bpom_registration_no TEXT, created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS approved_claims (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  product_id TEXT NOT NULL REFERENCES products(id), claim_text TEXT NOT NULL,
-  source TEXT, refs TEXT,
-  channel_scope TEXT, approved_by TEXT REFERENCES users(id),
-  approved_at INTEGER, expires_at INTEGER, status TEXT NOT NULL DEFAULT 'active'
-);
-CREATE TABLE IF NOT EXISTS content_submissions (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  product_id TEXT NOT NULL REFERENCES products(id), title TEXT NOT NULL,
-  channel TEXT, target_audience TEXT, submitted_by TEXT NOT NULL REFERENCES users(id),
-  status TEXT NOT NULL DEFAULT 'in_review', current_stage TEXT,
-  created_at INTEGER NOT NULL, decided_at INTEGER
-);
-CREATE TABLE IF NOT EXISTS content_versions (
-  id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES content_submissions(id),
-  version_number INTEGER NOT NULL, file_name TEXT, text_content TEXT,
-  change_note TEXT,
-  is_locked INTEGER NOT NULL DEFAULT 0, processing_status TEXT NOT NULL DEFAULT 'ready',
-  created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS content_version_pages (
-  id TEXT PRIMARY KEY, version_id TEXT NOT NULL REFERENCES content_versions(id),
-  page_number INTEGER NOT NULL, rendered_svg TEXT NOT NULL,
-  width INTEGER NOT NULL, height INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS content_elements (
-  id TEXT PRIMARY KEY, version_id TEXT NOT NULL REFERENCES content_versions(id),
-  page_number INTEGER NOT NULL, element_type TEXT NOT NULL,
-  extraction_method TEXT NOT NULL, extracted_text TEXT, ocr_confidence REAL,
-  bounding_box TEXT, requires_manual_review INTEGER NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS review_stages (
-  id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES content_submissions(id),
-  stage_order INTEGER NOT NULL, reviewer_role TEXT NOT NULL,
-  assigned_to TEXT REFERENCES users(id), status TEXT NOT NULL DEFAULT 'pending',
-  decided_at INTEGER, decision_note TEXT
-);
-CREATE TABLE IF NOT EXISTS review_comments (
-  id TEXT PRIMARY KEY, version_id TEXT NOT NULL REFERENCES content_versions(id),
-  element_id TEXT REFERENCES content_elements(id),
-  reviewer_id TEXT NOT NULL REFERENCES users(id), comment TEXT NOT NULL,
-  resolved INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS claim_flags (
-  id TEXT PRIMARY KEY, version_id TEXT NOT NULL REFERENCES content_versions(id),
-  element_id TEXT REFERENCES content_elements(id), flagged_text TEXT NOT NULL,
-  matched_claim_id TEXT REFERENCES approved_claims(id), similarity_score REAL,
-  flag_type TEXT NOT NULL DEFAULT 'no_match', reviewer_decision TEXT,
-  decided_by TEXT REFERENCES users(id),
-  journal_verdict TEXT, journal_note TEXT, journal_pmid TEXT
-);
-CREATE TABLE IF NOT EXISTS audit_log (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, action TEXT NOT NULL,
-  performed_by TEXT NOT NULL REFERENCES users(id), details TEXT, created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS journal_documents (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  pmid TEXT, citation TEXT NOT NULL, source TEXT NOT NULL,
-  content TEXT NOT NULL, created_at INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS workflow_templates (
-  id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL REFERENCES tenants(id),
-  channel TEXT NOT NULL, stages TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'sequential'
-);
-`;
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL is not set. Point it at your Postgres/Neon database " +
+      "(e.g. postgres://user:pass@host/db). See .env.example.",
+  );
+}
 
 type DB = ReturnType<typeof drizzle<typeof schema>>;
 
 declare global {
-  // eslint-disable-next-line no-var
+  var __mlrPool: Pool | undefined;
   var __mlrDb: DB | undefined;
 }
 
-function createDb(): DB {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const sqlite = new Database(path.join(DATA_DIR, "mlr.db"));
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.exec(DDL);
-  // Lightweight migrations for databases created before a column existed
-  try {
-    sqlite.exec("ALTER TABLE content_versions ADD COLUMN change_note TEXT");
-  } catch {
-    /* column already exists */
-  }
-  try {
-    sqlite.exec("ALTER TABLE approved_claims ADD COLUMN source TEXT");
-  } catch {
-    /* column already exists */
-  }
-  try {
-    sqlite.exec("ALTER TABLE approved_claims ADD COLUMN refs TEXT");
-  } catch {
-    /* column already exists */
-  }
-  for (const col of ["journal_verdict", "journal_note", "journal_pmid"]) {
-    try {
-      sqlite.exec(`ALTER TABLE claim_flags ADD COLUMN ${col} TEXT`);
-    } catch {
-      /* column already exists */
-    }
-  }
-  // Backfill demo references for databases seeded before the refs column existed
-  const backfillRef = sqlite.prepare(
-    "UPDATE approved_claims SET refs = ? WHERE id = ? AND refs IS NULL",
-  );
-  for (const [claimId, refs] of Object.entries(SEED_CLAIM_REFERENCES)) {
-    backfillRef.run(JSON.stringify(refs), claimId);
-  }
-  const db = drizzle(sqlite, { schema });
-  const row = sqlite.prepare("SELECT COUNT(*) AS n FROM tenants").get() as { n: number };
-  if (row.n === 0) seed(db);
-  return db;
-}
+// Reuse the pool across HMR reloads in dev and across warm serverless
+// invocations in production, so we don't exhaust Postgres connections.
+const pool =
+  globalThis.__mlrPool ??
+  new Pool({
+    connectionString,
+    // Neon's pooled endpoint handles concurrency; keep per-instance pools small.
+    max: Number(process.env.DB_POOL_MAX ?? 5),
+  });
+globalThis.__mlrPool = pool;
 
-// Reuse across HMR reloads in dev
-export const db: DB = globalThis.__mlrDb ?? createDb();
+export const db: DB = globalThis.__mlrDb ?? drizzle(pool, { schema });
 globalThis.__mlrDb = db;
 
 export * as t from "./schema";

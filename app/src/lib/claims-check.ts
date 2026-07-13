@@ -65,7 +65,7 @@ export async function runClaimsCheck(opts: {
   productId: string;
   tenantId: string;
 }): Promise<number> {
-  const claims = db
+  const claims = await db
     .select()
     .from(t.approvedClaims)
     .where(
@@ -74,14 +74,12 @@ export async function runClaimsCheck(opts: {
         eq(t.approvedClaims.productId, opts.productId),
         eq(t.approvedClaims.status, "active"),
       ),
-    )
-    .all();
+    );
 
-  const elements = db
+  const elements = await db
     .select()
     .from(t.contentElements)
-    .where(eq(t.contentElements.versionId, opts.versionId))
-    .all();
+    .where(eq(t.contentElements.versionId, opts.versionId));
 
   let flagCount = 0;
 
@@ -116,7 +114,7 @@ export async function runClaimsCheck(opts: {
       if (verdict === "mismatch") flagType = "matched"; // keep flag, human decides
     }
 
-    db.insert(t.claimFlags)
+    await db.insert(t.claimFlags)
       .values({
         id: crypto.randomUUID(),
         versionId: opts.versionId,
@@ -125,8 +123,7 @@ export async function runClaimsCheck(opts: {
         matchedClaimId: best && best.score >= 0.2 ? best.id : null,
         similarityScore: best ? Math.round(best.score * 100) / 100 : 0,
         flagType,
-      })
-      .run();
+      });
     flagCount += 1;
   }
 

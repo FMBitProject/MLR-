@@ -18,19 +18,20 @@ export default async function AppLayout({
   if (!user) redirect("/login");
   const { dict, locale } = await getDict();
 
-  const tenant = db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)).get();
+  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
 
-  const queueCount = db
-    .select()
-    .from(t.contentSubmissions)
-    .where(
-      and(
-        eq(t.contentSubmissions.tenantId, user.tenantId),
-        eq(t.contentSubmissions.status, "in_review"),
-        eq(t.contentSubmissions.currentStage, user.role),
-      ),
-    )
-    .all().length;
+  const queueCount = (
+    await db
+      .select()
+      .from(t.contentSubmissions)
+      .where(
+        and(
+          eq(t.contentSubmissions.tenantId, user.tenantId),
+          eq(t.contentSubmissions.status, "in_review"),
+          eq(t.contentSubmissions.currentStage, user.role),
+        ),
+      )
+  ).length;
 
   const items: NavItem[] = [
     { key: "dashboard", href: "/dashboard", label: dict.nav.dashboard },

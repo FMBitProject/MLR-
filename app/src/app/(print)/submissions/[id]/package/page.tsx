@@ -17,50 +17,46 @@ export default async function ApprovalPackagePage(
   const { dict, locale } = await getDict();
   const { id } = await props.params;
 
-  const sub = db
+  const sub = (await db
     .select()
     .from(t.contentSubmissions)
     .where(
       and(eq(t.contentSubmissions.id, id), eq(t.contentSubmissions.tenantId, user.tenantId)),
     )
-    .get();
+    )[0];
   if (!sub) notFound();
 
-  const versions = db
+  const versions = await db
     .select()
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, sub.id))
-    .orderBy(asc(t.contentVersions.versionNumber))
-    .all();
+    .orderBy(asc(t.contentVersions.versionNumber));
   const version = versions.findLast((v) => v.isLocked);
   // Package exists only for a locked (finally approved) version
   if (!version || sub.status !== "approved") redirect(`/submissions/${sub.id}`);
 
-  const product = db.select().from(t.products).where(eq(t.products.id, sub.productId)).get();
-  const tenant = db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)).get();
-  const tenantUsers = db.select().from(t.users).where(eq(t.users.tenantId, user.tenantId)).all();
+  const product = (await db.select().from(t.products).where(eq(t.products.id, sub.productId)))[0];
+  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  const tenantUsers = await db.select().from(t.users).where(eq(t.users.tenantId, user.tenantId));
   const userName = (uid: string | null) => tenantUsers.find((u) => u.id === uid)?.name ?? "—";
 
-  const stages = db
+  const stages = await db
     .select()
     .from(t.reviewStages)
     .where(eq(t.reviewStages.submissionId, sub.id))
-    .orderBy(asc(t.reviewStages.stageOrder))
-    .all();
-  const pages = db
+    .orderBy(asc(t.reviewStages.stageOrder));
+  const pages = await db
     .select()
     .from(t.contentVersionPages)
     .where(eq(t.contentVersionPages.versionId, version.id))
-    .orderBy(asc(t.contentVersionPages.pageNumber))
-    .all();
-  const flags = db
+    .orderBy(asc(t.contentVersionPages.pageNumber));
+  const flags = await db
     .select()
     .from(t.claimFlags)
-    .where(eq(t.claimFlags.versionId, version.id))
-    .all();
+    .where(eq(t.claimFlags.versionId, version.id));
   const flagClaimIds = flags.map((f) => f.matchedClaimId).filter((x): x is string => !!x);
   const flagClaims = flagClaimIds.length
-    ? db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, flagClaimIds)).all()
+    ? await db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, flagClaimIds))
     : [];
 
   const roleLabel = (r: string) => dict.roles[r as keyof typeof dict.roles] ?? r;

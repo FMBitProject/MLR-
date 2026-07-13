@@ -13,7 +13,7 @@ export default async function SubmissionsPage(props: PageProps<"/submissions">) 
   const sp = await props.searchParams;
   const statusFilter = typeof sp.status === "string" ? sp.status : null;
 
-  const subs = db
+  const subs = await db
     .select({
       sub: t.contentSubmissions,
       product: t.products,
@@ -28,23 +28,22 @@ export default async function SubmissionsPage(props: PageProps<"/submissions">) 
         ...(statusFilter ? [eq(t.contentSubmissions.status, statusFilter)] : []),
       ),
     )
-    .orderBy(desc(t.contentSubmissions.createdAt))
-    .all();
+    .orderBy(desc(t.contentSubmissions.createdAt));
 
   const subIds = subs.map((s) => s.sub.id);
   const versions = subIds.length
-    ? db
+    ? await db
         .select()
         .from(t.contentVersions)
         .where(inArray(t.contentVersions.submissionId, subIds))
-        .all()
+        
     : [];
   const stages = subIds.length
-    ? db
+    ? await db
         .select()
         .from(t.reviewStages)
         .where(inArray(t.reviewStages.submissionId, subIds))
-        .all()
+        
     : [];
 
   const latestVersion = (subId: string) =>

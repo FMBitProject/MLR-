@@ -20,24 +20,23 @@ export default async function ClaimsPage(props: PageProps<"/claims">) {
     user.role as (typeof CLAIM_MANAGER_ROLES)[number],
   );
 
-  const products = db
+  const products = await db
     .select({ id: t.products.id, name: t.products.name })
     .from(t.products)
-    .where(eq(t.products.tenantId, user.tenantId))
-    .all();
+    .where(eq(t.products.tenantId, user.tenantId));
 
-  const claims = db
-    .select({ claim: t.approvedClaims, approver: t.users })
-    .from(t.approvedClaims)
-    .leftJoin(t.users, eq(t.approvedClaims.approvedBy, t.users.id))
-    .where(eq(t.approvedClaims.tenantId, user.tenantId))
-    .orderBy(desc(t.approvedClaims.approvedAt))
-    .all()
-    .filter(
-      ({ claim }) =>
-        (!q || claim.claimText.toLowerCase().includes(q)) &&
-        (!productFilter || claim.productId === productFilter),
-    );
+  const claims = (
+    await db
+      .select({ claim: t.approvedClaims, approver: t.users })
+      .from(t.approvedClaims)
+      .leftJoin(t.users, eq(t.approvedClaims.approvedBy, t.users.id))
+      .where(eq(t.approvedClaims.tenantId, user.tenantId))
+      .orderBy(desc(t.approvedClaims.approvedAt))
+  ).filter(
+    ({ claim }) =>
+      (!q || claim.claimText.toLowerCase().includes(q)) &&
+      (!productFilter || claim.productId === productFilter),
+  );
 
   const now = Date.now();
   const soonMs = 30 * 86_400_000;

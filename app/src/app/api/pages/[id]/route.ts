@@ -10,11 +10,11 @@ export async function GET(
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const { id } = await ctx.params;
-  const page = db
+  const page = (await db
     .select()
     .from(t.contentVersionPages)
     .where(eq(t.contentVersionPages.id, id))
-    .get();
+    )[0];
   if (!page) return new Response("Not found", { status: 404 });
 
   return new Response(page.renderedSvg, {
