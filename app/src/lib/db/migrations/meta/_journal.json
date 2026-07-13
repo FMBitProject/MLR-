@@ -15,6 +15,13 @@
       "when": 1783906803768,
       "tag": "0001_neat_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783910633679,
+      "tag": "0002_naive_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }

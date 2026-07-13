@@ -63,7 +63,7 @@ export function LoginForm({ dict }: { dict: Dict }) {
         </div>
         {state?.error ? (
           <p className="rounded-lg bg-rose-50 px-3 py-2 text-[13px] text-rose-700 ring-1 ring-inset ring-rose-200">
-            {dict.login.invalid}
+            {state.error === "locked" ? dict.login.locked : dict.login.invalid}
           </p>
         ) : null}
         <button

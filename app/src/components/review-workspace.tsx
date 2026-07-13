@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
   ArrowLeft,
@@ -149,6 +150,42 @@ export function ReviewWorkspace({
   const [showResubmit, setShowResubmit] = useState(false);
   const [decisionNote, setDecisionNote] = useState("");
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  // The AI claims check runs in the background after submit/resubmit/rerun.
+  // Poll a lightweight status endpoint until the version leaves "processing",
+  // then refresh the server components once so the flags appear. (Refreshing
+  // on a blind interval doesn't work: the router coalesces repeated
+  // refreshes, so a poll → single refresh is both cheaper and reliable.)
+  const processing = currentVersion.processingStatus !== "ready";
+  useEffect(() => {
+    if (!processing) return;
+    let cancelled = false;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/versions/${currentVersion.id}/status`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const { processingStatus } = (await res.json()) as { processingStatus: string };
+        if (processingStatus === "ready" && !cancelled) {
+          clearInterval(id);
+          router.refresh();
+          // If the refreshed payload doesn't re-render us (this effect
+          // cleans up when it does), fall back to a full reload.
+          setTimeout(() => {
+            if (!cancelled) window.location.reload();
+          }, 3000);
+        }
+      } catch {
+        // transient network error — try again next tick
+      }
+    }, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [processing, currentVersion.id, router]);
 
   const page = data.pages.find((p) => p.pageNumber === pageNumber) ?? data.pages[0];
 
@@ -373,7 +410,7 @@ export function ReviewWorkspace({
               </p>
             </div>
 
-            {currentVersion.processingStatus !== "ready" ? (
+            {processing && !page ? (
               <div className="flex h-64 items-center justify-center text-sm text-slate-500">
                 {dict.detail.processing}
               </div>
@@ -776,11 +813,13 @@ export function ReviewWorkspace({
                   <form action={(fd) => startTransition(() => rerunClaimsCheck(fd))}>
                     <input type="hidden" name="submissionId" value={sub.id} />
                     <button
-                      disabled={pending}
+                      disabled={pending || processing}
                       title={dict.detail.rerunCheckHint}
                       className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60"
                     >
-                      <RefreshCw className={clsx("size-3", pending && "animate-spin")} />
+                      <RefreshCw
+                        className={clsx("size-3", (pending || processing) && "animate-spin")}
+                      />
                       {dict.detail.rerunCheck}
                     </button>
                   </form>
@@ -789,6 +828,12 @@ export function ReviewWorkspace({
               <p className="mb-4 text-[12px] leading-relaxed text-slate-400">
                 {dict.detail.aiFlagsDesc}
               </p>
+              {processing ? (
+                <p className="mb-4 flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-[12px] text-sky-800 ring-1 ring-inset ring-sky-200">
+                  <span className="size-2 animate-pulse rounded-full bg-sky-500" />
+                  {dict.detail.checkRunning}
+                </p>
+              ) : null}
               <div className="space-y-3">
                 {visibleFlags.map((f) => (
                   <div

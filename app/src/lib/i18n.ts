@@ -21,6 +21,7 @@ const dictionaries = {
       submit: "Masuk",
       demoHint: "Akun demo (kata sandi: demo123)",
       invalid: "Email atau kata sandi salah.",
+      locked: "Terlalu banyak percobaan masuk. Tunggu 15 menit lalu coba lagi.",
       compliance: "Audit-ready • Selaras Pedoman Promosi Obat",
       noAccount: "Perusahaan Anda belum punya workspace?",
       registerLink: "Daftar di sini",
@@ -35,6 +36,7 @@ const dictionaries = {
       submit: "Buat Workspace",
       invalid: "Data tidak lengkap atau kata sandi terlalu pendek (min. 8 karakter).",
       emailTaken: "Email ini sudah terdaftar. Silakan masuk atau gunakan email lain.",
+      throttled: "Terlalu banyak pendaftaran dari jaringan ini. Coba lagi sekitar satu jam lagi.",
       haveAccount: "Sudah punya workspace?",
       signIn: "Masuk",
     },
@@ -158,6 +160,8 @@ const dictionaries = {
       rerunCheck: "Ulangi cek",
       rerunCheckHint:
         "Hitung ulang flag AI terhadap Claims Library terkini (dipakai setelah klaim di library diperbaiki).",
+      checkRunning:
+        "AI claims check sedang berjalan di latar belakang — hasil muncul otomatis dalam beberapa saat.",
       similarity: "kemiripan",
       noMatch: "Tidak ada klaim yang cocok di Claims Library",
       noMatchDesc: "Sistem tidak menemukan klaim yang relevan — bukan berarti salah, tapi wajib diverifikasi.",
@@ -315,6 +319,15 @@ const dictionaries = {
       teammateAdding: "Menambahkan…",
       teammateEmailTaken: "Email ini sudah terdaftar.",
       teammateFailed: "Gagal menambah pengguna. Periksa data lalu coba lagi.",
+      planLimit: "Kuota paket ini sudah penuh — hubungi kami untuk upgrade paket.",
+      products: "Produk",
+      productsDesc:
+        "Produk menjadi acuan Claims Library dan pengajuan konten — tambah produk perusahaan Anda di sini.",
+      productName: "Nama produk",
+      productBpom: "No. registrasi BPOM (opsional)",
+      productAdd: "Tambah",
+      productAdding: "Menambahkan…",
+      productFailed: "Gagal menambah produk. Periksa data lalu coba lagi.",
     },
     common: {
       cancel: "Batal",
@@ -355,6 +368,7 @@ const dictionaries = {
       submit: "Sign in",
       demoHint: "Demo accounts (password: demo123)",
       invalid: "Invalid email or password.",
+      locked: "Too many sign-in attempts. Wait 15 minutes and try again.",
       compliance: "Audit-ready • Aligned with Pedoman Promosi Obat",
       noAccount: "Your company doesn't have a workspace yet?",
       registerLink: "Register here",
@@ -369,6 +383,7 @@ const dictionaries = {
       submit: "Create Workspace",
       invalid: "Missing fields or password too short (min. 8 characters).",
       emailTaken: "This email is already registered. Please sign in or use a different email.",
+      throttled: "Too many registrations from this network. Try again in about an hour.",
       haveAccount: "Already have a workspace?",
       signIn: "Sign in",
     },
@@ -492,6 +507,8 @@ const dictionaries = {
       rerunCheck: "Re-run check",
       rerunCheckHint:
         "Recompute AI flags against the current Claims Library (use after fixing library claims).",
+      checkRunning:
+        "The AI claims check is running in the background — results appear automatically shortly.",
       similarity: "similarity",
       noMatch: "No matching claim in the Claims Library",
       noMatchDesc: "The system found no relevant claim — not necessarily wrong, but it must be verified.",
@@ -649,6 +666,15 @@ const dictionaries = {
       teammateAdding: "Adding…",
       teammateEmailTaken: "This email is already registered.",
       teammateFailed: "Failed to add user. Check the details and try again.",
+      planLimit: "This plan's quota is full — contact us to upgrade.",
+      products: "Products",
+      productsDesc:
+        "Products anchor the Claims Library and content submissions — add your company's products here.",
+      productName: "Product name",
+      productBpom: "BPOM registration no. (optional)",
+      productAdd: "Add",
+      productAdding: "Adding…",
+      productFailed: "Failed to add product. Check the details and try again.",
     },
     common: {
       cancel: "Cancel",

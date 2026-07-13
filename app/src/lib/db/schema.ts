@@ -200,6 +200,14 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
+// Fixed-window rate limiting for unauthenticated endpoints (login,
+// registration). DB-backed so it works across serverless instances.
+export const authThrottle = pgTable("auth_throttle", {
+  key: text("key").primaryKey(), // e.g. "login:user@x.co" | "login-ip:1.2.3.4"
+  attempts: integer("attempts").notNull().default(0),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+});
+
 export const workflowTemplates = pgTable("workflow_templates", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),

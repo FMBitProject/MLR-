@@ -23,11 +23,20 @@ export function TeammateForm({ dict }: { dict: Dict }) {
     setError(null);
     startTransition(async () => {
       try {
-        await createTeammate(formData);
+        const res = await createTeammate(formData);
+        if (res?.error) {
+          setError(
+            res.error === "EMAIL_TAKEN"
+              ? dict.settings.teammateEmailTaken
+              : res.error === "PLAN_LIMIT"
+                ? dict.settings.planLimit
+                : dict.settings.teammateFailed,
+          );
+          return;
+        }
         formRef.current?.reset();
-      } catch (e) {
-        const msg = (e as Error)?.message;
-        setError(msg === "EMAIL_TAKEN" ? dict.settings.teammateEmailTaken : dict.settings.teammateFailed);
+      } catch {
+        setError(dict.settings.teammateFailed);
       }
     });
   };

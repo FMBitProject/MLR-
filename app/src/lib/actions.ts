@@ -3,7 +3,8 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { after } from "next/server";
 import { db, t } from "./db";
 import { storage } from "./storage";
 import { mimeForFileName } from "./mime";
@@ -26,16 +27,34 @@ import { checkAgainstJournal } from "./journal-check";
 import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
+import { consumeAttempt, clearThrottle } from "./throttle";
+import { planLimits } from "./plans";
+
+async function clientIp(): Promise<string> {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
 
 /* ----------------------------- session ----------------------------- */
 
 export async function login(_prev: { error: string } | null, formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+
+  // Brute-force protection: 5 attempts per account and 20 per source IP
+  // within 15 minutes. Counted before verification so failures always cost.
+  const WINDOW = 15 * 60_000;
+  const [emailOk, ipOk] = await Promise.all([
+    consumeAttempt(`login:${email}`, 5, WINDOW),
+    consumeAttempt(`login-ip:${await clientIp()}`, 20, WINDOW),
+  ]);
+  if (!emailOk || !ipOk) return { error: "locked" };
+
   const user = (await db.select().from(t.users).where(eq(t.users.email, email)))[0];
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return { error: "invalid" };
   }
+  await clearThrottle(`login:${email}`);
   await createSession(user.id);
   await logAudit({
     tenantId: user.tenantId,
@@ -68,6 +87,10 @@ export async function register(
 
   if (!companyName || !name || !email || password.length < 8) {
     return { error: "validation" };
+  }
+  // Throttle workspace creation per source IP: 5 per hour.
+  if (!(await consumeAttempt(`register:${await clientIp()}`, 5, 60 * 60_000))) {
+    return { error: "throttled" };
   }
   if ((await db.select().from(t.users).where(eq(t.users.email, email)))[0]) {
     return { error: "email_taken" };
@@ -168,7 +191,9 @@ async function createVersionWithPipeline(opts: {
       fileName: opts.fileName,
       textContent: opts.text,
       isLocked: false,
-      processingStatus: "ready",
+      // Pages/elements render synchronously below; the AI claims check runs
+      // in the background (scheduleClaimsCheck) and flips this to "ready".
+      processingStatus: "processing",
       createdAt: new Date(),
     });
 
@@ -286,6 +311,46 @@ async function createVersionWithPipeline(opts: {
   return { versionId, flags: 0 };
 }
 
+// Runs the AI claims check AFTER the response is sent (Vercel keeps the
+// function alive via waitUntil), so a large deck can't push the submit
+// request past the platform timeout. The version stays "processing" until
+// the check finishes; the review UI polls while in that state.
+function scheduleClaimsCheck(opts: {
+  versionId: string;
+  productId: string;
+  tenantId: string;
+  performedBy: string;
+  versionLabel: string;
+  auditAction?: "claims_check_completed" | "claims_check_rerun";
+}) {
+  after(async () => {
+    try {
+      const flags = await runClaimsCheck({
+        versionId: opts.versionId,
+        productId: opts.productId,
+        tenantId: opts.tenantId,
+      });
+      await logAudit({
+        tenantId: opts.tenantId,
+        entityType: "version",
+        entityId: opts.versionId,
+        action: opts.auditAction ?? "claims_check_completed",
+        performedBy: opts.performedBy,
+        details: { version: opts.versionLabel, flags },
+      });
+    } catch (e) {
+      // A failed check must never leave the version stuck in "processing" —
+      // reviewers can re-run it manually from the workspace.
+      console.error(`claims check failed for version ${opts.versionId}:`, e);
+    } finally {
+      await db
+        .update(t.contentVersions)
+        .set({ processingStatus: "ready" })
+        .where(eq(t.contentVersions.id, opts.versionId));
+    }
+  });
+}
+
 export async function createSubmission(formData: FormData) {
   const user = await requireUser();
   if (!SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number])) {
@@ -371,14 +436,12 @@ export async function createSubmission(formData: FormData) {
     details: { version: "v1", title },
   });
 
-  const flags = await runClaimsCheck({ versionId, productId, tenantId: user.tenantId });
-  await logAudit({
+  scheduleClaimsCheck({
+    versionId,
+    productId,
     tenantId: user.tenantId,
-    entityType: "version",
-    entityId: versionId,
-    action: "claims_check_completed",
     performedBy: user.id,
-    details: { version: "v1", flags },
+    versionLabel: "v1",
   });
 
   revalidatePath("/", "layout");
@@ -459,18 +522,12 @@ export async function resubmitVersion(formData: FormData) {
     details: { version: `v${nextVersion}`, changeNote },
   });
 
-  const flags = await runClaimsCheck({
+  scheduleClaimsCheck({
     versionId,
     productId: sub.productId,
     tenantId: user.tenantId,
-  });
-  await logAudit({
-    tenantId: user.tenantId,
-    entityType: "version",
-    entityId: versionId,
-    action: "claims_check_completed",
     performedBy: user.id,
-    details: { version: `v${nextVersion}`, flags },
+    versionLabel: `v${nextVersion}`,
   });
 
   revalidatePath("/", "layout");
@@ -724,18 +781,17 @@ export async function rerunClaimsCheck(formData: FormData) {
   if (!latest || latest.isLocked) throw new Error("LOCKED");
 
   await db.delete(t.claimFlags).where(eq(t.claimFlags.versionId, latest.id));
-  const flags = await runClaimsCheck({
+  await db
+    .update(t.contentVersions)
+    .set({ processingStatus: "processing" })
+    .where(eq(t.contentVersions.id, latest.id));
+  scheduleClaimsCheck({
     versionId: latest.id,
     productId: sub.productId,
     tenantId: user.tenantId,
-  });
-  await logAudit({
-    tenantId: user.tenantId,
-    entityType: "version",
-    entityId: latest.id,
-    action: "claims_check_rerun",
     performedBy: user.id,
-    details: { version: `v${latest.versionNumber}`, flags },
+    versionLabel: `v${latest.versionNumber}`,
+    auditAction: "claims_check_rerun",
   });
   revalidatePath("/", "layout");
 }
@@ -1115,16 +1171,27 @@ export async function createTeammate(formData: FormData) {
   const role = String(formData.get("role") ?? "");
   const password = String(formData.get("password") ?? "");
 
+  // Thrown errors are masked by Next.js in production, so expected failures
+  // are returned as codes for the form to translate.
   if (
     !name ||
     !email ||
     password.length < 8 ||
     !TEAMMATE_ROLES.includes(role as (typeof TEAMMATE_ROLES)[number])
   ) {
-    throw new Error("VALIDATION");
+    return { error: "VALIDATION" };
   }
   if ((await db.select().from(t.users).where(eq(t.users.email, email)))[0]) {
-    throw new Error("EMAIL_TAKEN");
+    return { error: "EMAIL_TAKEN" };
+  }
+
+  // Plan quota (PRD §12): starter 15 users, growth 50.
+  const [tenant, existingUsers] = await Promise.all([
+    db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)),
+    db.select({ id: t.users.id }).from(t.users).where(eq(t.users.tenantId, user.tenantId)),
+  ]);
+  if (existingUsers.length >= planLimits(tenant[0]?.plan).users) {
+    return { error: "PLAN_LIMIT" };
   }
 
   const teammateId = crypto.randomUUID();
@@ -1148,4 +1215,45 @@ export async function createTeammate(formData: FormData) {
     details: { email, role },
   });
   revalidatePath("/settings");
+  return {};
+}
+
+// Products are the anchor for claims and submissions; without one a fresh
+// tenant can't submit anything, so admins manage them from Settings.
+export async function createProduct(formData: FormData) {
+  const user = await requireUser();
+  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+
+  const name = String(formData.get("name") ?? "").trim();
+  const bpomRegistrationNo = String(formData.get("bpomRegistrationNo") ?? "").trim() || null;
+  if (!name) return { error: "VALIDATION" };
+
+  // Plan quota (PRD §12): starter 3 products, growth 15.
+  const [tenant, existing] = await Promise.all([
+    db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)),
+    db.select({ id: t.products.id }).from(t.products).where(eq(t.products.tenantId, user.tenantId)),
+  ]);
+  if (existing.length >= planLimits(tenant[0]?.plan).products) {
+    return { error: "PLAN_LIMIT" };
+  }
+
+  const productId = crypto.randomUUID();
+  await db.insert(t.products).values({
+    id: productId,
+    tenantId: user.tenantId,
+    name,
+    bpomRegistrationNo,
+    createdAt: new Date(),
+  });
+
+  await logAudit({
+    tenantId: user.tenantId,
+    entityType: "product",
+    entityId: productId,
+    action: "product_added",
+    performedBy: user.id,
+    details: { name, bpomRegistrationNo: bpomRegistrationNo ?? undefined },
+  });
+  revalidatePath("/", "layout");
+  return {};
 }

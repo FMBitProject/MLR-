@@ -60,7 +60,11 @@ export function RegisterForm({ dict }: { dict: Dict }) {
         </div>
         {state?.error ? (
           <p className="rounded-lg bg-rose-50 px-3 py-2 text-[13px] text-rose-700 ring-1 ring-inset ring-rose-200">
-            {state.error === "email_taken" ? dict.register.emailTaken : dict.register.invalid}
+            {state.error === "email_taken"
+              ? dict.register.emailTaken
+              : state.error === "throttled"
+                ? dict.register.throttled
+                : dict.register.invalid}
           </p>
         ) : null}
         <button

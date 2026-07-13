@@ -1,14 +1,16 @@
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { Building2, GitBranch, Users, Sparkles, ShieldAlert } from "lucide-react";
+import { Building2, GitBranch, Users, Sparkles, ShieldAlert, Package } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { saveWorkflow } from "@/lib/actions";
 import { getLlmProvider } from "@/lib/llm";
+import { planLimits } from "@/lib/plans";
 import { Avatar, Card, CardHeader, Chip, PageHeader } from "@/components/ui";
 import { TeammateForm } from "@/components/teammate-form";
+import { ProductForm } from "@/components/product-form";
 
 const CHANNELS = ["print", "digital", "e-detail", "social"] as const;
 const ROLES = ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"] as const;
@@ -20,12 +22,17 @@ export default async function SettingsPage() {
 
   const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
   const users = await db.select().from(t.users).where(eq(t.users.tenantId, user.tenantId));
+  const products = await db
+    .select()
+    .from(t.products)
+    .where(eq(t.products.tenantId, user.tenantId));
   const templates = await db
     .select()
     .from(t.workflowTemplates)
     .where(eq(t.workflowTemplates.tenantId, user.tenantId));
 
   const aiProvider = getLlmProvider();
+  const limits = planLimits(tenant?.plan);
 
   return (
     <div className="animate-fade-up">
@@ -61,6 +68,36 @@ export default async function SettingsPage() {
                   {formatDate(tenant?.createdAt ?? null, locale)}
                 </p>
               </div>
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <Package className="size-4 text-slate-400" />
+                  {dict.settings.products} ({products.length}
+                  {Number.isFinite(limits.products) ? `/${limits.products}` : ""})
+                </span>
+              }
+              desc={dict.settings.productsDesc}
+            />
+            <div className="divide-y divide-slate-100">
+              {products.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 px-6 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-medium text-slate-800">{p.name}</p>
+                    {p.bpomRegistrationNo ? (
+                      <p className="truncate text-[12px] text-slate-400">
+                        {p.bpomRegistrationNo}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-slate-100">
+              <ProductForm dict={dict} />
             </div>
           </Card>
 
@@ -141,7 +178,8 @@ export default async function SettingsPage() {
               title={
                 <span className="flex items-center gap-2">
                   <Users className="size-4 text-slate-400" />
-                  {dict.settings.users} ({users.length})
+                  {dict.settings.users} ({users.length}
+                  {Number.isFinite(limits.users) ? `/${limits.users}` : ""})
                 </span>
               }
             />
