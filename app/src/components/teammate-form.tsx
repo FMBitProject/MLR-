@@ -16,11 +16,13 @@ const ROLES = [
 
 export function TeammateForm({ dict }: { dict: Dict }) {
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [pending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
   const onSubmit = (formData: FormData) => {
     setError(null);
+    setSent(false);
     startTransition(async () => {
       try {
         const res = await createTeammate(formData);
@@ -35,6 +37,7 @@ export function TeammateForm({ dict }: { dict: Dict }) {
           return;
         }
         formRef.current?.reset();
+        setSent(true);
       } catch {
         setError(dict.settings.teammateFailed);
       }
@@ -56,29 +59,25 @@ export function TeammateForm({ dict }: { dict: Dict }) {
           className={input}
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <select name="role" required defaultValue="" className={input}>
-          <option value="" disabled>
-            {dict.settings.teammateRole}
+      <select name="role" required defaultValue="" className={input}>
+        <option value="" disabled>
+          {dict.settings.teammateRole}
+        </option>
+        {ROLES.map((r) => (
+          <option key={r} value={r}>
+            {dict.roles[r]}
           </option>
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {dict.roles[r]}
-            </option>
-          ))}
-        </select>
-        <input
-          name="password"
-          type="password"
-          required
-          minLength={8}
-          placeholder={dict.settings.teammatePassword}
-          className={input}
-        />
-      </div>
+        ))}
+      </select>
+      <p className="text-[11.5px] text-slate-400">{dict.settings.teammateInviteHint}</p>
       {error ? (
         <p className="rounded-lg bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700 ring-1 ring-inset ring-rose-200">
           {error}
+        </p>
+      ) : null}
+      {sent ? (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[12.5px] text-emerald-700 ring-1 ring-inset ring-emerald-200">
+          {dict.settings.teammateInvited}
         </p>
       ) : null}
       <button

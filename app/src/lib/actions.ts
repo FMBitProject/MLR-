@@ -29,6 +29,8 @@ import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
 import { consumeAttempt, clearThrottle } from "./throttle";
 import { planLimits } from "./plans";
+import { sendVerificationEmail, sendInviteEmail } from "./email";
+import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
 
 async function clientIp(): Promise<string> {
   const h = await headers();
@@ -51,9 +53,13 @@ export async function login(_prev: { error: string } | null, formData: FormData)
   if (!emailOk || !ipOk) return { error: "locked" };
 
   const user = (await db.select().from(t.users).where(eq(t.users.email, email)))[0];
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    return { error: "invalid" };
-  }
+  if (!user) return { error: "invalid" };
+  // Checked before the password so an invited-but-not-yet-activated account
+  // (which has no usable password yet) gets an actionable message instead
+  // of a generic "wrong password".
+  if (!user.emailVerifiedAt) return { error: "unverified" };
+  if (!verifyPassword(password, user.passwordHash)) return { error: "invalid" };
+
   await clearThrottle(`login:${email}`);
   await createSession(user.id);
   await logAudit({
@@ -77,7 +83,7 @@ function slugify(name: string): string {
 }
 
 export async function register(
-  _prev: { error: string } | null,
+  _prev: { error: string; sent?: undefined } | { sent: boolean; error?: undefined } | null,
   formData: FormData,
 ) {
   const companyName = String(formData.get("companyName") ?? "").trim();
@@ -117,6 +123,7 @@ export async function register(
       name,
       role: "super_admin",
       passwordHash: hashPassword(password),
+      emailVerifiedAt: null,
       createdAt: new Date(),
     });
 
@@ -129,8 +136,52 @@ export async function register(
     details: { companyName, slug },
   });
 
-  await createSession(userId);
-  redirect("/dashboard");
+  const token = await createAccountToken(userId, "verify");
+  await sendVerificationEmail(email, name, token);
+
+  return { sent: true };
+}
+
+export async function resendVerificationEmail(
+  _prev: { error?: string; sent?: boolean } | null,
+  formData: FormData,
+) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!(await consumeAttempt(`resend-verify:${email}`, 3, 60 * 60_000))) {
+    return { error: "throttled" };
+  }
+  const user = (await db.select().from(t.users).where(eq(t.users.email, email)))[0];
+  // Same response whether the account exists or is already verified — avoids
+  // confirming account existence to an unauthenticated caller.
+  if (user && !user.emailVerifiedAt) {
+    const token = await createAccountToken(user.id, "verify");
+    await sendVerificationEmail(user.email, user.name, token);
+  }
+  return { sent: true };
+}
+
+/** Confirms a self-registration "verify" token. Called directly from the
+ * /verify-email server component (not a form) — the click on the emailed
+ * link is the user action, no extra submit needed. */
+export async function verifyEmailToken(
+  token: string,
+): Promise<{ status: "ok" | "invalid" }> {
+  const found = await findAccountToken(token);
+  if (!found || found.purpose !== "verify") return { status: "invalid" };
+
+  await db
+    .update(t.users)
+    .set({ emailVerifiedAt: new Date() })
+    .where(eq(t.users.id, found.userId));
+  await consumeAccountToken(token);
+  await logAudit({
+    tenantId: found.user.tenantId,
+    entityType: "user",
+    entityId: found.userId,
+    action: "email_verified",
+    performedBy: found.userId,
+  });
+  return { status: "ok" };
 }
 
 export async function logout() {
@@ -1162,6 +1213,10 @@ const TEAMMATE_ROLES = [
   "super_admin",
 ] as const;
 
+// Invited teammates get no usable password at creation time — they set one
+// via the invite link, so a shared/typo'd admin-set password can never be
+// the actual credential in use (closes the account-identity gap: every
+// login is provably tied to whoever clicked the link sent to that inbox).
 export async function createTeammate(formData: FormData) {
   const user = await requireUser();
   if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
@@ -1169,16 +1224,10 @@ export async function createTeammate(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const role = String(formData.get("role") ?? "");
-  const password = String(formData.get("password") ?? "");
 
   // Thrown errors are masked by Next.js in production, so expected failures
   // are returned as codes for the form to translate.
-  if (
-    !name ||
-    !email ||
-    password.length < 8 ||
-    !TEAMMATE_ROLES.includes(role as (typeof TEAMMATE_ROLES)[number])
-  ) {
+  if (!name || !email || !TEAMMATE_ROLES.includes(role as (typeof TEAMMATE_ROLES)[number])) {
     return { error: "VALIDATION" };
   }
   if ((await db.select().from(t.users).where(eq(t.users.email, email)))[0]) {
@@ -1202,7 +1251,10 @@ export async function createTeammate(formData: FormData) {
       email,
       name,
       role,
-      passwordHash: hashPassword(password),
+      // Unguessable placeholder — nobody is ever told this value. Login is
+      // blocked anyway until emailVerifiedAt is set via the invite link.
+      passwordHash: hashPassword(crypto.randomUUID()),
+      emailVerifiedAt: null,
       createdAt: new Date(),
     });
 
@@ -1210,12 +1262,41 @@ export async function createTeammate(formData: FormData) {
     tenantId: user.tenantId,
     entityType: "user",
     entityId: teammateId,
-    action: "teammate_added",
+    action: "teammate_invited",
     performedBy: user.id,
     details: { email, role },
   });
+
+  const token = await createAccountToken(teammateId, "invite");
+  await sendInviteEmail(email, name, tenant[0]?.name ?? "MLR Flow", token);
+
   revalidatePath("/settings");
   return {};
+}
+
+export async function acceptInvite(formData: FormData) {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) return { error: "VALIDATION" };
+
+  const found = await findAccountToken(token);
+  if (!found || found.purpose !== "invite") return { error: "INVALID_TOKEN" };
+
+  await db
+    .update(t.users)
+    .set({ passwordHash: hashPassword(password), emailVerifiedAt: new Date() })
+    .where(eq(t.users.id, found.userId));
+  await consumeAccountToken(token);
+  await logAudit({
+    tenantId: found.user.tenantId,
+    entityType: "user",
+    entityId: found.userId,
+    action: "invite_accepted",
+    performedBy: found.userId,
+  });
+
+  await createSession(found.userId);
+  redirect("/dashboard");
 }
 
 // Products are the anchor for claims and submissions; without one a fresh

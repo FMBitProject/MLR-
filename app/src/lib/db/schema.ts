@@ -36,6 +36,21 @@ export const users = pgTable("users", {
   role: text("role").notNull(),
   locale: text("locale").notNull().default("id"),
   passwordHash: text("password_hash").notNull(),
+  // Null until the owner proves they control the address (register/invite
+  // link). Login is blocked while null — see requireVerifiedUser in auth.ts.
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+});
+
+// Single-use tokens for the two account-activation flows: "verify" (the
+// account already has a password — self-registration — just confirm the
+// address) and "invite" (an admin created the row with no usable password;
+// the recipient sets one when accepting).
+export const accountTokens = pgTable("account_tokens", {
+  token: text("token").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  purpose: text("purpose").notNull(), // verify | invite
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 

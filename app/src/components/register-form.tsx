@@ -12,6 +12,23 @@ export function RegisterForm({ dict }: { dict: Dict }) {
     "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10";
   const label = "mb-1.5 block text-[13px] font-medium text-slate-700";
 
+  if (state?.sent) {
+    return (
+      <div className="w-full max-w-md animate-fade-up text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          {dict.register.checkEmailTitle}
+        </h1>
+        <p className="mt-3 text-sm text-slate-500">{dict.register.checkEmailBody}</p>
+        <Link
+          href="/login"
+          className="mt-6 inline-block font-medium text-brand-700 hover:text-brand-800"
+        >
+          {dict.register.signIn}
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-md animate-fade-up">
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900">

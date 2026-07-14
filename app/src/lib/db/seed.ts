@@ -70,6 +70,7 @@ export async function seed(db: DB) {
       tenantId: TENANT,
       locale: "id",
       passwordHash: hashPassword("demo123"),
+      emailVerifiedAt: daysAgo(120),
       createdAt: daysAgo(120),
     });
   }

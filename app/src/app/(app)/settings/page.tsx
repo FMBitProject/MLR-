@@ -191,6 +191,9 @@ export default async function SettingsPage() {
                     <p className="truncate text-[13.5px] font-medium text-slate-800">{u.name}</p>
                     <p className="truncate text-[12px] text-slate-400">{u.email}</p>
                   </div>
+                  {!u.emailVerifiedAt ? (
+                    <Chip tone="slate">{dict.settings.pendingVerification}</Chip>
+                  ) : null}
                   <Chip tone={u.role === "super_admin" ? "brand" : "slate"}>
                     {dict.roles[u.role as keyof typeof dict.roles] ?? u.role}
                   </Chip>
