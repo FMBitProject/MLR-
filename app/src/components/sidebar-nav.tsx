@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FileStack,
+  FolderCheck,
   BookCheck,
   ScrollText,
   Settings,
@@ -14,6 +15,7 @@ import clsx from "clsx";
 const ICONS = {
   dashboard: LayoutDashboard,
   submissions: FileStack,
+  library: FolderCheck,
   claims: BookCheck,
   audit: ScrollText,
   settings: Settings,

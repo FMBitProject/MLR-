@@ -41,6 +41,7 @@ export default async function AppLayout({
       label: dict.nav.submissions,
       badge: queueCount || undefined,
     },
+    { key: "library", href: "/library", label: dict.nav.library },
     { key: "claims", href: "/claims", label: dict.nav.claims },
   ];
   if (["compliance_admin", "super_admin"].includes(user.role)) {

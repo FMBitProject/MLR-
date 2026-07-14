@@ -31,6 +31,7 @@ import { consumeAttempt, clearThrottle } from "./throttle";
 import { planLimits } from "./plans";
 import { sendVerificationEmail, sendInviteEmail } from "./email";
 import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
+import { getDict } from "./i18n-server";
 
 async function clientIp(): Promise<string> {
   const h = await headers();
@@ -582,6 +583,124 @@ export async function resubmitVersion(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
+}
+
+// "Reuse" from the Approved Library: clones the locked master of an approved
+// submission into a brand-new submission that runs the full review workflow
+// again. The source submission (and its approval trail) is never touched —
+// per MLR discipline every new use of a piece is a new reviewed submission.
+export async function reuseApprovedContent(formData: FormData) {
+  const user = await requireUser();
+  if (!SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number])) {
+    throw new Error("FORBIDDEN");
+  }
+  const sourceId = String(formData.get("submissionId") ?? "");
+
+  const source = (await db
+    .select()
+    .from(t.contentSubmissions)
+    .where(
+      and(
+        eq(t.contentSubmissions.id, sourceId),
+        eq(t.contentSubmissions.tenantId, user.tenantId),
+        eq(t.contentSubmissions.status, "approved"),
+      ),
+    )
+    )[0];
+  if (!source) throw new Error("NOT_FOUND");
+
+  const versions = await db
+    .select()
+    .from(t.contentVersions)
+    .where(eq(t.contentVersions.submissionId, sourceId))
+    .orderBy(asc(t.contentVersions.versionNumber));
+  const finalVersion = versions[versions.length - 1];
+  if (!finalVersion) throw new Error("NOT_FOUND");
+
+  const product = (await db
+    .select()
+    .from(t.products)
+    .where(eq(t.products.id, source.productId))
+    )[0];
+
+  // Prefer the original master file; fall back to the extracted text if the
+  // bytes are gone (e.g. local-disk driver wiped between deploys).
+  const fileData = finalVersion.fileName ? await storage.get(finalVersion.id) : null;
+  const fileName = fileData ? finalVersion.fileName : null;
+  const text = fileName ? null : finalVersion.textContent;
+  if (!fileName && !text) throw new Error("SOURCE_EMPTY");
+
+  const { dict } = await getDict();
+  const title = `${source.title} ${dict.library.reuseSuffix}`;
+  const channel = source.channel ?? "print";
+
+  const submissionId = crypto.randomUUID();
+  const stageRoles = await stagesForChannel(user.tenantId, channel);
+
+  await db.insert(t.contentSubmissions)
+    .values({
+      id: submissionId,
+      tenantId: user.tenantId,
+      productId: source.productId,
+      title,
+      channel,
+      targetAudience: source.targetAudience,
+      submittedBy: user.id,
+      status: "in_review",
+      currentStage: stageRoles[0],
+      createdAt: new Date(),
+    });
+
+  for (const [i, role] of stageRoles.entries()) {
+    await db.insert(t.reviewStages)
+      .values({
+        id: crypto.randomUUID(),
+        submissionId,
+        stageOrder: i + 1,
+        reviewerRole: role,
+        assignedTo: await defaultAssignee(user.tenantId, role),
+        status: i === 0 ? "in_progress" : "pending",
+      });
+  }
+
+  const { versionId } = await createVersionWithPipeline({
+    tenantId: user.tenantId,
+    submissionId,
+    productId: source.productId,
+    versionNumber: 1,
+    title,
+    subtitle: `${product?.name ?? ""} — ${channel}`,
+    text,
+    fileName,
+    fileData,
+  });
+  if (fileData) {
+    await storage.put(versionId, fileData, mimeForFileName(fileName));
+  }
+
+  await logAudit({
+    tenantId: user.tenantId,
+    entityType: "submission",
+    entityId: submissionId,
+    action: "reused_from_library",
+    performedBy: user.id,
+    details: {
+      title,
+      sourceSubmissionId: sourceId,
+      sourceVersion: `v${finalVersion.versionNumber}`,
+    },
+  });
+
+  scheduleClaimsCheck({
+    versionId,
+    productId: source.productId,
+    tenantId: user.tenantId,
+    performedBy: user.id,
+    versionLabel: "v1",
+  });
+
+  revalidatePath("/", "layout");
+  redirect(`/submissions/${submissionId}`);
 }
 
 /* ------------------------------ review ----------------------------- */
