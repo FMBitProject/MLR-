@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { Building2, GitBranch, Users, Sparkles, ShieldAlert, Package } from "lucide-react";
+import { Building2, GitBranch, Users, Sparkles, ShieldAlert, Package, Lock } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { saveWorkflow } from "@/lib/actions";
 import { getLlmProvider } from "@/lib/llm";
-import { planLimits } from "@/lib/plans";
+import { planDef, formatIdr } from "@/lib/plans";
+import { submissionQuota } from "@/lib/usage";
 import { Avatar, Card, CardHeader, Chip, PageHeader } from "@/components/ui";
 import { TeammateForm } from "@/components/teammate-form";
 import { ProductForm } from "@/components/product-form";
@@ -32,7 +33,9 @@ export default async function SettingsPage() {
     .where(eq(t.workflowTemplates.tenantId, user.tenantId));
 
   const aiProvider = getLlmProvider();
-  const limits = planLimits(tenant?.plan);
+  const plan = planDef(tenant?.plan);
+  const limits = plan.limits;
+  const quota = await submissionQuota(user.tenantId, tenant?.plan);
 
   return (
     <div className="animate-fade-up">
@@ -64,8 +67,22 @@ export default async function SettingsPage() {
                 <p className="mt-1">
                   <Chip tone="brand">{tenant?.plan?.toUpperCase()}</Chip>
                 </p>
-                <p className="mt-1 text-[12px] text-slate-400">
+                <p className="mt-1.5 text-[12.5px] font-medium text-slate-600">
+                  {plan.monthlyPriceIdr !== null
+                    ? `${formatIdr(plan.monthlyPriceIdr)}${dict.settings.planPerMonth}`
+                    : dict.settings.planCustomPrice}
+                </p>
+                <p className="mt-0.5 text-[12px] text-slate-400">
                   {formatDate(tenant?.createdAt ?? null, locale)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">
+                  {dict.settings.submissionsThisMonth}
+                </p>
+                <p className="mt-1 font-medium text-slate-800">
+                  {quota.used}
+                  {Number.isFinite(quota.limit) ? `/${quota.limit}` : ""}
                 </p>
               </div>
             </div>
@@ -111,6 +128,14 @@ export default async function SettingsPage() {
               }
               desc={dict.settings.workflowDesc}
             />
+            {!plan.features.customWorkflows ? (
+              <div className="flex items-start gap-3 px-6 py-5">
+                <Lock className="mt-0.5 size-4 shrink-0 text-slate-400" />
+                <p className="text-[12.5px] leading-relaxed text-slate-500">
+                  {dict.settings.workflowLocked}
+                </p>
+              </div>
+            ) : (
             <div className="divide-y divide-slate-100">
               {CHANNELS.map((channel) => {
                 const wf = templates.find((w) => w.channel === channel);
@@ -149,6 +174,7 @@ export default async function SettingsPage() {
                 );
               })}
             </div>
+            )}
           </Card>
 
           <Card className={aiProvider ? "border-emerald-200" : "border-amber-200"}>

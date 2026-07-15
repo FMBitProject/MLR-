@@ -151,6 +151,8 @@ const dictionaries = {
       fileTooLarge: "File terlalu besar — maksimum 20 MB.",
       submitFailed: "Gagal mengirim. Periksa koneksi Anda lalu coba lagi.",
       submitterOnly: "Hanya tim Marketing yang dapat mengajukan konten baru. Reviewer Medical/Legal/Regulatory hanya bertugas mereview.",
+      quotaLabel: "Kuota pengajuan bulan ini",
+      quotaFull: "Kuota pengajuan bulan ini sudah penuh — upgrade paket untuk menambah kuota.",
     },
     detail: {
       version: "Versi",
@@ -180,6 +182,7 @@ const dictionaries = {
       supportingRefs: "Referensi pendukung",
       journalCheck: "Cek terhadap Jurnal (AI)",
       journalChecking: "Membaca jurnal…",
+      journalUpgrade: "Substansiasi jurnal AI tersedia mulai paket Growth.",
       journalVerdicts: {
         supported: "✓ Didukung isi jurnal",
         not_supported: "✗ Tidak didukung isi jurnal",
@@ -355,6 +358,12 @@ const dictionaries = {
       teammateFailed: "Gagal mengirim undangan. Periksa data lalu coba lagi.",
       pendingVerification: "Menunggu verifikasi",
       planLimit: "Kuota paket ini sudah penuh — hubungi kami untuk upgrade paket.",
+      planPerMonth: "/bulan",
+      planCustomPrice: "Harga khusus",
+      submissionsThisMonth: "Pengajuan bulan ini",
+      planIncludes: "Termasuk dalam paket",
+      workflowLocked:
+        "Kustomisasi alur per kanal tersedia mulai paket Growth — paket Starter memakai alur standar 3 tahap (Medical → Legal → Regulatory).",
       products: "Produk",
       productsDesc:
         "Produk menjadi acuan Claims Library dan pengajuan konten — tambah produk perusahaan Anda di sini.",
@@ -363,6 +372,50 @@ const dictionaries = {
       productAdd: "Tambah",
       productAdding: "Menambahkan…",
       productFailed: "Gagal menambah produk. Periksa data lalu coba lagi.",
+    },
+    pricing: {
+      title: "Paket & Harga",
+      subtitle:
+        "Harga transparan, jauh di bawah tool enterprise — dengan alur kerja MLR inti yang benar-benar dipakai tim pharma menengah setiap hari.",
+      perMonth: "/bulan",
+      customPrice: "Harga khusus",
+      recommended: "Paling populer",
+      startCta: "Daftar Workspace",
+      contactSales: "Hubungi Sales",
+      usersUnit: "pengguna",
+      productsUnit: "produk",
+      submissionsUnit: "pengajuan konten/bulan",
+      unlimitedUsage: "Pengguna, produk & pengajuan tanpa batas",
+      taglines: {
+        starter: "Untuk tim kecil yang mulai merapikan disiplin review promosi.",
+        growth: "Untuk tim MLR aktif dengan banyak produk dan kanal.",
+        enterprise: "Untuk organisasi besar dengan kebutuhan dan volume khusus.",
+      },
+      featureLists: {
+        starter: [
+          "Workflow review standar 3 tahap (Medical → Legal → Regulatory)",
+          "AI claims check terhadap Approved Claims Library",
+          "Approved Content Library",
+          "Jejak audit lengkap, siap inspeksi BPOM",
+          "UI dwibahasa (ID/EN)",
+          "Dukungan email",
+        ],
+        growth: [
+          "Semua fitur Starter",
+          "Substansiasi jurnal AI (PubMed / full-text PDF)",
+          "Kustomisasi workflow review per kanal",
+          "Dukungan prioritas",
+        ],
+        enterprise: [
+          "Semua fitur Growth",
+          "Onboarding terdedikasi",
+          "SLA khusus",
+        ],
+      },
+      footnote:
+        "Harga belum termasuk PPN. Semua paket mencakup isolasi data penuh per tenant. Butuh demo atau masa uji coba? Hubungi kami.",
+      haveWorkspace: "Sudah punya workspace?",
+      signIn: "Masuk",
     },
     common: {
       cancel: "Batal",
@@ -533,6 +586,8 @@ const dictionaries = {
       fileTooLarge: "File is too large — 20 MB max.",
       submitFailed: "Submission failed. Check your connection and try again.",
       submitterOnly: "Only Marketing can submit new content. Medical/Legal/Regulatory reviewers only review.",
+      quotaLabel: "This month's submission quota",
+      quotaFull: "This month's submission quota is full — upgrade your plan for more.",
     },
     detail: {
       version: "Version",
@@ -562,6 +617,7 @@ const dictionaries = {
       supportingRefs: "Supporting references",
       journalCheck: "Check against Journal (AI)",
       journalChecking: "Reading the journal…",
+      journalUpgrade: "AI journal substantiation is available from the Growth plan.",
       journalVerdicts: {
         supported: "✓ Supported by the journal",
         not_supported: "✗ Not supported by the journal",
@@ -737,6 +793,12 @@ const dictionaries = {
       teammateFailed: "Failed to send invite. Check the details and try again.",
       pendingVerification: "Pending verification",
       planLimit: "This plan's quota is full — contact us to upgrade.",
+      planPerMonth: "/month",
+      planCustomPrice: "Custom pricing",
+      submissionsThisMonth: "Submissions this month",
+      planIncludes: "Included in this plan",
+      workflowLocked:
+        "Per-channel workflow customization is available from the Growth plan — Starter uses the standard 3-stage flow (Medical → Legal → Regulatory).",
       products: "Products",
       productsDesc:
         "Products anchor the Claims Library and content submissions — add your company's products here.",
@@ -745,6 +807,50 @@ const dictionaries = {
       productAdd: "Add",
       productAdding: "Adding…",
       productFailed: "Failed to add product. Check the details and try again.",
+    },
+    pricing: {
+      title: "Plans & Pricing",
+      subtitle:
+        "Transparent pricing, positioned well below enterprise tools — covering the core MLR workflow mid-size pharma teams actually use every day.",
+      perMonth: "/month",
+      customPrice: "Custom pricing",
+      recommended: "Most popular",
+      startCta: "Create a Workspace",
+      contactSales: "Contact Sales",
+      usersUnit: "users",
+      productsUnit: "products",
+      submissionsUnit: "content submissions/month",
+      unlimitedUsage: "Unlimited users, products & submissions",
+      taglines: {
+        starter: "For small teams starting to formalize promotional review.",
+        growth: "For active MLR teams with multiple products and channels.",
+        enterprise: "For large organizations with custom needs and volume.",
+      },
+      featureLists: {
+        starter: [
+          "Standard 3-stage review workflow (Medical → Legal → Regulatory)",
+          "AI claims check against the Approved Claims Library",
+          "Approved Content Library",
+          "Complete audit trail, BPOM inspection-ready",
+          "Bilingual UI (ID/EN)",
+          "Email support",
+        ],
+        growth: [
+          "Everything in Starter",
+          "AI journal substantiation (PubMed / full-text PDF)",
+          "Per-channel review workflow customization",
+          "Priority support",
+        ],
+        enterprise: [
+          "Everything in Growth",
+          "Dedicated onboarding",
+          "Custom SLA",
+        ],
+      },
+      footnote:
+        "Prices exclude VAT. Every plan includes full per-tenant data isolation. Need a demo or a trial? Contact us.",
+      haveWorkspace: "Already have a workspace?",
+      signIn: "Sign in",
     },
     common: {
       cancel: "Cancel",

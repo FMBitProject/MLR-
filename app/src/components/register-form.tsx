@@ -98,6 +98,10 @@ export function RegisterForm({ dict }: { dict: Dict }) {
         <Link href="/login" className="font-medium text-brand-700 hover:text-brand-800">
           {dict.register.signIn}
         </Link>
+        {" · "}
+        <Link href="/pricing" className="font-medium text-brand-700 hover:text-brand-800">
+          {dict.pricing.title}
+        </Link>
       </p>
     </div>
   );

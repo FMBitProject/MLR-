@@ -11,11 +11,14 @@ export function SubmissionForm({
   dict,
   products,
   workflows,
+  quota,
 }: {
   dict: Dict;
   products: Product[];
   workflows: Record<string, string[]>;
+  quota: { used: number; limit: number | null };
 }) {
+  const quotaFull = quota.limit !== null && quota.used >= quota.limit;
   const [channel, setChannel] = useState("print");
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +139,12 @@ export function SubmissionForm({
           <p className="mt-1.5 text-[12px] text-slate-400">{dict.newSubmission.fileNote}</p>
         </div>
 
+        {quotaFull ? (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-800 ring-1 ring-inset ring-amber-200">
+            {dict.newSubmission.quotaFull}
+          </p>
+        ) : null}
+
         {error ? (
           <p className="rounded-lg bg-rose-50 px-3 py-2 text-[13px] text-rose-700 ring-1 ring-inset ring-rose-200">
             {error}
@@ -144,7 +153,7 @@ export function SubmissionForm({
 
         <button
           type="submit"
-          disabled={pending}
+          disabled={pending || quotaFull}
           className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99] disabled:opacity-60"
         >
           {pending ? dict.newSubmission.submitting : dict.newSubmission.submit}
@@ -177,6 +186,14 @@ export function SubmissionForm({
           <FileText className="mt-0.5 size-4 shrink-0" />
           {dict.newSubmission.subtitle}
         </div>
+        {quota.limit !== null ? (
+          <p className="mt-4 text-[12px] text-slate-400">
+            {dict.newSubmission.quotaLabel}:{" "}
+            <strong className="font-semibold text-slate-600">
+              {quota.used}/{quota.limit}
+            </strong>
+          </p>
+        ) : null}
       </aside>
     </form>
   );

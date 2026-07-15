@@ -133,6 +133,7 @@ export type WorkspaceData = {
   canResubmit: boolean;
   isLatest: boolean;
   libraryHasJournals: boolean;
+  journalCheckAllowed: boolean;
 };
 
 export function ReviewWorkspace({
@@ -984,19 +985,25 @@ export function ReviewWorkspace({
                         </p>
                       </div>
                     ) : data.canReview && !f.reviewerDecision && data.libraryHasJournals ? (
-                      <form
-                        action={(fd) => startTransition(() => verifyFlagJournal(fd))}
-                        className="mt-2.5"
-                      >
-                        <input type="hidden" name="flagId" value={f.id} />
-                        <button
-                          disabled={pending}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11.5px] font-semibold text-sky-800 transition hover:bg-sky-100 disabled:opacity-60"
+                      data.journalCheckAllowed ? (
+                        <form
+                          action={(fd) => startTransition(() => verifyFlagJournal(fd))}
+                          className="mt-2.5"
                         >
-                          <BookOpenCheck className="size-3.5" />
-                          {pending ? dict.detail.journalChecking : dict.detail.journalCheck}
-                        </button>
-                      </form>
+                          <input type="hidden" name="flagId" value={f.id} />
+                          <button
+                            disabled={pending}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11.5px] font-semibold text-sky-800 transition hover:bg-sky-100 disabled:opacity-60"
+                          >
+                            <BookOpenCheck className="size-3.5" />
+                            {pending ? dict.detail.journalChecking : dict.detail.journalCheck}
+                          </button>
+                        </form>
+                      ) : (
+                        <p className="mt-2.5 text-[11px] text-slate-400">
+                          {dict.detail.journalUpgrade}
+                        </p>
+                      )
                     ) : f.journalVerdict === "unavailable" ? (
                       <p className="mt-2.5 text-[11px] text-slate-400">
                         {dict.detail.journalVerdicts.unavailable}

@@ -5,6 +5,7 @@ import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { diffParagraphs } from "@/lib/diff";
+import { planHas } from "@/lib/plans";
 import { ReviewWorkspace, type WorkspaceData } from "@/components/review-workspace";
 
 export default async function SubmissionDetailPage(
@@ -86,6 +87,11 @@ export default async function SubmissionDetailPage(
   const libraryHasJournals = productClaims.some((c) =>
     (c.references ?? []).some((r) => r.pmid || r.docId),
   );
+
+  // Journal substantiation is plan-gated (Growth+, PRD §12) — Starter sees an
+  // upgrade hint where the button would be.
+  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  const journalCheckAllowed = planHas(tenant?.plan, "journalSubstantiation");
 
   const versionIds = versions.map((v) => v.id);
   const audit = (
@@ -182,6 +188,7 @@ export default async function SubmissionDetailPage(
     },
     diff,
     libraryHasJournals,
+    journalCheckAllowed,
     prevOpenComments,
     pages: pages.map((p) => ({
       id: p.id,

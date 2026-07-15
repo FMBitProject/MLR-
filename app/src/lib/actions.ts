@@ -28,7 +28,8 @@ import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
 import { consumeAttempt, clearThrottle } from "./throttle";
-import { planLimits } from "./plans";
+import { planLimits, planHas } from "./plans";
+import { submissionQuota } from "./usage";
 import { sendVerificationEmail, sendInviteEmail } from "./email";
 import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
 import { getDict } from "./i18n-server";
@@ -431,6 +432,12 @@ export async function createSubmission(formData: FormData) {
     .where(and(eq(t.products.id, productId), eq(t.products.tenantId, user.tenantId)))
     )[0];
   if (!product) throw new Error("NOT_FOUND");
+
+  // Plan quota (PRD §12): monthly submission cap. The form disables itself
+  // when the quota is full; this closes the race for concurrent submitters.
+  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  const quota = await submissionQuota(user.tenantId, tenant?.plan);
+  if (quota.used >= quota.limit) throw new Error("PLAN_LIMIT");
 
   const submissionId = crypto.randomUUID();
   const stageRoles = await stagesForChannel(user.tenantId, channel);
@@ -976,6 +983,11 @@ export async function verifyFlagJournal(formData: FormData) {
   const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
   if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
 
+  // Journal substantiation is a Growth+ feature (PRD §12). The button is
+  // hidden on Starter; this guards direct invocations.
+  const planTenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  if (!planHas(planTenant?.plan, "journalSubstantiation")) throw new Error("PLAN_FEATURE");
+
   const flag = (await db.select().from(t.claimFlags).where(eq(t.claimFlags.id, flagId)))[0];
   if (!flag) throw new Error("NOT_FOUND");
 
@@ -1285,6 +1297,11 @@ export async function saveWorkflow(formData: FormData) {
   const channel = String(formData.get("channel") ?? "");
   const stages = formData.getAll("stages").map(String).filter(Boolean);
   if (!channel || !stages.length) throw new Error("VALIDATION");
+
+  // Per-channel workflow configuration is a Growth+ feature (PRD §12);
+  // Starter tenants run the default 3-stage sequential workflow.
+  const wfTenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  if (!planHas(wfTenant?.plan, "customWorkflows")) throw new Error("PLAN_FEATURE");
 
   const existing = (await db
     .select()
