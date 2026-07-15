@@ -206,8 +206,9 @@ const dictionaries = {
       flagDecided: "Diputuskan",
       resubmit: "Ajukan Versi Revisi",
       resubmitTitle: "Ajukan versi baru",
-      resubmitDesc: "Versi baru akan mereset seluruh tahap review dan menjalankan ulang AI claims check.",
-      newText: "Naskah revisi",
+      resubmitDesc:
+        "Unggah ulang file yang sudah direvisi (utuh, bukan hanya bagian yang dikomentari) atau tempel naskah baru. Seluruh tahap review direset dan AI claims check berjalan ulang.",
+      newText: "Naskah revisi (opsional jika mengunggah file)",
       changeNote: "Catatan revisi (wajib)",
       changeNotePlaceholder: "Jelaskan apa saja yang diubah pada versi ini…",
       revisionNote: "Catatan revisi",
@@ -690,8 +691,9 @@ const dictionaries = {
       flagDecided: "Decided",
       resubmit: "Submit Revised Version",
       resubmitTitle: "Submit a new version",
-      resubmitDesc: "A new version resets all review stages and re-runs the AI claims check.",
-      newText: "Revised copy",
+      resubmitDesc:
+        "Re-upload the revised file (the full document, not just the commented parts) or paste new copy. All review stages reset and the AI claims check re-runs.",
+      newText: "Revised copy (optional if uploading a file)",
       changeNote: "Revision note (required)",
       changeNotePlaceholder: "Describe what changed in this version…",
       revisionNote: "Revision note",

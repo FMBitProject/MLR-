@@ -513,9 +513,14 @@ export async function resubmitVersion(formData: FormData) {
     throw new Error("FORBIDDEN");
   }
   const submissionId = String(formData.get("submissionId") ?? "");
-  const text = String(formData.get("text") ?? "").trim();
+  const text = String(formData.get("text") ?? "").trim() || null;
   const changeNote = String(formData.get("changeNote") ?? "").trim();
-  if (!text || !changeNote) throw new Error("VALIDATION");
+  const file = formData.get("file");
+  const fileName = file instanceof File && file.size > 0 ? file.name : null;
+  const fileData =
+    file instanceof File && file.size > 0 ? Buffer.from(await file.arrayBuffer()) : null;
+  // Same rule as the initial submission: revised text or a revised file.
+  if ((!text && !fileName) || !changeNote) throw new Error("VALIDATION");
 
   const sub = (await db
     .select()
@@ -546,12 +551,18 @@ export async function resubmitVersion(formData: FormData) {
     title: sub.title,
     subtitle: `${product?.name ?? ""} — ${sub.channel ?? ""} — v${nextVersion}`,
     text,
-    fileName: null,
-    fileData: null,
+    fileName,
+    fileData,
   });
   await db.update(t.contentVersions)
     .set({ changeNote })
     .where(eq(t.contentVersions.id, versionId));
+
+  // Persist the revised upload (keyed by version id), same as v1: the
+  // approved master must always be downloadable for the audit package.
+  if (fileData) {
+    await storage.put(versionId, fileData, mimeForFileName(fileName));
+  }
 
   // Reset the review workflow: fresh stages from the tenant template
   await db.delete(t.reviewStages).where(eq(t.reviewStages.submissionId, submissionId));

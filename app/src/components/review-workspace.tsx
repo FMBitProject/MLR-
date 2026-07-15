@@ -14,6 +14,7 @@ import {
   History,
   ScanEye,
   RefreshCw,
+  UploadCloud,
   ListChecks,
   GitCompareArrows,
   StickyNote,
@@ -149,6 +150,8 @@ export function ReviewWorkspace({
   const [pageNumber, setPageNumber] = useState(data.pages[0]?.pageNumber ?? 1);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [showResubmit, setShowResubmit] = useState(false);
+  const [resubmitFileName, setResubmitFileName] = useState<string | null>(null);
+  const [resubmitError, setResubmitError] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
@@ -345,20 +348,52 @@ export function ReviewWorkspace({
             </h3>
             <p className="mt-1 text-[13px] text-slate-500">{dict.detail.resubmitDesc}</p>
             <form
-              action={(fd) => startTransition(async () => {
-                await resubmitVersion(fd);
-                setShowResubmit(false);
-              })}
+              action={(fd) => {
+                const text = String(fd.get("text") ?? "").trim();
+                const file = fd.get("file");
+                const hasFile = file instanceof File && file.size > 0;
+                if (!text && !hasFile) {
+                  setResubmitError(dict.newSubmission.needTextOrFile);
+                  return;
+                }
+                if (hasFile && file.size > 20 * 1024 * 1024) {
+                  setResubmitError(dict.newSubmission.fileTooLarge);
+                  return;
+                }
+                setResubmitError(null);
+                startTransition(async () => {
+                  try {
+                    await resubmitVersion(fd);
+                    setShowResubmit(false);
+                    setResubmitFileName(null);
+                  } catch (e) {
+                    if ((e as { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) throw e;
+                    setResubmitError(dict.newSubmission.submitFailed);
+                  }
+                });
+              }}
               className="mt-4 space-y-3"
             >
               <input type="hidden" name="submissionId" value={sub.id} />
               <textarea
                 name="text"
                 rows={6}
-                required
                 placeholder={dict.detail.newText}
                 className={inputCls + " resize-y leading-relaxed"}
               />
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-3 transition hover:border-brand-400 hover:bg-brand-50/40">
+                <UploadCloud className="size-5 shrink-0 text-slate-400" />
+                <span className="text-[13px] text-slate-600">
+                  {resubmitFileName ?? dict.newSubmission.file}
+                </span>
+                <input
+                  type="file"
+                  name="file"
+                  accept=".pdf,.pptx,.docx"
+                  className="hidden"
+                  onChange={(e) => setResubmitFileName(e.target.files?.[0]?.name ?? null)}
+                />
+              </label>
               <textarea
                 name="changeNote"
                 rows={2}
@@ -366,6 +401,11 @@ export function ReviewWorkspace({
                 placeholder={dict.detail.changeNotePlaceholder}
                 className={inputCls + " resize-y"}
               />
+              {resubmitError ? (
+                <p className="rounded-lg bg-rose-50 px-3 py-2 text-[13px] text-rose-700 ring-1 ring-inset ring-rose-200">
+                  {resubmitError}
+                </p>
+              ) : null}
               <button
                 type="submit"
                 disabled={pending}
