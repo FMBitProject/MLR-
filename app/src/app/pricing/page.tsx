@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Check, ShieldCheck } from "lucide-react";
 import { getDict } from "@/lib/i18n-server";
-import { PLANS, formatIdr, type PlanId } from "@/lib/plans";
+import { formatDate } from "@/lib/i18n";
+import { PLANS, formatIdr, promoActive, effectivePriceIdr, type PlanId } from "@/lib/plans";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
 // Public marketing page — no auth. Numbers come from the PLANS catalog so
@@ -76,8 +77,13 @@ export default async function PricingPage() {
                 <p className="mt-3">
                   {plan.monthlyPriceIdr !== null ? (
                     <>
+                      {promoActive(plan) ? (
+                        <span className="mr-2 text-[15px] font-medium text-slate-400 line-through">
+                          {formatIdr(plan.monthlyPriceIdr)}
+                        </span>
+                      ) : null}
                       <span className="text-[28px] font-semibold tracking-tight text-slate-900">
-                        {formatIdr(plan.monthlyPriceIdr)}
+                        {formatIdr(effectivePriceIdr(plan) ?? plan.monthlyPriceIdr)}
                       </span>
                       <span className="text-[13px] text-slate-400">{p.perMonth}</span>
                     </>
@@ -87,6 +93,12 @@ export default async function PricingPage() {
                     </span>
                   )}
                 </p>
+                {promoActive(plan) && plan.promoEndsAt ? (
+                  <p className="mt-1 inline-flex w-fit rounded-full bg-amber-50 px-2.5 py-0.5 text-[11.5px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+                    {/* Noon UTC so the calendar date survives formatting in any server TZ */}
+                    {p.promoUntil} {formatDate(new Date(`${plan.promoEndsAt}T12:00:00Z`), locale)}
+                  </p>
+                ) : null}
                 <p className="mt-2 min-h-10 text-[13px] leading-relaxed text-slate-500">
                   {p.taglines[id]}
                 </p>

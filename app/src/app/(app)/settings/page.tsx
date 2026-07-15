@@ -7,7 +7,7 @@ import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { saveWorkflow } from "@/lib/actions";
 import { getLlmProvider } from "@/lib/llm";
-import { planDef, formatIdr } from "@/lib/plans";
+import { planDef, formatIdr, effectivePriceIdr } from "@/lib/plans";
 import { submissionQuota } from "@/lib/usage";
 import { Avatar, Card, CardHeader, Chip, PageHeader } from "@/components/ui";
 import { TeammateForm } from "@/components/teammate-form";
@@ -69,7 +69,7 @@ export default async function SettingsPage() {
                 </p>
                 <p className="mt-1.5 text-[12.5px] font-medium text-slate-600">
                   {plan.monthlyPriceIdr !== null
-                    ? `${formatIdr(plan.monthlyPriceIdr)}${dict.settings.planPerMonth}`
+                    ? `${formatIdr(effectivePriceIdr(plan) ?? plan.monthlyPriceIdr)}${dict.settings.planPerMonth}`
                     : dict.settings.planCustomPrice}
                 </p>
                 <p className="mt-0.5 text-[12px] text-slate-400">

@@ -8,8 +8,12 @@ export type PlanId = "starter" | "growth" | "enterprise";
 
 export type PlanDef = {
   id: PlanId;
-  /** Monthly price in IDR; null = custom quote (enterprise). */
+  /** Regular (list) monthly price in IDR; null = custom quote (enterprise). */
   monthlyPriceIdr: number | null;
+  /** Time-limited launch promo price; applies while today <= promoEndsAt. */
+  promoPriceIdr?: number;
+  /** Last day the promo price applies (inclusive, WIB), as YYYY-MM-DD. */
+  promoEndsAt?: string;
   limits: {
     users: number;
     products: number;
@@ -31,7 +35,9 @@ export type PlanDef = {
 export const PLANS: Record<PlanId, PlanDef> = {
   starter: {
     id: "starter",
-    monthlyPriceIdr: 2_500_000,
+    monthlyPriceIdr: 3_500_000,
+    promoPriceIdr: 2_500_000,
+    promoEndsAt: "2026-12-31",
     limits: { users: 15, products: 3, submissionsPerMonth: 25 },
     features: {
       aiClaimsCheck: true,
@@ -43,7 +49,9 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
   growth: {
     id: "growth",
-    monthlyPriceIdr: 6_500_000,
+    monthlyPriceIdr: 9_500_000,
+    promoPriceIdr: 6_500_000,
+    promoEndsAt: "2026-12-31",
     limits: { users: 50, products: 15, submissionsPerMonth: 150 },
     features: {
       aiClaimsCheck: true,
@@ -80,6 +88,19 @@ export function planHas(
   feature: keyof PlanDef["features"],
 ) {
   return planDef(plan).features[feature];
+}
+
+export function promoActive(def: PlanDef, now = new Date()): boolean {
+  return (
+    def.promoPriceIdr != null &&
+    def.promoEndsAt != null &&
+    now <= new Date(`${def.promoEndsAt}T23:59:59+07:00`)
+  );
+}
+
+/** The price a tenant actually pays this month: promo while it runs, else list. */
+export function effectivePriceIdr(def: PlanDef, now = new Date()): number | null {
+  return promoActive(def, now) ? (def.promoPriceIdr ?? def.monthlyPriceIdr) : def.monthlyPriceIdr;
 }
 
 /** "Rp 3.500.000" — no decimals; used on the pricing page and settings. */
