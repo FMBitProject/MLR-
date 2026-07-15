@@ -373,6 +373,54 @@ const dictionaries = {
       productAdding: "Menambahkan…",
       productFailed: "Gagal menambah produk. Periksa data lalu coba lagi.",
     },
+    landing: {
+      signIn: "Masuk",
+      register: "Daftar",
+      heroBadge: "Untuk perusahaan farmasi Indonesia",
+      heroTitle: "Persetujuan konten promosi farmasi — cepat, tertib, siap audit.",
+      heroSubtitle:
+        "MLR Flow menyatukan review Medical, Legal, dan Regulatory dalam satu alur kerja: AI claims check, review visual per halaman, dan jejak audit lengkap yang siap inspeksi BPOM.",
+      ctaPrimary: "Buat Workspace",
+      ctaSecondary: "Lihat Paket & Harga",
+      featuresTitle: "Semua yang tim MLR Anda butuhkan",
+      features: [
+        {
+          title: "Workflow multi-tahap",
+          desc: "Medical → Legal → Regulatory berjalan otomatis sesuai kanal — tak ada konten lolos tanpa tahap yang semestinya.",
+        },
+        {
+          title: "AI claims check",
+          desc: "Setiap klaim di konten dicek terhadap Approved Claims Library — yang tak cocok langsung ditandai untuk reviewer.",
+        },
+        {
+          title: "Review visual per halaman",
+          desc: "Komentar ter-pin tepat di elemen halaman — tidak ada lagi feedback lewat email yang tercecer.",
+        },
+        {
+          title: "Jejak audit lengkap",
+          desc: "Setiap keputusan, versi, dan komentar terekam — siap ditunjukkan saat inspeksi BPOM.",
+        },
+      ],
+      howTitle: "Cara kerjanya",
+      how: [
+        {
+          title: "Ajukan konten",
+          desc: "Marketing mengunggah materi promosi (PDF/PPTX/DOCX) atau menempel naskah — sistem merendernya per halaman.",
+        },
+        {
+          title: "AI memeriksa klaim",
+          desc: "Setiap kalimat dicek terhadap Claims Library produk; yang menyimpang ditandai sebelum reviewer membukanya.",
+        },
+        {
+          title: "Review & setujui",
+          desc: "Reviewer memutuskan tiap tahap dengan catatan; versi disetujui terkunci dan tercatat di audit trail.",
+        },
+      ],
+      pricingTitle: "Harga sederhana dan transparan",
+      pricingSubtitle: "Jauh di bawah tool enterprise — mulai dari",
+      pricingCta: "Lihat detail paket",
+      footerCompliance: "Audit-ready • Selaras Pedoman Promosi Obat",
+    },
     pricing: {
       title: "Paket & Harga",
       subtitle:
@@ -808,6 +856,54 @@ const dictionaries = {
       productAdd: "Add",
       productAdding: "Adding…",
       productFailed: "Failed to add product. Check the details and try again.",
+    },
+    landing: {
+      signIn: "Sign in",
+      register: "Register",
+      heroBadge: "Built for Indonesian pharma companies",
+      heroTitle: "Pharma promotional content approval — fast, orderly, audit-ready.",
+      heroSubtitle:
+        "MLR Flow unifies Medical, Legal, and Regulatory review in one workflow: AI claims check, visual page-by-page review, and a complete audit trail ready for BPOM inspection.",
+      ctaPrimary: "Create a Workspace",
+      ctaSecondary: "See Plans & Pricing",
+      featuresTitle: "Everything your MLR team needs",
+      features: [
+        {
+          title: "Multi-stage workflow",
+          desc: "Medical → Legal → Regulatory runs automatically per channel — no content skips the stages it should pass.",
+        },
+        {
+          title: "AI claims check",
+          desc: "Every claim in the content is checked against the Approved Claims Library — mismatches are flagged for reviewers instantly.",
+        },
+        {
+          title: "Visual page-by-page review",
+          desc: "Comments pin to the exact page element — no more feedback scattered across email threads.",
+        },
+        {
+          title: "Complete audit trail",
+          desc: "Every decision, version, and comment is recorded — ready to show at a BPOM inspection.",
+        },
+      ],
+      howTitle: "How it works",
+      how: [
+        {
+          title: "Submit content",
+          desc: "Marketing uploads promotional material (PDF/PPTX/DOCX) or pastes copy — the system renders it page by page.",
+        },
+        {
+          title: "AI checks the claims",
+          desc: "Every sentence is checked against the product's Claims Library; deviations are flagged before a reviewer opens it.",
+        },
+        {
+          title: "Review & approve",
+          desc: "Reviewers decide each stage with notes; approved versions lock and are recorded in the audit trail.",
+        },
+      ],
+      pricingTitle: "Simple, transparent pricing",
+      pricingSubtitle: "Well below enterprise tools — starting from",
+      pricingCta: "See plan details",
+      footerCompliance: "Audit-ready • Aligned with Pedoman Promosi Obat",
     },
     pricing: {
       title: "Plans & Pricing",

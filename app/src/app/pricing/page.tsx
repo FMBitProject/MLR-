@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Check, ShieldCheck } from "lucide-react";
+import { Check } from "lucide-react";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { PLANS, formatIdr, promoActive, effectivePriceIdr, type PlanId } from "@/lib/plans";
+import { BrandLogo } from "@/components/brand-logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
 // Public marketing page — no auth. Numbers come from the PLANS catalog so
@@ -19,19 +20,7 @@ export default async function PricingPage() {
     <div className="min-h-screen bg-[#f6f8fa] px-6 py-10">
       <div className="mx-auto max-w-5xl">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-brand-900 ring-1 ring-brand-800">
-              <ShieldCheck className="size-5 text-brand-300" />
-            </div>
-            <div>
-              <p className="text-lg font-semibold tracking-tight text-slate-900">
-                {dict.appName}
-              </p>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                {dict.tagline}
-              </p>
-            </div>
-          </div>
+          <BrandLogo appName={dict.appName} tagline={dict.tagline} />
           <LocaleSwitcher locale={locale} />
         </div>
 

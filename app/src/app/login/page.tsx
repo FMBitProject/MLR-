@@ -3,6 +3,7 @@ import { ShieldCheck, FileSearch, GitBranch, Sparkles } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { LoginForm } from "@/components/login-form";
+import { BrandLogo } from "@/components/brand-logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
 export default async function LoginPage() {
@@ -37,17 +38,7 @@ export default async function LoginPage() {
           className="pointer-events-none absolute -bottom-40 -left-24 size-[420px] rounded-full bg-teal-400/10 blur-3xl"
         />
         <div className="relative">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
-              <ShieldCheck className="size-5 text-brand-300" />
-            </div>
-            <div>
-              <p className="text-lg font-semibold tracking-tight">{dict.appName}</p>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-brand-300/80">
-                {dict.tagline}
-              </p>
-            </div>
-          </div>
+          <BrandLogo appName={dict.appName} tagline={dict.tagline} variant="dark" />
 
           <h2 className="mt-16 max-w-md text-[34px] font-semibold leading-[1.15] tracking-tight">
             {locale === "id"

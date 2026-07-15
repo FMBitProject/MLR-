@@ -106,16 +106,19 @@ export function LoginForm({ dict }: { dict: Dict }) {
         )
       ) : null}
 
-      <p className="mt-6 text-center text-[13px] text-slate-500">
-        {dict.login.noAccount}{" "}
-        <Link href="/register" className="font-medium text-brand-700 hover:text-brand-800">
-          {dict.login.registerLink}
-        </Link>
-        {" · "}
-        <Link href="/pricing" className="font-medium text-brand-700 hover:text-brand-800">
-          {dict.pricing.title}
-        </Link>
-      </p>
+      <div className="mt-6 space-y-2.5 text-center text-[13px] text-slate-500">
+        <p>
+          {dict.login.noAccount}{" "}
+          <Link href="/register" className="font-medium text-brand-700 hover:text-brand-800">
+            {dict.login.registerLink}
+          </Link>
+        </p>
+        <p>
+          <Link href="/pricing" className="font-medium text-brand-700 hover:text-brand-800">
+            {dict.pricing.title}
+          </Link>
+        </p>
+      </div>
 
       <div className="mt-8">
         <p className="text-[12px] font-medium uppercase tracking-wider text-slate-400">
