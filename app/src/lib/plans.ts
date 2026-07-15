@@ -31,7 +31,7 @@ export type PlanDef = {
 export const PLANS: Record<PlanId, PlanDef> = {
   starter: {
     id: "starter",
-    monthlyPriceIdr: 3_500_000,
+    monthlyPriceIdr: 2_500_000,
     limits: { users: 15, products: 3, submissionsPerMonth: 25 },
     features: {
       aiClaimsCheck: true,
@@ -43,7 +43,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
   growth: {
     id: "growth",
-    monthlyPriceIdr: 9_500_000,
+    monthlyPriceIdr: 6_500_000,
     limits: { users: 50, products: 15, submissionsPerMonth: 150 },
     features: {
       aiClaimsCheck: true,

@@ -324,13 +324,13 @@ Implemented in `src/lib/plans.ts` (the single source of truth the app enforces) 
 
 | Plan | Price | Limits | Feature access |
 |---|---|---|---|
-| Starter | Rp 3,500,000/month | 3 products, 15 users, 25 submissions/month | Standard 3-stage workflow, AI claims check, Approved Content Library, audit trail, bilingual UI, email support |
-| Growth | Rp 9,500,000/month | 15 products, 50 users, 150 submissions/month | Everything in Starter + AI journal substantiation (PubMed/full-text), per-channel workflow customization, priority support |
+| Starter | Rp 2,500,000/month | 3 products, 15 users, 25 submissions/month | Standard 3-stage workflow, AI claims check, Approved Content Library, audit trail, bilingual UI, email support |
+| Growth | Rp 6,500,000/month | 15 products, 50 users, 150 submissions/month | Everything in Starter + AI journal substantiation (PubMed/full-text), per-channel workflow customization, priority support |
 | Enterprise | Custom | unlimited products/users/submissions | Everything in Growth + dedicated onboarding, custom SLA |
 
 Enforcement points: user/product creation, monthly submission count, journal substantiation action, and workflow customization are all gated server-side by plan; the UI hides or locks gated features with an upgrade hint. Prices exclude VAT.
 
-This is positioned well below the estimated $50–200/user/month range reported for enterprise Vault-class tools, while covering the core MLR workflow need that mid-size pharma companies actually use day to day.
+Pricing is set deliberately low relative to the estimated $50–200/user/month range reported for enterprise Vault-class tools, so it stays accessible to low- and mid-scale pharma companies that would otherwise have no MLR tooling at all — not just a discount off enterprise pricing, but a different market segment.
 
 ---
 
