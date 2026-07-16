@@ -249,6 +249,87 @@ export async function sendDecisionEmail(
   );
 }
 
+export type ReminderItem = {
+  title: string;
+  productName: string;
+  versionLabel: string;
+  stageRole: string;
+  daysWaiting: number;
+  submissionId: string;
+  /** Assigned reviewer's name, for the admin digest. */
+  reviewerName?: string | null;
+};
+
+const reminderRows = (items: ReminderItem[], locale: Locale, withReviewer: boolean) =>
+  items
+    .map((it) => {
+      const days =
+        locale === "id" ? `menunggu ${it.daysWaiting} hari` : `waiting ${it.daysWaiting} days`;
+      const reviewer = withReviewer
+        ? ` · ${esc(it.reviewerName ?? roleLabel(it.stageRole, locale))}`
+        : "";
+      return `<li style="margin: 0 0 10px;">
+        <a href="${appUrl()}/submissions/${it.submissionId}" style="color: #0f766e; font-weight: 600; text-decoration: none;">${esc(it.title)}</a>
+        <span style="color: #64748b; font-size: 13px;"> — ${esc(it.productName)} · ${it.versionLabel} · ${roleLabel(it.stageRole, locale)}${reviewer} · <strong style="color: #b45309;">${days}</strong></span>
+      </li>`;
+    })
+    .join("");
+
+/** Daily digest to a reviewer: everything stuck waiting on them. */
+export async function sendReviewReminderEmail(
+  to: string,
+  opts: { locale: Locale; items: ReminderItem[] },
+) {
+  const { locale, items } = opts;
+  const n = items.length;
+  const subject =
+    locale === "id"
+      ? `${n} materi menunggu review Anda`
+      : `${n} ${n === 1 ? "item is" : "items are"} waiting for your review`;
+  const body =
+    locale === "id"
+      ? `Materi berikut sudah menunggu review Anda lebih lama dari seharusnya. Reviewer lain dan tim marketing menunggu giliran setelah Anda:`
+      : `The following materials have been waiting for your review longer than they should. Other reviewers and the marketing team are queued behind you:`;
+  await sendEmail(
+    to,
+    `${subject} — MLR Flow`,
+    shell(
+      locale === "id" ? "Pengingat review harian" : "Daily review reminder",
+      `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${body}</p>
+      <ul style="padding-left: 18px; margin: 12px 0 4px;">${reminderRows(items, locale, false)}</ul>
+      ${button(`${appUrl()}/dashboard`, locale === "id" ? "Buka Dashboard" : "Open Dashboard")}`,
+      noReplyFooter[locale],
+    ),
+  );
+}
+
+/** Daily digest to workspace admins: every stuck stage and who it waits on. */
+export async function sendBottleneckDigestEmail(
+  to: string,
+  opts: { locale: Locale; items: ReminderItem[] },
+) {
+  const { locale, items } = opts;
+  const subject =
+    locale === "id"
+      ? `Bottleneck review: ${items.length} materi macet`
+      : `Review bottleneck: ${items.length} stuck ${items.length === 1 ? "item" : "items"}`;
+  const body =
+    locale === "id"
+      ? `Materi berikut macet di tahap review lebih lama dari seharusnya:`
+      : `The following materials are stuck in review longer than they should be:`;
+  await sendEmail(
+    to,
+    `${subject} — MLR Flow`,
+    shell(
+      locale === "id" ? "Ringkasan bottleneck review" : "Review bottleneck summary",
+      `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${body}</p>
+      <ul style="padding-left: 18px; margin: 12px 0 4px;">${reminderRows(items, locale, true)}</ul>
+      ${button(`${appUrl()}/dashboard`, locale === "id" ? "Buka Dashboard" : "Open Dashboard")}`,
+      noReplyFooter[locale],
+    ),
+  );
+}
+
 export async function sendInviteEmail(to: string, name: string, tenantName: string, token: string) {
   const link = `${appUrl()}/verify-email?token=${token}`;
   await sendEmail(

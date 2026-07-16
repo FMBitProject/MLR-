@@ -49,6 +49,15 @@ Gotchas learned the hard way:
 - After adding a new route, run `npx next typegen` or `PageProps<"/new-route">`
   fails typecheck.
 
+## Cron endpoints
+
+The daily reminder sweep is `GET /api/cron/reminders`. Without `CRON_SECRET` in
+the dev server's env it runs open (dev only); with it, send
+`Authorization: Bearer $CRON_SECRET`. Seed data makes it fire: `sub-cardiovex`
+has been waiting on medical review for 3 days (threshold is 2, override with
+`REMINDER_AFTER_DAYS`). Nudge staleness via SQL on `content_versions.created_at`
+/ `review_stages.decided_at` and re-curl.
+
 ## Teardown
 
 Stop the dev task and `docker rm -f mlr-verify-pg`.
