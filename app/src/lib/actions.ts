@@ -31,6 +31,7 @@ import { consumeAttempt, clearThrottle } from "./throttle";
 import { planLimits, planHas } from "./plans";
 import { submissionQuota } from "./usage";
 import { sendVerificationEmail, sendInviteEmail } from "./email";
+import { notifyCurrentStageReviewers, notifySubmitterDecision } from "./notify";
 import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
 import { getDict } from "./i18n-server";
 
@@ -503,6 +504,16 @@ export async function createSubmission(formData: FormData) {
     versionLabel: "v1",
   });
 
+  after(() =>
+    notifyCurrentStageReviewers({
+      tenantId: user.tenantId,
+      submissionId,
+      kind: "new",
+      versionLabel: "v1",
+      actorId: user.id,
+    }),
+  );
+
   revalidatePath("/", "layout");
   redirect(`/submissions/${submissionId}`);
 }
@@ -599,6 +610,16 @@ export async function resubmitVersion(formData: FormData) {
     performedBy: user.id,
     versionLabel: `v${nextVersion}`,
   });
+
+  after(() =>
+    notifyCurrentStageReviewers({
+      tenantId: user.tenantId,
+      submissionId,
+      kind: "resubmitted",
+      versionLabel: `v${nextVersion}`,
+      actorId: user.id,
+    }),
+  );
 
   revalidatePath("/", "layout");
 }
@@ -717,6 +738,16 @@ export async function reuseApprovedContent(formData: FormData) {
     versionLabel: "v1",
   });
 
+  after(() =>
+    notifyCurrentStageReviewers({
+      tenantId: user.tenantId,
+      submissionId,
+      kind: "new",
+      versionLabel: "v1",
+      actorId: user.id,
+    }),
+  );
+
   revalidatePath("/", "layout");
   redirect(`/submissions/${submissionId}`);
 }
@@ -794,6 +825,15 @@ export async function decideStage(formData: FormData) {
       await db.update(t.contentSubmissions)
         .set({ currentStage: next.reviewerRole })
         .where(eq(t.contentSubmissions.id, sub.id));
+      after(() =>
+        notifyCurrentStageReviewers({
+          tenantId: user.tenantId,
+          submissionId: sub.id,
+          kind: "advanced",
+          versionLabel: `v${currentVersion.versionNumber}`,
+          actorId: user.id,
+        }),
+      );
     } else {
       // Final approval: lock the version (immutability NFR)
       await db.update(t.contentSubmissions)
@@ -810,15 +850,48 @@ export async function decideStage(formData: FormData) {
         performedBy: user.id,
         details: { version: `v${currentVersion.versionNumber}` },
       });
+      after(() =>
+        notifySubmitterDecision({
+          tenantId: user.tenantId,
+          submissionId: sub.id,
+          decision: "approved",
+          stageRole: stage.reviewerRole,
+          note,
+          versionLabel: `v${currentVersion.versionNumber}`,
+          actorId: user.id,
+        }),
+      );
     }
   } else if (decision === "changes_requested") {
     await db.update(t.contentSubmissions)
       .set({ status: "changes_requested" })
       .where(eq(t.contentSubmissions.id, sub.id));
+    after(() =>
+      notifySubmitterDecision({
+        tenantId: user.tenantId,
+        submissionId: sub.id,
+        decision: "changes_requested",
+        stageRole: stage.reviewerRole,
+        note,
+        versionLabel: `v${currentVersion.versionNumber}`,
+        actorId: user.id,
+      }),
+    );
   } else {
     await db.update(t.contentSubmissions)
       .set({ status: "rejected", currentStage: null, decidedAt: new Date() })
       .where(eq(t.contentSubmissions.id, sub.id));
+    after(() =>
+      notifySubmitterDecision({
+        tenantId: user.tenantId,
+        submissionId: sub.id,
+        decision: "rejected",
+        stageRole: stage.reviewerRole,
+        note,
+        versionLabel: `v${currentVersion.versionNumber}`,
+        actorId: user.id,
+      }),
+    );
   }
 
   await logAudit({
