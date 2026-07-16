@@ -75,6 +75,46 @@ export async function sendVerificationEmail(to: string, name: string, token: str
   );
 }
 
+export async function sendPasswordResetEmail(
+  to: string,
+  name: string,
+  token: string,
+  locale: Locale,
+) {
+  const link = `${appUrl()}/reset-password?token=${token}`;
+  const copy =
+    locale === "id"
+      ? {
+          subject: "Atur ulang kata sandi Anda — MLR Flow",
+          title: `Halo ${name}, atur ulang kata sandi Anda`,
+          body: "Kami menerima permintaan untuk mengatur ulang kata sandi akun MLR Flow Anda. Klik tombol di bawah untuk membuat kata sandi baru. Tautan berlaku 1 jam.",
+          cta: "Atur Ulang Kata Sandi",
+          copyHint: "Atau salin tautan ini:",
+          footer:
+            "Jika Anda tidak meminta pengaturan ulang kata sandi, abaikan email ini — kata sandi Anda tidak berubah.",
+        }
+      : {
+          subject: "Reset your password — MLR Flow",
+          title: `Hi ${name}, reset your password`,
+          body: "We received a request to reset the password for your MLR Flow account. Click the button below to choose a new password. The link is valid for 1 hour.",
+          cta: "Reset Password",
+          copyHint: "Or copy this link:",
+          footer:
+            "If you didn't request a password reset, ignore this email — your password is unchanged.",
+        };
+  await sendEmail(
+    to,
+    copy.subject,
+    shell(
+      copy.title,
+      `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${copy.body}</p>
+      ${button(link, copy.cta)}
+      <p style="color: #94a3b8; font-size: 12px;">${copy.copyHint} ${link}</p>`,
+      copy.footer,
+    ),
+  );
+}
+
 // User-provided strings (titles, notes, names) go into HTML bodies — escape them.
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

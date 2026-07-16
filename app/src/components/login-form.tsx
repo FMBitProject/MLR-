@@ -56,9 +56,18 @@ export function LoginForm({ dict }: { dict: Dict }) {
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
-            {dict.login.password}
-          </label>
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <label className="block text-[13px] font-medium text-slate-700">
+              {dict.login.password}
+            </label>
+            <Link
+              href="/reset-password"
+              tabIndex={-1}
+              className="text-[12px] font-medium text-brand-700 hover:text-brand-800"
+            >
+              {dict.login.forgot}
+            </Link>
+          </div>
           <input
             ref={passwordRef}
             name="password"

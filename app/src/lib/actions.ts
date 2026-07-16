@@ -30,7 +30,7 @@ import { extractPptxSlides, extractDocxParagraphs } from "./office";
 import { consumeAttempt, clearThrottle } from "./throttle";
 import { planLimits, planHas } from "./plans";
 import { submissionQuota } from "./usage";
-import { sendVerificationEmail, sendInviteEmail } from "./email";
+import { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail } from "./email";
 import { notifyCurrentStageReviewers, notifySubmitterDecision } from "./notify";
 import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
 import { getDict } from "./i18n-server";
@@ -185,6 +185,59 @@ export async function verifyEmailToken(
     performedBy: found.userId,
   });
   return { status: "ok" };
+}
+
+export async function requestPasswordReset(
+  _prev: { error?: string; sent?: boolean } | null,
+  formData: FormData,
+) {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) return { error: "validation" };
+  // Reset mail is an unauthenticated email cannon — throttle per target
+  // address and per source IP.
+  const [emailOk, ipOk] = await Promise.all([
+    consumeAttempt(`reset-request:${email}`, 3, 60 * 60_000),
+    consumeAttempt(`reset-ip:${await clientIp()}`, 10, 60 * 60_000),
+  ]);
+  if (!emailOk || !ipOk) return { error: "throttled" };
+
+  const user = (await db.select().from(t.users).where(eq(t.users.email, email)))[0];
+  // Same response whether the account exists — avoids confirming account
+  // existence. Unverified accounts are skipped: they must finish activation
+  // (which sets a password) via the verification link instead.
+  if (user && user.emailVerifiedAt) {
+    const token = await createAccountToken(user.id, "reset");
+    await sendPasswordResetEmail(user.email, user.name, token, user.locale === "en" ? "en" : "id");
+  }
+  return { sent: true };
+}
+
+export async function resetPassword(formData: FormData) {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) return { error: "VALIDATION" };
+
+  const found = await findAccountToken(token);
+  if (!found || found.purpose !== "reset") return { error: "INVALID_TOKEN" };
+
+  await db
+    .update(t.users)
+    .set({ passwordHash: hashPassword(password) })
+    .where(eq(t.users.id, found.userId));
+  await consumeAccountToken(token);
+  // A successful reset proves control of the inbox — lift any login lockout
+  // so the owner isn't stuck behind their attacker's failed attempts.
+  await clearThrottle(`login:${found.user.email}`);
+  await logAudit({
+    tenantId: found.user.tenantId,
+    entityType: "user",
+    entityId: found.userId,
+    action: "password_reset",
+    performedBy: found.userId,
+  });
+
+  await createSession(found.userId);
+  redirect("/dashboard");
 }
 
 export async function logout() {

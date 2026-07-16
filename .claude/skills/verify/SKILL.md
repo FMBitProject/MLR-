@@ -42,6 +42,12 @@ Gotchas learned the hard way:
 - Decision buttons: `button[name="decision"][value="approved"|"changes_requested"|"rejected"]`;
   reject/changes stay disabled until `textarea[name="note"]` is filled.
 - Switch users by `context.clearCookies()` then logging in again.
+- Don't assert on `page.textContent("body")` — it includes the RSC flight payload
+  in script tags, which embeds the entire i18n dictionary (every UI string "appears"
+  on every page). Assert on visible text via `waitForSelector("text=...")` or
+  a specific element instead.
+- After adding a new route, run `npx next typegen` or `PageProps<"/new-route">`
+  fails typecheck.
 
 ## Teardown
 

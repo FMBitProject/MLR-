@@ -29,6 +29,7 @@ const dictionaries = {
       compliance: "Audit-ready • Selaras Pedoman Promosi Obat",
       noAccount: "Perusahaan Anda belum punya workspace?",
       registerLink: "Daftar di sini",
+      forgot: "Lupa kata sandi?",
     },
     register: {
       title: "Daftarkan perusahaan Anda",
@@ -58,6 +59,23 @@ const dictionaries = {
       submit: "Aktifkan Akun",
       submitting: "Mengaktifkan…",
       inviteInvalid: "Undangan tidak valid atau sudah kedaluwarsa.",
+    },
+    resetPassword: {
+      requestTitle: "Lupa kata sandi?",
+      requestBody:
+        "Masukkan email akun Anda. Jika terdaftar, kami kirimkan tautan untuk mengatur ulang kata sandi.",
+      email: "Email",
+      requestSubmit: "Kirim Tautan Reset",
+      requestSubmitting: "Mengirim…",
+      sent: "Jika email tersebut terdaftar, tautan reset sudah terkirim — cek inbox Anda.",
+      throttled: "Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.",
+      setTitle: "Buat kata sandi baru",
+      setBody: "Masukkan kata sandi baru untuk akun",
+      password: "Kata sandi baru",
+      setSubmit: "Simpan Kata Sandi",
+      setSubmitting: "Menyimpan…",
+      invalid: "Tautan reset tidak valid atau sudah kedaluwarsa. Minta tautan baru.",
+      backToLogin: "Kembali ke halaman masuk",
     },
     roles: {
       super_admin: "Admin Perusahaan",
@@ -514,6 +532,7 @@ const dictionaries = {
       compliance: "Audit-ready • Aligned with Pedoman Promosi Obat",
       noAccount: "Your company doesn't have a workspace yet?",
       registerLink: "Register here",
+      forgot: "Forgot your password?",
     },
     register: {
       title: "Register your company",
@@ -543,6 +562,23 @@ const dictionaries = {
       submit: "Activate Account",
       submitting: "Activating…",
       inviteInvalid: "This invite is invalid or has expired.",
+    },
+    resetPassword: {
+      requestTitle: "Forgot your password?",
+      requestBody:
+        "Enter your account email. If it's registered, we'll send you a link to reset your password.",
+      email: "Email",
+      requestSubmit: "Send Reset Link",
+      requestSubmitting: "Sending…",
+      sent: "If that email is registered, a reset link is on its way — check your inbox.",
+      throttled: "Too many requests. Wait a moment and try again.",
+      setTitle: "Choose a new password",
+      setBody: "Enter a new password for the account",
+      password: "New password",
+      setSubmit: "Save Password",
+      setSubmitting: "Saving…",
+      invalid: "This reset link is invalid or has expired. Request a new one.",
+      backToLogin: "Back to sign in",
     },
     roles: {
       super_admin: "Company Admin",

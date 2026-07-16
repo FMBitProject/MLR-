@@ -3,11 +3,14 @@ import { eq } from "drizzle-orm";
 import { db, t } from "./db";
 
 const TOKEN_TTL_MS = 24 * 60 * 60_000; // 24h
+// Reset links grant account takeover to whoever holds them, so they live
+// much shorter than activation links.
+const RESET_TTL_MS = 60 * 60_000; // 1h
 
-/** Creates a single-use activation token for a user, replacing any prior one. */
+/** Creates a single-use account token for a user, replacing any prior one. */
 export async function createAccountToken(
   userId: string,
-  purpose: "verify" | "invite",
+  purpose: "verify" | "invite" | "reset",
 ): Promise<string> {
   await db.delete(t.accountTokens).where(eq(t.accountTokens.userId, userId));
   const token = randomBytes(32).toString("hex");
@@ -15,7 +18,7 @@ export async function createAccountToken(
     token,
     userId,
     purpose,
-    expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+    expiresAt: new Date(Date.now() + (purpose === "reset" ? RESET_TTL_MS : TOKEN_TTL_MS)),
     createdAt: new Date(),
   });
   return token;
