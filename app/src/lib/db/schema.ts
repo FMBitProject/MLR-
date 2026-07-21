@@ -24,6 +24,34 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   plan: text("plan").notNull().default("starter"),
+  // Subscription paid through this date. Null = billing not managed by the
+  // app (enterprise/manual tenants) — treated as always active. New
+  // registrations get a trial window; payments extend it by one month.
+  planActiveUntil: timestamp("plan_active_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+});
+
+// Subscription invoices, paid via Midtrans Snap. The invoice id doubles as
+// the Midtrans order_id, so the payment notification webhook can find the
+// row without a mapping table.
+export const invoices = pgTable("invoices", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  number: text("number").notNull().unique(), // human-readable, e.g. INV-20260720-A1B2C3
+  plan: text("plan").notNull(),
+  amountIdr: integer("amount_idr").notNull(),
+  // The subscription month this invoice pays for. Finalized at payment time
+  // (anchored at max(now, previous planActiveUntil)) so late payers aren't
+  // charged for days that already elapsed.
+  periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+  periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("pending"), // pending | paid | expired | canceled
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+  snapToken: text("snap_token"),
+  snapRedirectUrl: text("snap_redirect_url"),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
+  paymentType: text("payment_type"), // from the Midtrans notification, e.g. bank_transfer
+  lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
 
@@ -118,6 +146,16 @@ export const contentSubmissions = pgTable("content_submissions", {
   currentStage: text("current_stage"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
+  // Market lifecycle after approval: approved material expires (default one
+  // year, editable by compliance) and can be withdrawn from circulation
+  // early (label change, BPOM finding). Expired/withdrawn material stays in
+  // the library for the audit trail but can no longer be reused.
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  // Throttles the pre-expiry reminder digest, mirrors invoices.lastReminderAt.
+  expiryRemindedAt: timestamp("expiry_reminded_at", { withTimezone: true }),
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+  withdrawnBy: text("withdrawn_by").references(() => users.id),
+  withdrawnReason: text("withdrawn_reason"),
 });
 
 export const contentVersions = pgTable("content_versions", {
@@ -174,6 +212,11 @@ export const reviewStages = pgTable("review_stages", {
   status: text("status").notNull().default("pending"), // pending | in_progress | approved | rejected | changes_requested | skipped
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   decisionNote: text("decision_note"),
+  // Who actually signed the decision (may differ from assignedTo when an
+  // admin decides). Set together with the e-signature: the decision form
+  // re-verifies the account password, and the signature manifest goes to
+  // the audit log ("signature" in details).
+  decidedBy: text("decided_by").references(() => users.id),
 });
 
 export const reviewComments = pgTable("review_comments", {

@@ -153,6 +153,8 @@ export function ReviewWorkspace({
   const [resubmitFileName, setResubmitFileName] = useState<string | null>(null);
   const [resubmitError, setResubmitError] = useState<string | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
+  const [signPassword, setSignPassword] = useState("");
+  const [signError, setSignError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -776,7 +778,18 @@ export function ReviewWorkspace({
                   {dict.detail.yourTurn}
                 </p>
                 <form
-                  action={(fd) => startTransition(() => decideStage(fd))}
+                  action={(fd) =>
+                    startTransition(async () => {
+                      setSignError(null);
+                      const res = await decideStage(fd);
+                      if (res && "error" in res) {
+                        setSignError(res.error);
+                      } else {
+                        setSignPassword("");
+                        setDecisionNote("");
+                      }
+                    })
+                  }
                   className="space-y-3"
                 >
                   <input type="hidden" name="stageId" value={data.activeStageId} />
@@ -794,11 +807,36 @@ export function ReviewWorkspace({
                       {dict.detail.approveBlocked}
                     </p>
                   ) : null}
+                  {/* E-signature: the decision is signed by re-entering the
+                      account password; buttons stay disabled until filled. */}
+                  <div className="rounded-lg bg-white/70 p-3 ring-1 ring-inset ring-sky-200">
+                    <p className="mb-2 text-[11.5px] leading-snug text-slate-500">
+                      {dict.detail.signStatement}
+                    </p>
+                    <input
+                      type="password"
+                      name="password"
+                      autoComplete="current-password"
+                      value={signPassword}
+                      onChange={(e) => setSignPassword(e.target.value)}
+                      placeholder={dict.detail.signPassword}
+                      className={inputCls}
+                    />
+                    {signError ? (
+                      <p className="mt-2 text-[12px] font-medium text-rose-600">
+                        {signError === "SIGN_LOCKED"
+                          ? dict.detail.signLocked
+                          : dict.detail.signInvalid}
+                      </p>
+                    ) : null}
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       name="decision"
                       value="approved"
-                      disabled={pending || data.prevOpenComments.length > 0}
+                      disabled={
+                        pending || data.prevOpenComments.length > 0 || !signPassword
+                      }
                       title={
                         data.prevOpenComments.length > 0 ? dict.detail.approveBlocked : undefined
                       }
@@ -809,7 +847,7 @@ export function ReviewWorkspace({
                     <button
                       name="decision"
                       value="changes_requested"
-                      disabled={pending || !decisionNote.trim()}
+                      disabled={pending || !decisionNote.trim() || !signPassword}
                       title={!decisionNote.trim() ? dict.detail.noteRequired : undefined}
                       className="rounded-xl bg-amber-500 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40"
                       formNoValidate
@@ -819,7 +857,7 @@ export function ReviewWorkspace({
                     <button
                       name="decision"
                       value="rejected"
-                      disabled={pending || !decisionNote.trim()}
+                      disabled={pending || !decisionNote.trim() || !signPassword}
                       title={!decisionNote.trim() ? dict.detail.noteRequired : undefined}
                       className="rounded-xl bg-rose-600 px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
                       formNoValidate

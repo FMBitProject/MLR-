@@ -30,6 +30,7 @@ import { extractPptxSlides, extractDocxParagraphs } from "./office";
 import { consumeAttempt, clearThrottle } from "./throttle";
 import { planLimits, planHas } from "./plans";
 import { submissionQuota } from "./usage";
+import { assertTenantWritable, ensureRenewalInvoice, TRIAL_DAYS } from "./billing";
 import { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail } from "./email";
 import { notifyCurrentStageReviewers, notifySubmitterDecision } from "./notify";
 import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
@@ -38,6 +39,14 @@ import { getDict } from "./i18n-server";
 async function clientIp(): Promise<string> {
   const h = await headers();
   return h.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
+
+// Billing gate: past-grace tenants are read-only — content-creating actions
+// throw BILLING_LOCKED while reviews of in-flight work stay allowed.
+async function requireWritableTenant(tenantId: string) {
+  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, tenantId)))[0];
+  assertTenantWritable(tenant);
+  return tenant;
 }
 
 /* ----------------------------- session ----------------------------- */
@@ -117,7 +126,15 @@ export async function register(
   const userId = crypto.randomUUID();
 
   await db.insert(t.tenants)
-    .values({ id: tenantId, name: companyName, slug, plan: "starter", createdAt: new Date() });
+    .values({
+      id: tenantId,
+      name: companyName,
+      slug,
+      plan: "starter",
+      // Free trial: the first invoice becomes payable as this date approaches.
+      planActiveUntil: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60_000),
+      createdAt: new Date(),
+    });
   await db.insert(t.users)
     .values({
       id: userId,
@@ -490,6 +507,7 @@ export async function createSubmission(formData: FormData) {
   // Plan quota (PRD §12): monthly submission cap. The form disables itself
   // when the quota is full; this closes the race for concurrent submitters.
   const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  assertTenantWritable(tenant);
   const quota = await submissionQuota(user.tenantId, tenant?.plan);
   if (quota.used >= quota.limit) throw new Error("PLAN_LIMIT");
 
@@ -585,6 +603,7 @@ export async function resubmitVersion(formData: FormData) {
     file instanceof File && file.size > 0 ? Buffer.from(await file.arrayBuffer()) : null;
   // Same rule as the initial submission: revised text or a revised file.
   if ((!text && !fileName) || !changeNote) throw new Error("VALIDATION");
+  await requireWritableTenant(user.tenantId);
 
   const sub = (await db
     .select()
@@ -687,6 +706,7 @@ export async function reuseApprovedContent(formData: FormData) {
     throw new Error("FORBIDDEN");
   }
   const sourceId = String(formData.get("submissionId") ?? "");
+  await requireWritableTenant(user.tenantId);
 
   const source = (await db
     .select()
@@ -700,6 +720,9 @@ export async function reuseApprovedContent(formData: FormData) {
     )
     )[0];
   if (!source) throw new Error("NOT_FOUND");
+  // Expired material must not re-enter circulation via reuse; withdrawn
+  // material already drops out through the status filter above.
+  if (source.expiresAt && source.expiresAt < new Date()) throw new Error("SOURCE_EXPIRED");
 
   const versions = await db
     .select()
@@ -812,11 +835,24 @@ export async function decideStage(formData: FormData) {
   const stageId = String(formData.get("stageId") ?? "");
   const decision = String(formData.get("decision") ?? ""); // approved | changes_requested | rejected
   const note = String(formData.get("note") ?? "").trim() || null;
+  const password = String(formData.get("password") ?? "");
 
   if (!["approved", "changes_requested", "rejected"].includes(decision)) {
     throw new Error("VALIDATION");
   }
   if (decision !== "approved" && !note) throw new Error("NOTE_REQUIRED");
+
+  // Part 11-style e-signature: the decision is signed by re-entering the
+  // account password at the moment of signing. Returned (not thrown) so the
+  // decision panel can show it inline; throttled like login to keep this
+  // from becoming a password oracle.
+  if (!(await consumeAttempt(`sign:${user.id}`, 5, 15 * 60_000))) {
+    return { error: "SIGN_LOCKED" as const };
+  }
+  if (!verifyPassword(password, user.passwordHash)) {
+    return { error: "BAD_PASSWORD" as const };
+  }
+  await clearThrottle(`sign:${user.id}`);
 
   const stage = (await db.select().from(t.reviewStages).where(eq(t.reviewStages.id, stageId)))[0];
   if (!stage) throw new Error("NOT_FOUND");
@@ -860,8 +896,9 @@ export async function decideStage(formData: FormData) {
     if (openPrev > 0) throw new Error("PREV_COMMENTS_OPEN");
   }
 
+  const signedAt = new Date();
   await db.update(t.reviewStages)
-    .set({ status: decision, decidedAt: new Date(), decisionNote: note })
+    .set({ status: decision, decidedAt: signedAt, decisionNote: note, decidedBy: user.id })
     .where(eq(t.reviewStages.id, stageId));
 
   if (decision === "approved") {
@@ -888,9 +925,12 @@ export async function decideStage(formData: FormData) {
         }),
       );
     } else {
-      // Final approval: lock the version (immutability NFR)
+      // Final approval: lock the version (immutability NFR) and start the
+      // one-year market shelf life (compliance can adjust it in the library).
+      const expiresAt = new Date(signedAt);
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
       await db.update(t.contentSubmissions)
-        .set({ status: "approved", currentStage: null, decidedAt: new Date() })
+        .set({ status: "approved", currentStage: null, decidedAt: signedAt, expiresAt })
         .where(eq(t.contentSubmissions.id, sub.id));
       await db.update(t.contentVersions)
         .set({ isLocked: true })
@@ -957,6 +997,16 @@ export async function decideStage(formData: FormData) {
       version: `v${currentVersion.versionNumber}`,
       stage: stage.reviewerRole,
       note: note ?? undefined,
+      // E-signature manifest: identity captured at signing time plus the
+      // meaning of the signature, per Part 11-style expectations.
+      signature: {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        meaning: `${decision} as ${stage.reviewerRole} for v${currentVersion.versionNumber}`,
+        method: "password_reentry",
+        signedAt: signedAt.toISOString(),
+      },
     },
   });
 
@@ -1297,6 +1347,7 @@ export async function saveClaim(formData: FormData) {
   const channels = formData.getAll("channels").map(String);
   const references = parseReferences(formData);
   if (!productId || !claimText || !expiresAt) throw new Error("VALIDATION");
+  await requireWritableTenant(user.tenantId);
 
   if (id) {
     await db.update(t.approvedClaims)
@@ -1397,6 +1448,7 @@ export async function importClaims(formData: FormData) {
   const channels = formData.getAll("channels").map(String);
   const claims = formData.getAll("claims").map(String).filter(Boolean);
   if (!productId || !expiresAt || !claims.length) throw new Error("VALIDATION");
+  await requireWritableTenant(user.tenantId);
 
   for (const claimText of claims) {
     const id = crypto.randomUUID();
@@ -1423,6 +1475,99 @@ export async function importClaims(formData: FormData) {
     });
   }
   revalidatePath("/claims");
+}
+
+/* ----------------------- content lifecycle ------------------------- */
+
+// Compliance/QA owns the market lifecycle of approved material, same as the
+// claims library (PRD persona 5).
+const LIFECYCLE_ROLES = ["compliance_admin", "super_admin"];
+
+/**
+ * Pulls approved material from circulation before its expiry (label change,
+ * BPOM finding, claim withdrawn). The material stays in the library and
+ * audit trail but can no longer be reused.
+ */
+export async function withdrawSubmission(formData: FormData) {
+  const user = await requireUser();
+  if (!LIFECYCLE_ROLES.includes(user.role)) throw new Error("FORBIDDEN");
+
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) throw new Error("VALIDATION");
+
+  const sub = (await db
+    .select()
+    .from(t.contentSubmissions)
+    .where(
+      and(
+        eq(t.contentSubmissions.id, submissionId),
+        eq(t.contentSubmissions.tenantId, user.tenantId),
+        eq(t.contentSubmissions.status, "approved"),
+      ),
+    ))[0];
+  if (!sub) throw new Error("NOT_FOUND");
+
+  await db.update(t.contentSubmissions)
+    .set({
+      status: "withdrawn",
+      withdrawnAt: new Date(),
+      withdrawnBy: user.id,
+      withdrawnReason: reason,
+    })
+    .where(eq(t.contentSubmissions.id, submissionId));
+
+  await logAudit({
+    tenantId: user.tenantId,
+    entityType: "submission",
+    entityId: submissionId,
+    action: "content_withdrawn",
+    performedBy: user.id,
+    details: { title: sub.title, reason },
+  });
+  revalidatePath("/", "layout");
+}
+
+/** Adjusts the market expiry date of approved material (default: one year). */
+export async function setContentExpiry(formData: FormData) {
+  const user = await requireUser();
+  if (!LIFECYCLE_ROLES.includes(user.role)) throw new Error("FORBIDDEN");
+
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const expiresAtRaw = String(formData.get("expiresAt") ?? "");
+  if (!expiresAtRaw) throw new Error("VALIDATION");
+
+  const sub = (await db
+    .select()
+    .from(t.contentSubmissions)
+    .where(
+      and(
+        eq(t.contentSubmissions.id, submissionId),
+        eq(t.contentSubmissions.tenantId, user.tenantId),
+        eq(t.contentSubmissions.status, "approved"),
+      ),
+    ))[0];
+  if (!sub) throw new Error("NOT_FOUND");
+
+  const expiresAt = new Date(`${expiresAtRaw}T23:59:59+07:00`);
+  await db.update(t.contentSubmissions)
+    // Reset the reminder throttle so the new date gets its own warnings.
+    .set({ expiresAt, expiryRemindedAt: null })
+    .where(eq(t.contentSubmissions.id, submissionId));
+
+  await logAudit({
+    tenantId: user.tenantId,
+    entityType: "submission",
+    entityId: submissionId,
+    action: "expiry_updated",
+    performedBy: user.id,
+    details: {
+      title: sub.title,
+      from: sub.expiresAt?.toISOString() ?? null,
+      to: expiresAt.toISOString(),
+    },
+  });
+  revalidatePath("/library");
 }
 
 /* ----------------------------- settings ---------------------------- */
@@ -1515,6 +1660,7 @@ export async function createTeammate(formData: FormData) {
   if (existingUsers.length >= planLimits(tenant[0]?.plan).users) {
     return { error: "PLAN_LIMIT" };
   }
+  assertTenantWritable(tenant[0]);
 
   const teammateId = crypto.randomUUID();
   await db.insert(t.users)
@@ -1590,6 +1736,7 @@ export async function createProduct(formData: FormData) {
   if (existing.length >= planLimits(tenant[0]?.plan).products) {
     return { error: "PLAN_LIMIT" };
   }
+  assertTenantWritable(tenant[0]);
 
   const productId = crypto.randomUUID();
   await db.insert(t.products).values({
@@ -1610,4 +1757,31 @@ export async function createProduct(formData: FormData) {
   });
   revalidatePath("/", "layout");
   return {};
+}
+
+/* ----------------------------- billing ----------------------------- */
+
+// Opens (creating if needed) the tenant's renewal invoice and sends the
+// admin to the Midtrans Snap payment page. Without a MIDTRANS_SERVER_KEY
+// (dev) the invoice is created but there's no page to redirect to, so the
+// settings card re-renders showing it as pending.
+export async function payRenewalInvoice() {
+  const user = await requireUser();
+  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+
+  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
+  if (!tenant) throw new Error("NOT_FOUND");
+
+  const invoice = await ensureRenewalInvoice(tenant, { name: user.name, email: user.email });
+  await logAudit({
+    tenantId: user.tenantId,
+    entityType: "invoice",
+    entityId: invoice.id,
+    action: "invoice_payment_opened",
+    performedBy: user.id,
+    details: { number: invoice.number, amountIdr: invoice.amountIdr, plan: invoice.plan },
+  });
+
+  if (invoice.snapRedirectUrl) redirect(invoice.snapRedirectUrl);
+  revalidatePath("/settings");
 }

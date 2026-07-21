@@ -6,12 +6,16 @@ import { requireUser, SUBMITTER_ROLES } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { reuseApprovedContent } from "@/lib/actions";
+import { contentLifecycle } from "@/lib/content-expiry";
 import { Card, EmptyState, PageHeader, Chip } from "@/components/ui";
+import { LibraryLifecycle } from "@/components/library-lifecycle";
 
 export default async function LibraryPage() {
   const user = await requireUser();
   const { dict, locale } = await getDict();
 
+  // Withdrawn material stays listed (greyed, no reuse) — the library is the
+  // audit-facing record of what has circulated, not just what may circulate.
   const subs = await db
     .select({ sub: t.contentSubmissions, product: t.products })
     .from(t.contentSubmissions)
@@ -19,7 +23,7 @@ export default async function LibraryPage() {
     .where(
       and(
         eq(t.contentSubmissions.tenantId, user.tenantId),
-        eq(t.contentSubmissions.status, "approved"),
+        inArray(t.contentSubmissions.status, ["approved", "withdrawn"]),
       ),
     )
     .orderBy(desc(t.contentSubmissions.decidedAt));
@@ -44,6 +48,7 @@ export default async function LibraryPage() {
       .sort((a, b) => b.versionNumber - a.versionNumber)[0];
 
   const canSubmit = SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number]);
+  const canManage = ["compliance_admin", "super_admin"].includes(user.role);
 
   return (
     <div className="animate-fade-up">
@@ -60,13 +65,27 @@ export default async function LibraryPage() {
           <div className="divide-y divide-slate-100">
             {subs.map(({ sub, product }) => {
               const v = finalVersion(sub.id);
+              const lifecycle = contentLifecycle(sub);
+              const withdrawn = lifecycle === "withdrawn";
+              const expired = lifecycle === "expired";
+              const expiringSoon = lifecycle === "expiring_soon";
+              const inCirculation = !withdrawn && !expired;
               return (
                 <div
                   key={sub.id}
-                  className="flex flex-wrap items-center gap-4 px-6 py-4"
+                  data-testid={`library-row-${sub.id}`}
+                  className={
+                    "flex flex-wrap items-center gap-4 px-6 py-4" +
+                    (inCirculation ? "" : " bg-slate-50/60")
+                  }
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-medium text-slate-900">
+                    <p
+                      className={
+                        "truncate text-[14px] font-medium " +
+                        (inCirculation ? "text-slate-900" : "text-slate-500 line-through")
+                      }
+                    >
                       {sub.title}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
@@ -75,6 +94,19 @@ export default async function LibraryPage() {
                         {dict.channels[sub.channel as keyof typeof dict.channels] ??
                           sub.channel}
                       </Chip>
+                      {withdrawn ? (
+                        <Chip tone="red">{dict.status.withdrawn}</Chip>
+                      ) : expired ? (
+                        <Chip tone="red">{dict.status.expired}</Chip>
+                      ) : expiringSoon ? (
+                        <Chip tone="amber">
+                          {dict.library.expiresOn} {formatDate(sub.expiresAt, locale)}
+                        </Chip>
+                      ) : sub.expiresAt ? (
+                        <span>
+                          {dict.library.expiresOn} {formatDate(sub.expiresAt, locale)}
+                        </span>
+                      ) : null}
                       <span>
                         {dict.library.finalVersion} v{v?.versionNumber ?? 1}
                       </span>
@@ -88,10 +120,16 @@ export default async function LibraryPage() {
                         {v?.fileName ?? dict.library.textOnly}
                       </span>
                     </div>
+                    {withdrawn && sub.withdrawnReason ? (
+                      <p className="mt-1.5 text-[12px] italic text-rose-700">
+                        {dict.library.withdrawnReasonLabel}: “{sub.withdrawnReason}” ·{" "}
+                        {formatDate(sub.withdrawnAt, locale)}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {v?.fileName ? (
+                    {v?.fileName && inCirculation ? (
                       <a
                         href={`/api/files/${v.id}`}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[12.5px] font-medium text-slate-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"
@@ -107,7 +145,7 @@ export default async function LibraryPage() {
                       <History className="size-3.5" />
                       {dict.library.view}
                     </Link>
-                    {canSubmit ? (
+                    {canSubmit && inCirculation ? (
                       <form action={reuseApprovedContent}>
                         <input type="hidden" name="submissionId" value={sub.id} />
                         <button
@@ -120,6 +158,16 @@ export default async function LibraryPage() {
                       </form>
                     ) : null}
                   </div>
+
+                  {canManage && !withdrawn ? (
+                    <div className="w-full border-t border-slate-100 pt-3">
+                      <LibraryLifecycle
+                        submissionId={sub.id}
+                        expiresAt={sub.expiresAt?.toISOString().slice(0, 10) ?? null}
+                        dict={dict}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

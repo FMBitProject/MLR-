@@ -147,6 +147,13 @@ const dictionaries = {
       finalVersion: "Versi final",
       textOnly: "Konten teks (tanpa file)",
       reuseSuffix: "(pakai ulang)",
+      expiresOn: "Berlaku sampai",
+      withdraw: "Tarik dari Peredaran",
+      withdrawReason: "Alasan penarikan (wajib, tercatat di audit trail)",
+      withdrawConfirm: "Konfirmasi Tarik",
+      withdrawCancel: "Batal",
+      withdrawnReasonLabel: "Alasan ditarik",
+      saveExpiry: "Simpan",
     },
     newSubmission: {
       title: "Ajukan Konten Baru",
@@ -196,6 +203,11 @@ const dictionaries = {
       reject: "Tolak",
       decisionNote: "Catatan keputusan (wajib untuk revisi/tolak)",
       noteRequired: "Isi catatan keputusan dulu untuk revisi/tolak",
+      signStatement:
+        "Tanda tangan elektronik: dengan memasukkan kata sandi, Anda menandatangani keputusan ini atas nama Anda sendiri — setara tanda tangan basah pada dokumen review, dan tercatat permanen di audit trail.",
+      signPassword: "Kata sandi Anda (untuk menandatangani)",
+      signInvalid: "Kata sandi salah — keputusan tidak ditandatangani.",
+      signLocked: "Terlalu banyak percobaan. Tunggu 15 menit lalu coba lagi.",
       closestClaim: "Klaim terdekat",
       supportingRefs: "Referensi pendukung",
       journalCheck: "Cek terhadap Jurnal (AI)",
@@ -264,6 +276,11 @@ const dictionaries = {
       generated: "Dokumen dibuat",
       disclaimer:
         "Dokumen ini dihasilkan otomatis dari jejak audit MLR Flow dan merepresentasikan versi terkunci yang disetujui. Perubahan apa pun memerlukan versi baru dengan siklus review penuh.",
+      signatures: "Tanda tangan elektronik",
+      signedElectronically: "Ditandatangani elektronik oleh",
+      signMeaning: "Makna tanda tangan",
+      signDisclaimer:
+        "Setiap tanda tangan direkam melalui verifikasi ulang kata sandi akun pada saat keputusan dibuat, terikat pada identitas pengguna terautentikasi, versi materi, dan waktu penandatanganan di audit trail. Ini adalah tanda tangan elektronik in-app, bukan tanda tangan digital bersertifikat.",
     },
     claims: {
       title: "Claims Library",
@@ -391,6 +408,32 @@ const dictionaries = {
       productAdd: "Tambah",
       productAdding: "Menambahkan…",
       productFailed: "Gagal menambah produk. Periksa data lalu coba lagi.",
+      billing: "Billing & Langganan",
+      billingDesc: "Tagihan dibayar via Midtrans — transfer bank/VA, QRIS, e-wallet, atau kartu.",
+      billingActiveUntil: "Langganan aktif sampai",
+      billingUnmanaged: "Billing paket ini diatur manual — hubungi kami untuk perpanjangan atau perubahan.",
+      billingStatus: { active: "Aktif", grace: "Masa tenggang", delinquent: "Baca-saja" },
+      billingPay: "Bayar Perpanjangan",
+      billingPaying: "Menyiapkan pembayaran…",
+      billingPayPending: "Lanjutkan Pembayaran",
+      billingDevHint: "MIDTRANS_SERVER_KEY belum diset — invoice dibuat tanpa link pembayaran (mode dev).",
+      billingInvoices: "Riwayat tagihan",
+      billingNoInvoices: "Belum ada tagihan — tagihan pertama muncul menjelang akhir masa aktif.",
+      billingInvoiceStatus: {
+        pending: "Menunggu pembayaran",
+        paid: "Lunas",
+        expired: "Kedaluwarsa",
+        canceled: "Dibatalkan",
+      },
+    },
+    billingBanner: {
+      grace:
+        "Langganan workspace ini telah berakhir. Selesaikan pembayaran sebelum masa tenggang habis agar workspace tidak beralih ke mode baca-saja.",
+      delinquent:
+        "Workspace ini dalam mode baca-saja karena tagihan belum dibayar. Data dan review berjalan tetap aman — pengajuan baru dinonaktifkan.",
+      graceAdmin: "Bayar di Pengaturan →",
+      delinquentAdmin: "Pulihkan akses di Pengaturan →",
+      nonAdmin: "Hubungi admin workspace Anda.",
     },
     landing: {
       signIn: "Masuk",
@@ -650,6 +693,13 @@ const dictionaries = {
       finalVersion: "Final version",
       textOnly: "Text content (no file)",
       reuseSuffix: "(reuse)",
+      expiresOn: "Valid until",
+      withdraw: "Withdraw from Circulation",
+      withdrawReason: "Withdrawal reason (required, recorded in the audit trail)",
+      withdrawConfirm: "Confirm Withdrawal",
+      withdrawCancel: "Cancel",
+      withdrawnReasonLabel: "Withdrawal reason",
+      saveExpiry: "Save",
     },
     newSubmission: {
       title: "Submit New Content",
@@ -699,6 +749,11 @@ const dictionaries = {
       reject: "Reject",
       decisionNote: "Decision note (required for changes/reject)",
       noteRequired: "Add a decision note first to request changes/reject",
+      signStatement:
+        "Electronic signature: by entering your password you sign this decision in your own name — the equivalent of a wet signature on the review document, permanently recorded in the audit trail.",
+      signPassword: "Your password (to sign)",
+      signInvalid: "Wrong password — the decision was not signed.",
+      signLocked: "Too many attempts. Wait 15 minutes and try again.",
       closestClaim: "Closest claim",
       supportingRefs: "Supporting references",
       journalCheck: "Check against Journal (AI)",
@@ -767,6 +822,11 @@ const dictionaries = {
       generated: "Document generated",
       disclaimer:
         "This document is generated automatically from the MLR Flow audit trail and represents the locked, approved version. Any change requires a new version with a full review cycle.",
+      signatures: "Electronic signatures",
+      signedElectronically: "Electronically signed by",
+      signMeaning: "Meaning of signature",
+      signDisclaimer:
+        "Each signature was recorded by re-verifying the account password at the moment of decision, bound in the audit trail to the authenticated user identity, the material version, and the signing time. This is an in-app electronic signature, not a certificate-based digital signature.",
     },
     claims: {
       title: "Claims Library",
@@ -894,6 +954,32 @@ const dictionaries = {
       productAdd: "Add",
       productAdding: "Adding…",
       productFailed: "Failed to add product. Check the details and try again.",
+      billing: "Billing & Subscription",
+      billingDesc: "Invoices are paid via Midtrans — bank transfer/VA, QRIS, e-wallets, or cards.",
+      billingActiveUntil: "Subscription active until",
+      billingUnmanaged: "Billing for this plan is handled manually — contact us for renewals or changes.",
+      billingStatus: { active: "Active", grace: "Grace period", delinquent: "Read-only" },
+      billingPay: "Pay Renewal",
+      billingPaying: "Preparing payment…",
+      billingPayPending: "Continue Payment",
+      billingDevHint: "MIDTRANS_SERVER_KEY is not set — the invoice was created without a payment link (dev mode).",
+      billingInvoices: "Invoice history",
+      billingNoInvoices: "No invoices yet — the first one appears as the active period nears its end.",
+      billingInvoiceStatus: {
+        pending: "Awaiting payment",
+        paid: "Paid",
+        expired: "Expired",
+        canceled: "Canceled",
+      },
+    },
+    billingBanner: {
+      grace:
+        "This workspace's subscription has lapsed. Complete the payment before the grace period ends to avoid read-only mode.",
+      delinquent:
+        "This workspace is read-only because of an unpaid invoice. Data and in-flight reviews are safe — new submissions are disabled.",
+      graceAdmin: "Pay in Settings →",
+      delinquentAdmin: "Restore access in Settings →",
+      nonAdmin: "Contact your workspace admin.",
     },
     landing: {
       signIn: "Sign in",

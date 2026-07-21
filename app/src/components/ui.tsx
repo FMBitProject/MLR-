@@ -91,7 +91,7 @@ export function Chip({
   tone = "slate",
 }: {
   children: ReactNode;
-  tone?: "slate" | "brand" | "amber";
+  tone?: "slate" | "brand" | "amber" | "red";
 }) {
   return (
     <span
@@ -100,6 +100,7 @@ export function Chip({
         tone === "slate" && "bg-slate-50 text-slate-600 ring-slate-200",
         tone === "brand" && "bg-brand-50 text-brand-800 ring-brand-200",
         tone === "amber" && "bg-amber-50 text-amber-800 ring-amber-200",
+        tone === "red" && "bg-red-50 text-red-800 ring-red-200",
       )}
     >
       {children}

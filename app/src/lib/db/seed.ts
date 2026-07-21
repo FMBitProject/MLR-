@@ -53,6 +53,8 @@ export async function seed(db: DB) {
     name: "PT Nusantara Pharma",
     slug: "nusantara",
     plan: "growth",
+    // Mid-trial so the billing card renders in its managed (payable) state.
+    planActiveUntil: new Date(Date.now() + 14 * 24 * 60 * 60_000),
     createdAt: daysAgo(120),
   });
 

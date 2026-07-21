@@ -1,11 +1,22 @@
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { Building2, GitBranch, Users, Sparkles, ShieldAlert, Package, Lock } from "lucide-react";
+import {
+  Building2,
+  GitBranch,
+  Users,
+  Sparkles,
+  ShieldAlert,
+  Package,
+  Lock,
+  CreditCard,
+} from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
-import { saveWorkflow } from "@/lib/actions";
+import { saveWorkflow, payRenewalInvoice } from "@/lib/actions";
+import { billingState, latestInvoices } from "@/lib/billing";
+import { midtransConfigured } from "@/lib/midtrans";
 import { getLlmProvider } from "@/lib/llm";
 import { planDef, formatIdr, effectivePriceIdr } from "@/lib/plans";
 import { submissionQuota } from "@/lib/usage";
@@ -36,6 +47,16 @@ export default async function SettingsPage() {
   const plan = planDef(tenant?.plan);
   const limits = plan.limits;
   const quota = await submissionQuota(user.tenantId, tenant?.plan);
+  const billing = billingState(tenant);
+  const invoices = await latestInvoices(user.tenantId);
+  const pending = invoices.find((i) => i.status === "pending");
+  const billingTone = { active: "brand", grace: "amber", delinquent: "red" } as const;
+  const invoiceTone = {
+    pending: "amber",
+    paid: "brand",
+    expired: "slate",
+    canceled: "slate",
+  } as const;
 
   return (
     <div className="animate-fade-up">
@@ -199,6 +220,86 @@ export default async function SettingsPage() {
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <CreditCard className="size-4 text-slate-400" />
+                  {dict.settings.billing}
+                </span>
+              }
+              desc={dict.settings.billingDesc}
+            />
+            <div className="px-6 py-5">
+              {!billing.managed ? (
+                <p className="text-[12.5px] leading-relaxed text-slate-500">
+                  {dict.settings.billingUnmanaged}
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Chip tone={billingTone[billing.status]}>
+                      {dict.settings.billingStatus[billing.status]}
+                    </Chip>
+                    <p className="text-[13px] text-slate-600">
+                      {dict.settings.billingActiveUntil}{" "}
+                      <span className="font-semibold text-slate-800">
+                        {formatDate(billing.activeUntil, locale)}
+                      </span>
+                    </p>
+                    <form action={payRenewalInvoice} className="ml-auto">
+                      <button className="rounded-lg bg-slate-900 px-3.5 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-slate-700">
+                        {pending?.snapRedirectUrl
+                          ? dict.settings.billingPayPending
+                          : dict.settings.billingPay}
+                      </button>
+                    </form>
+                  </div>
+                  {pending && !pending.snapRedirectUrl && !midtransConfigured() ? (
+                    <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-800 ring-1 ring-inset ring-amber-200">
+                      {dict.settings.billingDevHint}
+                    </p>
+                  ) : null}
+                  <p className="mt-5 text-[11.5px] font-semibold uppercase tracking-wider text-slate-400">
+                    {dict.settings.billingInvoices}
+                  </p>
+                  {invoices.length === 0 ? (
+                    <p className="mt-2 text-[12.5px] text-slate-500">
+                      {dict.settings.billingNoInvoices}
+                    </p>
+                  ) : (
+                    <div className="mt-2 divide-y divide-slate-100">
+                      {invoices.map((inv) => (
+                        <div key={inv.id} className="flex items-center gap-3 py-2.5">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[13px] font-medium text-slate-800">
+                              {inv.number}
+                            </p>
+                            <p className="text-[12px] text-slate-400">
+                              {formatDate(inv.createdAt, locale)} · {inv.plan}
+                            </p>
+                          </div>
+                          <p className="text-[13px] font-semibold text-slate-700">
+                            {formatIdr(inv.amountIdr)}
+                          </p>
+                          <Chip
+                            tone={
+                              invoiceTone[inv.status as keyof typeof invoiceTone] ?? "slate"
+                            }
+                          >
+                            {dict.settings.billingInvoiceStatus[
+                              inv.status as keyof typeof dict.settings.billingInvoiceStatus
+                            ] ?? inv.status}
+                          </Chip>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </Card>
+
           <Card>
             <CardHeader
               title={

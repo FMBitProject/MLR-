@@ -126,7 +126,7 @@ export default async function ApprovalPackagePage(
               <tr key={s.id}>
                 <td className="py-2.5 text-slate-400">{s.stageOrder}</td>
                 <td className="py-2.5 font-medium">{roleLabel(s.reviewerRole)}</td>
-                <td className="py-2.5">{userName(s.assignedTo)}</td>
+                <td className="py-2.5">{userName(s.decidedBy ?? s.assignedTo)}</td>
                 <td className="py-2.5">
                   <span className="font-semibold text-emerald-700">
                     {dict.status[s.status as keyof typeof dict.status] ?? s.status}
@@ -138,6 +138,49 @@ export default async function ApprovalPackagePage(
             ))}
           </tbody>
         </table>
+      </section>
+
+      {/* e-signature manifest — one signature line per decided stage */}
+      <section className="mt-8">
+        <h2 className="border-b-2 border-brand-700 pb-2 text-[15px] font-semibold uppercase tracking-wider text-slate-700">
+          {dict.pkg.signatures}
+        </h2>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {stages
+            .filter((s) => s.decidedAt)
+            .map((s) => {
+              const signer = tenantUsers.find((u) => u.id === (s.decidedBy ?? s.assignedTo));
+              return (
+                <div
+                  key={s.id}
+                  className="break-inside-avoid rounded-xl border border-slate-200 p-4 text-[12.5px]"
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    {roleLabel(s.reviewerRole)}
+                  </p>
+                  <p className="mt-2 border-b border-slate-300 pb-1 font-[cursive] text-[17px] text-slate-800">
+                    {signer?.name ?? "—"}
+                  </p>
+                  <p className="mt-1.5 leading-relaxed text-slate-500">
+                    {dict.pkg.signedElectronically}{" "}
+                    <strong className="text-slate-700">{signer?.email ?? "—"}</strong>
+                    {" · "}
+                    {formatDate(s.decidedAt, locale)}
+                  </p>
+                  <p className="mt-1 text-slate-500">
+                    {dict.pkg.signMeaning}:{" "}
+                    <strong className="text-slate-700">
+                      {dict.status[s.status as keyof typeof dict.status] ?? s.status} —{" "}
+                      v{version.versionNumber}
+                    </strong>
+                  </p>
+                </div>
+              );
+            })}
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+          {dict.pkg.signDisclaimer}
+        </p>
       </section>
 
       {/* AI flag decisions */}

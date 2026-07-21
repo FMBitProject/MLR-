@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut, ShieldCheck, TriangleAlert } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { billingState } from "@/lib/billing";
 import { getDict } from "@/lib/i18n-server";
 import { logout } from "@/lib/actions";
 import { SidebarNav, type NavItem } from "@/components/sidebar-nav";
@@ -96,6 +98,34 @@ export default async function AppLayout({
         <header className="sticky top-0 z-20 flex h-14 items-center justify-end gap-3 border-b border-slate-200/70 bg-[#f6f8fa]/80 px-8 backdrop-blur">
           <LocaleSwitcher locale={locale} />
         </header>
+        {(() => {
+          const billing = billingState(tenant);
+          if (billing.status === "active") return null;
+          const isAdmin = ["compliance_admin", "super_admin"].includes(user.role);
+          const grace = billing.status === "grace";
+          return (
+            <div
+              className={
+                "flex items-start gap-3 border-b px-8 py-3 text-[13px] " +
+                (grace
+                  ? "border-amber-200 bg-amber-50 text-amber-900"
+                  : "border-red-200 bg-red-50 text-red-900")
+              }
+            >
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <p>
+                {grace ? dict.billingBanner.grace : dict.billingBanner.delinquent}{" "}
+                {isAdmin ? (
+                  <Link href="/settings" className="font-semibold underline underline-offset-2">
+                    {grace ? dict.billingBanner.graceAdmin : dict.billingBanner.delinquentAdmin}
+                  </Link>
+                ) : (
+                  <span className="font-semibold">{dict.billingBanner.nonAdmin}</span>
+                )}
+              </p>
+            </div>
+          );
+        })()}
         <main className="mx-auto w-full max-w-[1200px] flex-1 px-8 py-8">{children}</main>
       </div>
     </div>

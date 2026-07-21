@@ -1,4 +1,5 @@
 import { sendStaleReviewReminders } from "@/lib/reminders";
+import { sendContentExpiryReminders } from "@/lib/content-expiry";
 
 // Daily reminder sweep. On Vercel this is invoked by the cron entry in
 // vercel.json (Vercel sends `Authorization: Bearer ${CRON_SECRET}`); on
@@ -16,6 +17,7 @@ export async function GET(req: Request) {
   }
 
   const stats = await sendStaleReviewReminders();
-  console.log("reminder sweep:", stats);
-  return Response.json(stats);
+  const expiry = await sendContentExpiryReminders();
+  console.log("reminder sweep:", stats, "expiry sweep:", expiry);
+  return Response.json({ ...stats, expiry });
 }

@@ -330,6 +330,158 @@ export async function sendBottleneckDigestEmail(
   );
 }
 
+/**
+ * Renewal invoice notice to workspace admins. Sent when the invoice is
+ * raised and re-sent (throttled) while it stays unpaid; the copy escalates
+ * with the billing status.
+ */
+export async function sendInvoiceEmail(
+  to: string,
+  opts: {
+    locale: Locale;
+    status: "active" | "grace" | "delinquent";
+    tenantName: string;
+    invoiceNumber: string;
+    plan: string;
+    amountIdr: number;
+    activeUntil: Date;
+    payUrl: string | null;
+  },
+) {
+  const { locale } = opts;
+  const amount = new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(opts.amountIdr);
+  const until = opts.activeUntil.toLocaleDateString(locale === "id" ? "id-ID" : "en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const copy = {
+    active: {
+      subject:
+        locale === "id"
+          ? `Tagihan perpanjangan ${opts.invoiceNumber}`
+          : `Renewal invoice ${opts.invoiceNumber}`,
+      heading: locale === "id" ? "Tagihan langganan Anda" : "Your subscription invoice",
+      body:
+        locale === "id"
+          ? `Langganan MLR Flow workspace <strong>${esc(opts.tenantName)}</strong> (paket ${esc(opts.plan)}) aktif sampai <strong>${until}</strong>. Bayar tagihan <strong>${esc(opts.invoiceNumber)}</strong> sebesar <strong>${amount}</strong> untuk memperpanjang satu bulan.`
+          : `The MLR Flow subscription for workspace <strong>${esc(opts.tenantName)}</strong> (${esc(opts.plan)} plan) is active until <strong>${until}</strong>. Pay invoice <strong>${esc(opts.invoiceNumber)}</strong> of <strong>${amount}</strong> to extend it by one month.`,
+    },
+    grace: {
+      subject:
+        locale === "id"
+          ? `Langganan berakhir — masa tenggang berjalan (${opts.invoiceNumber})`
+          : `Subscription lapsed — grace period running (${opts.invoiceNumber})`,
+      heading: locale === "id" ? "Langganan Anda telah berakhir" : "Your subscription has lapsed",
+      body:
+        locale === "id"
+          ? `Langganan workspace <strong>${esc(opts.tenantName)}</strong> berakhir pada <strong>${until}</strong>. Workspace masih dapat digunakan penuh selama masa tenggang, lalu beralih ke mode baca-saja. Bayar <strong>${amount}</strong> (${esc(opts.invoiceNumber)}) untuk melanjutkan.`
+          : `The subscription for workspace <strong>${esc(opts.tenantName)}</strong> lapsed on <strong>${until}</strong>. The workspace keeps full access during the grace period, then becomes read-only. Pay <strong>${amount}</strong> (${esc(opts.invoiceNumber)}) to continue.`,
+    },
+    delinquent: {
+      subject:
+        locale === "id"
+          ? `Workspace baca-saja — tagihan belum dibayar (${opts.invoiceNumber})`
+          : `Workspace is read-only — unpaid invoice (${opts.invoiceNumber})`,
+      heading:
+        locale === "id" ? "Workspace Anda kini baca-saja" : "Your workspace is now read-only",
+      body:
+        locale === "id"
+          ? `Masa tenggang workspace <strong>${esc(opts.tenantName)}</strong> telah habis, sehingga pengajuan konten baru dinonaktifkan. Semua data dan review yang berjalan tetap aman. Bayar <strong>${amount}</strong> (${esc(opts.invoiceNumber)}) untuk memulihkan akses penuh.`
+          : `The grace period for workspace <strong>${esc(opts.tenantName)}</strong> has ended, so new content submissions are disabled. All data and in-flight reviews remain safe. Pay <strong>${amount}</strong> (${esc(opts.invoiceNumber)}) to restore full access.`,
+    },
+  }[opts.status];
+
+  const payBlock = opts.payUrl
+    ? button(opts.payUrl, locale === "id" ? "Bayar Sekarang" : "Pay Now")
+    : button(
+        `${appUrl()}/settings`,
+        locale === "id" ? "Buka Pengaturan Billing" : "Open Billing Settings",
+      );
+
+  await sendEmail(
+    to,
+    `${copy.subject} — MLR Flow`,
+    shell(
+      copy.heading,
+      `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${copy.body}</p>
+      ${payBlock}`,
+      noReplyFooter[locale],
+    ),
+  );
+}
+
+export type ExpiryItem = {
+  title: string;
+  productName: string;
+  expiresAt: Date;
+  /** Negative once past expiry. */
+  daysLeft: number;
+  submissionId: string;
+};
+
+/**
+ * Digest to compliance/QA and workspace admins: approved material expiring
+ * within 30 days or already expired — pull it from circulation or extend
+ * its expiry after re-review.
+ */
+export async function sendContentExpiryEmail(
+  to: string,
+  opts: { locale: Locale; items: ExpiryItem[] },
+) {
+  const { locale, items } = opts;
+  const n = items.length;
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(locale === "id" ? "id-ID" : "en-US", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  const dayNote = (it: ExpiryItem) =>
+    it.daysLeft < 0
+      ? locale === "id"
+        ? `kedaluwarsa ${-it.daysLeft} hari lalu`
+        : `expired ${-it.daysLeft} days ago`
+      : locale === "id"
+        ? `${it.daysLeft} hari lagi`
+        : `${it.daysLeft} days left`;
+
+  const rows = items
+    .map(
+      (it) => `<li style="margin: 0 0 10px;">
+        <a href="${appUrl()}/submissions/${it.submissionId}" style="color: #0f766e; font-weight: 600; text-decoration: none;">${esc(it.title)}</a>
+        <span style="color: #64748b; font-size: 13px;"> — ${esc(it.productName)} · ${fmt(it.expiresAt)} · <strong style="color: ${it.daysLeft < 0 ? "#be123c" : "#b45309"};">${dayNote(it)}</strong></span>
+      </li>`,
+    )
+    .join("");
+
+  const subject =
+    locale === "id"
+      ? `${n} materi disetujui akan/telah kedaluwarsa`
+      : `${n} approved ${n === 1 ? "material is" : "materials are"} expiring or expired`;
+  const body =
+    locale === "id"
+      ? `Materi berikut mendekati atau telah melewati tanggal kedaluwarsanya. Tarik dari peredaran, atau perpanjang tanggalnya setelah review ulang:`
+      : `The following materials are approaching or past their expiry date. Withdraw them from circulation, or extend the date after re-review:`;
+
+  await sendEmail(
+    to,
+    `${subject} — MLR Flow`,
+    shell(
+      locale === "id" ? "Pengingat kedaluwarsa materi" : "Material expiry reminder",
+      `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${body}</p>
+      <ul style="padding-left: 18px; margin: 12px 0 4px;">${rows}</ul>
+      ${button(`${appUrl()}/library`, locale === "id" ? "Buka Library" : "Open Library")}`,
+      noReplyFooter[locale],
+    ),
+  );
+}
+
 export async function sendInviteEmail(to: string, name: string, tenantName: string, token: string) {
   const link = `${appUrl()}/verify-email?token=${token}`;
   await sendEmail(
