@@ -9,9 +9,14 @@ import { db, t } from "./db";
 //   STORAGE_DRIVER=local  -> .data/uploads/<key> (ephemeral; local dev only —
 //                             never durable on Vercel's serverless filesystem)
 //   STORAGE_DRIVER=db     -> Postgres bytea column on content_versions (default;
-//                             files are capped at 20MB client-side, so storing
-//                             them inline avoids needing a separate object
-//                             storage account)
+//                             uploads are capped at 4MB — see lib/upload.ts —
+//                             so storing them inline avoids needing a separate
+//                             object storage account)
+//
+// Note: an S3/R2 driver here is also the way past the 4MB upload cap, since it
+// would let the browser PUT to storage directly instead of routing the bytes
+// through a Server Action (and let downloads redirect to a signed URL rather
+// than stream back through a Function).
 //
 // Keys are content version ids.
 

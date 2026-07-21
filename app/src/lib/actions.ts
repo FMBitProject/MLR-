@@ -31,6 +31,7 @@ import { consumeAttempt, clearThrottle } from "./throttle";
 import { planLimits, planHas } from "./plans";
 import { submissionQuota } from "./usage";
 import { assertTenantWritable, ensureRenewalInvoice, TRIAL_DAYS } from "./billing";
+import { MAX_UPLOAD_BYTES } from "./upload";
 import { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail } from "./email";
 import { notifyCurrentStageReviewers, notifySubmitterDecision } from "./notify";
 import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
@@ -43,6 +44,13 @@ async function clientIp(): Promise<string> {
 
 // Billing gate: past-grace tenants are read-only — content-creating actions
 // throw BILLING_LOCKED while reviews of in-flight work stay allowed.
+// Backstop for the forms' own size check: keeps an oversized file from being
+// written into Postgres if the client check is bypassed. On Vercel a body
+// over 4.5 MB never reaches us at all — see lib/upload.ts.
+function assertUploadWithinLimit(fileData: Buffer | null) {
+  if (fileData && fileData.byteLength > MAX_UPLOAD_BYTES) throw new Error("FILE_TOO_LARGE");
+}
+
 async function requireWritableTenant(tenantId: string) {
   const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, tenantId)))[0];
   assertTenantWritable(tenant);
@@ -496,6 +504,7 @@ export async function createSubmission(formData: FormData) {
   if (!title || !productId || (!text && !fileName)) {
     throw new Error("VALIDATION");
   }
+  assertUploadWithinLimit(fileData);
 
   const product = (await db
     .select()
@@ -603,6 +612,7 @@ export async function resubmitVersion(formData: FormData) {
     file instanceof File && file.size > 0 ? Buffer.from(await file.arrayBuffer()) : null;
   // Same rule as the initial submission: revised text or a revised file.
   if ((!text && !fileName) || !changeNote) throw new Error("VALIDATION");
+  assertUploadWithinLimit(fileData);
   await requireWritableTenant(user.tenantId);
 
   const sub = (await db

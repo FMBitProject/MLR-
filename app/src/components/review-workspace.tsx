@@ -31,6 +31,7 @@ import {
   verifyFlagJournal,
   rerunClaimsCheck,
 } from "@/lib/actions";
+import { MAX_UPLOAD_BYTES } from "@/lib/upload";
 import type { Dict, Locale } from "@/lib/i18n";
 import { formatDate, relativeDays } from "@/lib/i18n";
 import { Avatar, Card, Chip, StatusBadge } from "@/components/ui";
@@ -358,7 +359,7 @@ export function ReviewWorkspace({
                   setResubmitError(dict.newSubmission.needTextOrFile);
                   return;
                 }
-                if (hasFile && file.size > 20 * 1024 * 1024) {
+                if (hasFile && file.size > MAX_UPLOAD_BYTES) {
                   setResubmitError(dict.newSubmission.fileTooLarge);
                   return;
                 }

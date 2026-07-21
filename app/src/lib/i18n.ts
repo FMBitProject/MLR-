@@ -173,7 +173,8 @@ const dictionaries = {
       submit: "Ajukan untuk Review",
       submitting: "Mengajukan…",
       needTextOrFile: "Isi teks konten atau unggah file terlebih dahulu.",
-      fileTooLarge: "File terlalu besar — maksimum 20 MB.",
+      fileTooLarge:
+        "File terlalu besar — maksimum 4 MB. Kompres file (turunkan resolusi gambar) atau pecah materi menjadi beberapa pengajuan.",
       submitFailed: "Gagal mengirim. Periksa koneksi Anda lalu coba lagi.",
       submitterOnly: "Hanya tim Marketing yang dapat mengajukan konten baru. Reviewer Medical/Legal/Regulatory hanya bertugas mereview.",
       quotaLabel: "Kuota pengajuan bulan ini",
@@ -719,7 +720,8 @@ const dictionaries = {
       submit: "Submit for Review",
       submitting: "Submitting…",
       needTextOrFile: "Provide content text or upload a file first.",
-      fileTooLarge: "File is too large — 20 MB max.",
+      fileTooLarge:
+        "File is too large — 4 MB max. Compress the file (lower image resolution) or split the material into several submissions.",
       submitFailed: "Submission failed. Check your connection and try again.",
       submitterOnly: "Only Marketing can submit new content. Medical/Legal/Regulatory reviewers only review.",
       quotaLabel: "This month's submission quota",

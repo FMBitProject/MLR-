@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { ArrowRight, UploadCloud, FileText } from "lucide-react";
 import { createSubmission } from "@/lib/actions";
+import { MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "@/lib/upload";
 import type { Dict } from "@/lib/i18n";
 
 type Product = { id: string; name: string };
@@ -30,8 +31,6 @@ export function SubmissionForm({
     "regulatory_reviewer",
   ];
 
-  const MAX_UPLOAD_MB = 20;
-
   const onSubmit = (formData: FormData) => {
     const text = String(formData.get("text") ?? "").trim();
     const file = formData.get("file");
@@ -40,7 +39,7 @@ export function SubmissionForm({
       setError(dict.newSubmission.needTextOrFile);
       return;
     }
-    if (hasFile && file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+    if (hasFile && file.size > MAX_UPLOAD_BYTES) {
       setError(dict.newSubmission.fileTooLarge);
       return;
     }
@@ -126,7 +125,7 @@ export function SubmissionForm({
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-3.5 transition hover:border-brand-400 hover:bg-brand-50/40">
             <UploadCloud className="size-5 text-slate-400" />
             <span className="text-sm text-slate-600">
-              {fileName ?? "PDF · PPTX · DOCX"}
+              {fileName ?? `PDF · PPTX · DOCX · maks ${MAX_UPLOAD_MB} MB`}
             </span>
             <input
               type="file"

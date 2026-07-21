@@ -164,7 +164,7 @@ export const contentVersions = pgTable("content_versions", {
   versionNumber: integer("version_number").notNull(),
   fileName: text("file_name"),
   // The original uploaded file (PPTX/PDF/DOCX), stored inline — content is
-  // capped at 20MB client-side, so Postgres bytea avoids needing a separate
+  // capped at 4MB client-side, so Postgres bytea avoids needing a separate
   // object storage service. See src/lib/storage.ts.
   fileData: bytea("file_data"),
   textContent: text("text_content"),
