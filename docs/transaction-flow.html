@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<title>Alur Transaksi — MLR Flow (Midtrans)</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+
+  :root {
+    --ink: #0f172a;
+    --muted: #475569;
+    --faint: #94a3b8;
+    --line: #e2e8f0;
+    --brand: #0f766e;
+    --brand-bg: #f0fdfa;
+    --warn-bg: #fffbeb;
+    --warn-line: #fcd34d;
+    --warn-ink: #92400e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: var(--ink);
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .sheet { max-width: 820px; margin: 0 auto; padding: 24px 20px 48px; }
+
+  /* ---------- header ---------- */
+  header.doc {
+    border-bottom: 3px solid var(--brand);
+    padding-bottom: 14px;
+    margin-bottom: 22px;
+  }
+  .eyebrow {
+    font-size: 8.5pt; font-weight: 700; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--brand); margin: 0 0 6px;
+  }
+  h1 { font-size: 19pt; margin: 0 0 4px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0; font-size: 10pt; }
+  .meta {
+    margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 28px;
+    font-size: 9pt; color: var(--muted);
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 26px; }
+  h2 {
+    font-size: 11.5pt; margin: 0 0 10px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    text-transform: uppercase; letter-spacing: .06em;
+  }
+  h2 .n {
+    display: inline-block; min-width: 22px; height: 22px; line-height: 22px;
+    text-align: center; background: var(--brand); color: #fff;
+    border-radius: 6px; font-size: 9.5pt; margin-right: 8px;
+  }
+  h3 { font-size: 10.5pt; margin: 16px 0 6px; }
+  p { margin: 0 0 9px; }
+  ul { margin: 0 0 9px; padding-left: 18px; }
+  li { margin-bottom: 4px; }
+
+  /* ---------- tables ---------- */
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-size: 9.5pt; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-size: 8.5pt; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--faint); font-weight: 700; border-bottom: 1.5px solid var(--line);
+  }
+  td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* ---------- flow diagram ---------- */
+  .flow { margin: 14px 0 6px; }
+  .step {
+    display: flex; gap: 12px; padding: 10px 0;
+    border-bottom: 1px dashed var(--line); break-inside: avoid;
+  }
+  .step:last-child { border-bottom: 0; }
+  .step .badge {
+    flex: 0 0 26px; height: 26px; border-radius: 50%;
+    background: var(--brand-bg); color: var(--brand);
+    border: 1.5px solid var(--brand);
+    font-weight: 700; font-size: 9.5pt; text-align: center; line-height: 23px;
+  }
+  .step .body { flex: 1; }
+  .step .t { font-weight: 650; margin-bottom: 2px; }
+  .step .who {
+    font-size: 8pt; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--faint); font-weight: 700; margin-bottom: 3px;
+  }
+  .step .d { color: var(--muted); font-size: 9.5pt; }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 9pt; background: #f1f5f9; padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* ---------- callouts ---------- */
+  .note {
+    background: var(--brand-bg); border-left: 3px solid var(--brand);
+    padding: 10px 12px; margin: 12px 0; font-size: 9.5pt; break-inside: avoid;
+  }
+  .fill {
+    background: var(--warn-bg); border: 1.5px dashed var(--warn-line);
+    padding: 12px 14px; margin: 12px 0; break-inside: avoid; border-radius: 6px;
+  }
+  .fill .hd {
+    font-weight: 700; color: var(--warn-ink); font-size: 9.5pt;
+    text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px;
+  }
+  .fill td, .fill th { border-bottom-color: #fde68a; }
+  .blank {
+    display: inline-block; min-width: 190px;
+    border-bottom: 1.2px solid var(--warn-ink); color: var(--warn-ink);
+    font-style: italic; font-size: 9pt;
+  }
+
+  footer.doc {
+    margin-top: 34px; padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: 8.5pt; color: var(--faint);
+  }
+
+  .pb { break-before: page; }
+  @media print { .noprint { display: none; } .sheet { padding: 0; } }
+
+  .noprint {
+    background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 8px;
+    font-size: 9.5pt; margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="noprint">
+    <strong>Cara membuat PDF:</strong> buka file ini di browser → Ctrl/Cmd + P → tujuan
+    <em>Save as PDF</em> → ukuran A4. Blok kuning wajib diisi terlebih dahulu.
+  </div>
+
+  <header class="doc">
+    <p class="eyebrow">Dokumen Alur Transaksi</p>
+    <h1>MLR Flow — Alur Berlangganan &amp; Pembayaran</h1>
+    <p class="sub">
+      Diajukan kepada Midtrans untuk keperluan verifikasi merchant dan aktivasi akun produksi.
+    </p>
+    <div class="meta">
+      <span><b>Produk:</b> MLR Flow (SaaS B2B)</span>
+      <span><b>Metode integrasi:</b> Midtrans Snap</span>
+      <span><b>Versi dokumen:</b> 1.0</span>
+      <span><b>Tanggal:</b> <span class="blank">&nbsp;</span></span>
+    </div>
+  </header>
+
+  <div class="fill">
+    <div class="hd">⚠ Wajib diisi sebelum dikirim ke Midtrans</div>
+    <table>
+      <tr><td style="width:38%">Nama badan hukum</td><td><span class="blank">&nbsp;</span></td></tr>
+      <tr><td>Alamat terdaftar</td><td><span class="blank">&nbsp;</span></td></tr>
+      <tr><td>NPWP / NIB</td><td><span class="blank">&nbsp;</span></td></tr>
+      <tr><td>Domain aplikasi (produksi)</td><td><span class="blank">&nbsp;</span></td></tr>
+      <tr><td>Email &amp; telepon layanan pelanggan</td><td><span class="blank">&nbsp;</span></td></tr>
+      <tr><td>Penanggung jawab (nama &amp; jabatan)</td><td><span class="blank">&nbsp;</span></td></tr>
+    </table>
+  </div>
+
+  <!-- 1 -->
+  <section>
+    <h2><span class="n">1</span>Ringkasan Bisnis</h2>
+    <p>
+      MLR Flow adalah perangkat lunak berbasis langganan (SaaS) untuk perusahaan farmasi.
+      Aplikasi ini mendigitalkan proses persetujuan materi promosi obat melalui alur review
+      <em>Medical</em>, <em>Legal</em>, dan <em>Regulatory</em> (MLR), lengkap dengan jejak audit
+      yang siap diperiksa saat inspeksi.
+    </p>
+    <table>
+      <tr><td style="width:38%"><b>Jenis produk</b></td><td>Jasa perangkat lunak digital (tanpa pengiriman barang fisik)</td></tr>
+      <tr><td><b>Target pelanggan</b></td><td>Perusahaan farmasi skala kecil–menengah (B2B, badan usaha)</td></tr>
+      <tr><td><b>Model penagihan</b></td><td>Langganan per bulan, ditagih melalui invoice per periode</td></tr>
+      <tr><td><b>Penyerahan layanan</b></td><td>Otomatis dan seketika — masa aktif workspace diperpanjang segera setelah pembayaran terkonfirmasi</td></tr>
+      <tr><td><b>Mata uang</b></td><td>IDR (Rupiah)</td></tr>
+    </table>
+  </section>
+
+  <!-- 2 -->
+  <section>
+    <h2><span class="n">2</span>Paket &amp; Nilai Transaksi</h2>
+    <p>
+      Nilai transaksi ditentukan oleh paket yang dipakai perusahaan pelanggan. Setiap transaksi
+      membayar satu bulan masa aktif.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Paket</th><th>Harga normal / bulan</th><th>Harga promo / bulan</th><th>Cakupan</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Starter</b></td>
+          <td class="num">Rp 3.500.000</td>
+          <td class="num">Rp 2.500.000</td>
+          <td>15 pengguna, 3 produk, 25 pengajuan/bulan</td>
+        </tr>
+        <tr>
+          <td><b>Growth</b></td>
+          <td class="num">Rp 9.500.000</td>
+          <td class="num">Rp 6.500.000</td>
+          <td>50 pengguna, 15 produk, 150 pengajuan/bulan</td>
+        </tr>
+        <tr>
+          <td><b>Enterprise</b></td>
+          <td class="num" colspan="2">Harga khusus (negosiasi)</td>
+          <td>Tanpa batas; ditagih manual di luar Snap</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:9pt;color:var(--muted)">
+      Harga promo berlaku sampai 31 Desember 2026. Rentang nilai transaksi melalui Midtrans Snap:
+      <b>Rp 2.500.000 – Rp 9.500.000</b> per transaksi.
+    </p>
+    <div class="fill">
+      <div class="hd">⚠ Konfirmasi perlakuan pajak</div>
+      <p style="margin:0;font-size:9.5pt">
+        Harga di atas adalah harga yang tercantum di aplikasi. Tandai apakah nilai tersebut sudah
+        termasuk PPN atau belum, karena memengaruhi nominal yang dikirim ke Midtrans:
+        <span class="blank">&nbsp;</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <h2><span class="n">3</span>Metode Pembayaran</h2>
+    <p>
+      Seluruh metode pembayaran disediakan melalui halaman Midtrans Snap. Aplikasi tidak pernah
+      menerima, memproses, atau menyimpan data kartu maupun kredensial pembayaran pelanggan.
+    </p>
+    <ul>
+      <li>Transfer bank / Virtual Account</li>
+      <li>QRIS</li>
+      <li>E-wallet</li>
+      <li>Kartu kredit / debit</li>
+    </ul>
+    <div class="note">
+      Data yang dikirim aplikasi ke Midtrans saat membuat transaksi hanya: nomor pesanan
+      (<code>order_id</code>), nominal, deskripsi item, serta nama dan email admin pelanggan
+      untuk keperluan struk.
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="pb">
+    <h2><span class="n">4</span>Alur Transaksi Langkah demi Langkah</h2>
+
+    <div class="flow">
+      <div class="step">
+        <div class="badge">1</div>
+        <div class="body">
+          <div class="who">Pelanggan</div>
+          <div class="t">Mendaftarkan workspace perusahaan</div>
+          <div class="d">
+            Calon pelanggan membuat workspace dan memverifikasi alamat email. Workspace langsung
+            aktif dengan <b>masa uji coba 14 hari</b> tanpa pembayaran di muka.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">2</div>
+        <div class="body">
+          <div class="who">Pelanggan</div>
+          <div class="t">Meninjau paket dan harga</div>
+          <div class="d">
+            Rincian paket, harga, dan batasan kuota ditampilkan pada halaman harga serta pada
+            kartu <em>Billing &amp; Langganan</em> di menu Pengaturan.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">3</div>
+        <div class="body">
+          <div class="who">Pelanggan</div>
+          <div class="t">Menekan tombol “Bayar Perpanjangan”</div>
+          <div class="d">
+            Tombol ini hanya dapat diakses oleh Admin Perusahaan atau Compliance Admin dari
+            workspace yang bersangkutan.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">4</div>
+        <div class="body">
+          <div class="who">Sistem MLR Flow</div>
+          <div class="t">Menerbitkan invoice</div>
+          <div class="d">
+            Sistem membuat invoice bernomor unik (format <code>INV-YYYYMMDD-XXXXXX</code>) berisi
+            paket, nominal, serta periode langganan yang dibayar. Invoice berlaku 7 hari.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">5</div>
+        <div class="body">
+          <div class="who">Sistem MLR Flow → Midtrans</div>
+          <div class="t">Membuat transaksi Snap</div>
+          <div class="d">
+            Sistem memanggil API Snap untuk membuat transaksi dengan <code>order_id</code> yang
+            identik dengan ID invoice, beserta nominal dan masa berlaku 7 hari. Midtrans
+            mengembalikan tautan halaman pembayaran.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">6</div>
+        <div class="body">
+          <div class="who">Pelanggan</div>
+          <div class="t">Membayar di halaman Midtrans Snap</div>
+          <div class="d">
+            Pelanggan diarahkan ke halaman Snap, memilih metode pembayaran, lalu menyelesaikan
+            pembayaran. Seluruh proses ini berlangsung di lingkungan Midtrans.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">7</div>
+        <div class="body">
+          <div class="who">Midtrans → Sistem MLR Flow</div>
+          <div class="t">Notifikasi pembayaran (webhook)</div>
+          <div class="d">
+            Midtrans mengirim <em>HTTP Payment Notification</em> ke endpoint aplikasi. Sistem
+            memverifikasi keaslian notifikasi melalui <code>signature_key</code> dan mencocokkan
+            nominal terhadap invoice sebelum mengakui pembayaran.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">8</div>
+        <div class="body">
+          <div class="who">Sistem MLR Flow</div>
+          <div class="t">Mengaktifkan langganan</div>
+          <div class="d">
+            Setelah status pembayaran sah, invoice ditandai <b>Lunas</b> dan masa aktif workspace
+            diperpanjang satu bulan secara otomatis. Perpanjangan dihitung dari sisa masa aktif
+            yang belum terpakai, sehingga pelanggan tidak dirugikan bila membayar lebih awal.
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="badge">9</div>
+        <div class="body">
+          <div class="who">Pelanggan</div>
+          <div class="t">Kembali ke aplikasi dan menerima konfirmasi</div>
+          <div class="d">
+            Pelanggan diarahkan kembali ke halaman Pengaturan, melihat status langganan yang
+            telah diperbarui beserta riwayat tagihan bertanda “Lunas”. Struk resmi pembayaran
+            dikirim oleh Midtrans.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section>
+    <h2><span class="n">5</span>Penanganan Status Pembayaran</h2>
+    <p>Sistem menindaklanjuti setiap status yang dikirim Midtrans sebagai berikut:</p>
+    <table>
+      <thead>
+        <tr><th>Status dari Midtrans</th><th>Tindakan aplikasi</th><th>Dampak bagi pelanggan</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>settlement</code> / <code>capture</code> (fraud: accept)</td>
+          <td>Invoice ditandai lunas, masa aktif diperpanjang 1 bulan</td>
+          <td>Layanan aktif kembali seketika</td>
+        </tr>
+        <tr>
+          <td><code>pending</code></td>
+          <td>Invoice tetap menunggu; sistem menanti notifikasi berikutnya</td>
+          <td>Menunggu penyelesaian pembayaran</td>
+        </tr>
+        <tr>
+          <td><code>expire</code></td>
+          <td>Invoice ditandai kedaluwarsa; invoice baru dapat diterbitkan</td>
+          <td>Dapat mengulang pembayaran</td>
+        </tr>
+        <tr>
+          <td><code>cancel</code> / <code>deny</code> / <code>failure</code></td>
+          <td>Invoice ditandai batal</td>
+          <td>Dapat mengulang pembayaran</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <b>Anti-duplikasi:</b> notifikasi yang dikirim berulang oleh Midtrans tidak akan
+      memperpanjang masa aktif lebih dari sekali. Invoice yang sudah berstatus lunas akan
+      diabaikan pada pemrosesan berikutnya.
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section>
+    <h2><span class="n">6</span>Bila Pembayaran Tidak Dilakukan</h2>
+    <p>
+      Aplikasi tidak langsung memutus akses. Tahapannya bertingkat dan seluruh data pelanggan
+      tetap tersimpan aman.
+    </p>
+    <table>
+      <thead><tr><th>Tahap</th><th>Kondisi</th><th>Akses pelanggan</th></tr></thead>
+      <tbody>
+        <tr><td><b>Aktif</b></td><td>Dalam masa langganan berbayar</td><td>Penuh</td></tr>
+        <tr><td><b>Masa tenggang</b></td><td>Sampai 7 hari setelah masa aktif berakhir</td><td>Masih penuh; pengingat dikirim via email</td></tr>
+        <tr><td><b>Baca-saja</b></td><td>Lewat masa tenggang</td><td>Data &amp; review berjalan tetap dapat dibuka; pengajuan materi baru dinonaktifkan sampai pembayaran diterima</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:9.5pt">
+      Pengingat tagihan dikirim otomatis melalui email ke admin workspace, disertai tautan
+      pembayaran Midtrans.
+    </p>
+  </section>
+
+  <!-- 7 -->
+  <section>
+    <h2><span class="n">7</span>Keamanan Transaksi</h2>
+    <ul>
+      <li>
+        Aplikasi <b>tidak menyimpan data kartu maupun kredensial pembayaran</b>. Seluruh proses
+        pembayaran ditangani sepenuhnya di halaman Midtrans Snap.
+      </li>
+      <li>
+        Setiap notifikasi pembayaran diverifikasi menggunakan <b>tanda tangan SHA-512</b> yang
+        dihitung dari <code>order_id</code>, <code>status_code</code>, <code>gross_amount</code>,
+        dan <em>server key</em> merchant. Notifikasi dengan tanda tangan tidak sah ditolak.
+      </li>
+      <li>
+        Nominal pada notifikasi <b>dicocokkan kembali</b> dengan nominal invoice sebelum
+        pembayaran diakui.
+      </li>
+      <li>
+        Setiap peristiwa pembayaran dicatat dalam jejak audit aplikasi (nomor invoice, nominal,
+        metode pembayaran, dan waktu).
+      </li>
+      <li>Seluruh komunikasi berlangsung melalui HTTPS.</li>
+    </ul>
+  </section>
+
+  <!-- 8 -->
+  <section>
+    <h2><span class="n">8</span>Kebijakan Pembatalan &amp; Pengembalian Dana</h2>
+    <div class="fill">
+      <div class="hd">⚠ Wajib diisi — kebijakan bisnis, tidak dapat diasumsikan</div>
+      <p style="margin:0 0 8px;font-size:9.5pt">
+        Midtrans umumnya menanyakan hal-hal berikut. Isi sesuai kebijakan perusahaan Anda:
+      </p>
+      <table>
+        <tr><td style="width:46%">Dapatkah langganan dibatalkan di tengah periode?</td><td><span class="blank">&nbsp;</span></td></tr>
+        <tr><td>Apakah tersedia pengembalian dana (refund)?</td><td><span class="blank">&nbsp;</span></td></tr>
+        <tr><td>Jangka waktu pemrosesan refund</td><td><span class="blank">&nbsp;</span></td></tr>
+        <tr><td>Kanal pengajuan keluhan / refund</td><td><span class="blank">&nbsp;</span></td></tr>
+        <tr><td>Tautan Syarat &amp; Ketentuan</td><td><span class="blank">&nbsp;</span></td></tr>
+        <tr><td>Tautan Kebijakan Privasi</td><td><span class="blank">&nbsp;</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer class="doc">
+    Dokumen ini menjelaskan alur transaksi aplikasi MLR Flow untuk keperluan verifikasi merchant
+    Midtrans. Nilai, alur, dan penanganan status di atas mengikuti implementasi aplikasi pada
+    versi dokumen ini.
+  </footer>
+
+</div>
+</body>
+</html>
