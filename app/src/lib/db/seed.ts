@@ -9,7 +9,58 @@ const now = Date.now();
 const daysAgo = (n: number) => new Date(now - n * 86_400_000);
 const daysAhead = (n: number) => new Date(now + n * 86_400_000);
 
-const TENANT = "tn-nusantara";
+export type SeedUser = { id: string; email: string; name: string; role: string };
+
+export type SeedOptions = {
+  tenantId: string;
+  tenantName: string;
+  slug: string;
+  plan: string;
+  planActiveUntil: Date | null;
+  /** Prepended to every row id this seed generates, so a second demo
+   *  workspace can be seeded into the same database without id collisions. */
+  prefix: string;
+  /** Accounts to create. A role with no matching user (e.g. a single-account
+   *  demo workspace) falls back to the first user in the list. */
+  users: SeedUser[];
+  password: string;
+};
+
+const DEFAULT_USERS: SeedUser[] = [
+  { id: "u-dewi", email: "dewi@nusantara-pharma.co.id", name: "Dewi Lestari", role: "marketing" },
+  { id: "u-budi", email: "budi@nusantara-pharma.co.id", name: "dr. Budi Santoso, Sp.JP", role: "medical_reviewer" },
+  { id: "u-ratna", email: "ratna@nusantara-pharma.co.id", name: "Ratna Wijaya, S.H.", role: "legal_reviewer" },
+  { id: "u-agus", email: "agus@nusantara-pharma.co.id", name: "Agus Prasetyo, Apt.", role: "regulatory_reviewer" },
+  { id: "u-sari", email: "sari@nusantara-pharma.co.id", name: "Sari Handayani", role: "compliance_admin" },
+  { id: "u-rudi", email: "rudi@nusantara-pharma.co.id", name: "Rudi Hartono", role: "super_admin" },
+];
+
+export const DEFAULT_SEED: SeedOptions = {
+  tenantId: "tn-nusantara",
+  tenantName: "PT Nusantara Pharma",
+  slug: "nusantara",
+  plan: "growth",
+  // Mid-trial so the billing card renders in its managed (payable) state.
+  planActiveUntil: new Date(now + 14 * 86_400_000),
+  prefix: "",
+  users: DEFAULT_USERS,
+  password: "demo123",
+};
+
+/** Resolved seed context handed to each submission seeder: config plus the
+ *  two lookups every one of them needs (id prefixing and role → user id). */
+type Ctx = SeedOptions & {
+  id: (raw: string) => string;
+  userFor: (role: string) => string;
+};
+
+function context(opts: SeedOptions): Ctx {
+  return {
+    ...opts,
+    id: (raw) => `${opts.prefix}${raw}`,
+    userFor: (role) => (opts.users.find((u) => u.role === role) ?? opts.users[0]).id,
+  };
+}
 
 // Journal references backing the demo claims. Real articles, verified against
 // PubMed — also used by db/index.ts to backfill databases seeded before the
@@ -47,43 +98,37 @@ export const SEED_CLAIM_REFERENCES: Record<string, t.ClaimReference[]> = {
   ],
 };
 
-export async function seed(db: DB) {
+export async function seed(db: DB, options: Partial<SeedOptions> = {}) {
+  const ctx = context({ ...DEFAULT_SEED, ...options });
+  const { id, userFor } = ctx;
+
   await db.insert(t.tenants).values({
-    id: TENANT,
-    name: "PT Nusantara Pharma",
-    slug: "nusantara",
-    plan: "growth",
-    // Mid-trial so the billing card renders in its managed (payable) state.
-    planActiveUntil: new Date(Date.now() + 14 * 24 * 60 * 60_000),
+    id: ctx.tenantId,
+    name: ctx.tenantName,
+    slug: ctx.slug,
+    plan: ctx.plan,
+    planActiveUntil: ctx.planActiveUntil,
     createdAt: daysAgo(120),
   });
 
-  const users = [
-    { id: "u-dewi", email: "dewi@nusantara-pharma.co.id", name: "Dewi Lestari", role: "marketing" },
-    { id: "u-budi", email: "budi@nusantara-pharma.co.id", name: "dr. Budi Santoso, Sp.JP", role: "medical_reviewer" },
-    { id: "u-ratna", email: "ratna@nusantara-pharma.co.id", name: "Ratna Wijaya, S.H.", role: "legal_reviewer" },
-    { id: "u-agus", email: "agus@nusantara-pharma.co.id", name: "Agus Prasetyo, Apt.", role: "regulatory_reviewer" },
-    { id: "u-sari", email: "sari@nusantara-pharma.co.id", name: "Sari Handayani", role: "compliance_admin" },
-    { id: "u-rudi", email: "rudi@nusantara-pharma.co.id", name: "Rudi Hartono", role: "super_admin" },
-  ];
-  for (const u of users) {
+  for (const u of ctx.users) {
     await db.insert(t.users).values({
       ...u,
-      tenantId: TENANT,
+      tenantId: ctx.tenantId,
       locale: "id",
-      passwordHash: hashPassword("demo123"),
+      passwordHash: hashPassword(ctx.password),
       emailVerifiedAt: daysAgo(120),
       createdAt: daysAgo(120),
     });
   }
 
   const products = [
-    { id: "p-cardiovex", name: "Cardiovex 10 mg", bpomRegistrationNo: "DKL2234567890A1" },
-    { id: "p-glucofit", name: "Glucofit XR 500", bpomRegistrationNo: "DKL2298765432A1" },
-    { id: "p-respira", name: "Respira Sirup", bpomRegistrationNo: "DTL2211223344A1" },
+    { id: id("p-cardiovex"), name: "Cardiovex 10 mg", bpomRegistrationNo: "DKL2234567890A1" },
+    { id: id("p-glucofit"), name: "Glucofit XR 500", bpomRegistrationNo: "DKL2298765432A1" },
+    { id: id("p-respira"), name: "Respira Sirup", bpomRegistrationNo: "DTL2211223344A1" },
   ];
   for (const p of products) {
-    await db.insert(t.products).values({ ...p, tenantId: TENANT, createdAt: daysAgo(110) });
+    await db.insert(t.products).values({ ...p, tenantId: ctx.tenantId, createdAt: daysAgo(110) });
   }
 
   const claims: Array<{
@@ -143,43 +188,43 @@ export async function seed(db: DB) {
   ];
   for (const c of claims) {
     await db.insert(t.approvedClaims).values({
-      id: c.id, tenantId: TENANT, productId: c.productId, claimText: c.claimText,
+      id: id(c.id), tenantId: ctx.tenantId, productId: id(c.productId), claimText: c.claimText,
       references: SEED_CLAIM_REFERENCES[c.id] ?? null,
-      channelScope: c.channelScope, approvedBy: "u-sari",
+      channelScope: c.channelScope, approvedBy: userFor("compliance_admin"),
       approvedAt: c.approvedAt ?? daysAgo(90), expiresAt: c.expiresAt,
       status: c.status ?? "active",
     });
   }
 
   await db.insert(t.workflowTemplates).values([
-    { id: "wf-print", tenantId: TENANT, channel: "print", stages: ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"], mode: "sequential" },
-    { id: "wf-digital", tenantId: TENANT, channel: "digital", stages: ["medical_reviewer", "regulatory_reviewer"], mode: "sequential" },
-    { id: "wf-edetail", tenantId: TENANT, channel: "e-detail", stages: ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"], mode: "sequential" },
-    { id: "wf-social", tenantId: TENANT, channel: "social", stages: ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"], mode: "sequential" },
+    { id: id("wf-print"), tenantId: ctx.tenantId, channel: "print", stages: ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"], mode: "sequential" },
+    { id: id("wf-digital"), tenantId: ctx.tenantId, channel: "digital", stages: ["medical_reviewer", "regulatory_reviewer"], mode: "sequential" },
+    { id: id("wf-edetail"), tenantId: ctx.tenantId, channel: "e-detail", stages: ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"], mode: "sequential" },
+    { id: id("wf-social"), tenantId: ctx.tenantId, channel: "social", stages: ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"], mode: "sequential" },
   ]);
 
-  await seedCardiovexSubmission(db);
-  await seedGlucofitSubmission(db);
-  await seedRespiraSubmission(db);
+  await seedCardiovexSubmission(db, ctx);
+  await seedGlucofitSubmission(db, ctx);
+  await seedRespiraSubmission(db, ctx);
 
   const audits: Array<[string, string, string, string, string, Date, Record<string, unknown>?]> = [
-    ["submission", "sub-glucofit", "submitted", "u-dewi", "v1", daysAgo(18)],
-    ["version", "v-glf-1", "claims_check_completed", "u-dewi", "v1", daysAgo(18), { flags: 0 }],
-    ["submission", "sub-glucofit", "approved", "u-budi", "v1", daysAgo(15), { stage: "medical_reviewer" }],
-    ["submission", "sub-glucofit", "approved", "u-agus", "v1", daysAgo(10), { stage: "regulatory_reviewer", final: true }],
-    ["version", "v-glf-1", "version_locked", "u-agus", "v1", daysAgo(10)],
-    ["submission", "sub-respira", "submitted", "u-dewi", "v1", daysAgo(9)],
-    ["version", "v-rsp-1", "claims_check_completed", "u-dewi", "v1", daysAgo(9), { flags: 1 }],
-    ["submission", "sub-respira", "approved", "u-budi", "v1", daysAgo(7), { stage: "medical_reviewer" }],
-    ["comment", "cm-rsp-1", "commented", "u-ratna", "v1", daysAgo(5)],
-    ["submission", "sub-respira", "changes_requested", "u-ratna", "v1", daysAgo(5), { stage: "legal_reviewer" }],
-    ["submission", "sub-cardiovex", "submitted", "u-dewi", "v1", daysAgo(3)],
-    ["version", "v-cvx-1", "claims_check_completed", "u-dewi", "v1", daysAgo(3), { flags: 2, manual_review_elements: 1 }],
-    ["comment", "cm-cvx-1", "commented", "u-budi", "v1", daysAgo(1)],
+    ["submission", "sub-glucofit", "submitted", userFor("marketing"), "v1", daysAgo(18)],
+    ["version", "v-glf-1", "claims_check_completed", userFor("marketing"), "v1", daysAgo(18), { flags: 0 }],
+    ["submission", "sub-glucofit", "approved", userFor("medical_reviewer"), "v1", daysAgo(15), { stage: "medical_reviewer" }],
+    ["submission", "sub-glucofit", "approved", userFor("regulatory_reviewer"), "v1", daysAgo(10), { stage: "regulatory_reviewer", final: true }],
+    ["version", "v-glf-1", "version_locked", userFor("regulatory_reviewer"), "v1", daysAgo(10)],
+    ["submission", "sub-respira", "submitted", userFor("marketing"), "v1", daysAgo(9)],
+    ["version", "v-rsp-1", "claims_check_completed", userFor("marketing"), "v1", daysAgo(9), { flags: 1 }],
+    ["submission", "sub-respira", "approved", userFor("medical_reviewer"), "v1", daysAgo(7), { stage: "medical_reviewer" }],
+    ["comment", "cm-rsp-1", "commented", userFor("legal_reviewer"), "v1", daysAgo(5)],
+    ["submission", "sub-respira", "changes_requested", userFor("legal_reviewer"), "v1", daysAgo(5), { stage: "legal_reviewer" }],
+    ["submission", "sub-cardiovex", "submitted", userFor("marketing"), "v1", daysAgo(3)],
+    ["version", "v-cvx-1", "claims_check_completed", userFor("marketing"), "v1", daysAgo(3), { flags: 2, manual_review_elements: 1 }],
+    ["comment", "cm-cvx-1", "commented", userFor("medical_reviewer"), "v1", daysAgo(1)],
   ];
   for (const [i, [entityType, entityId, action, performedBy, version, when, details]] of audits.entries()) {
     await db.insert(t.auditLog).values({
-      id: `au-seed-${i}`, tenantId: TENANT, entityType, entityId, action,
+      id: id(`au-seed-${i}`), tenantId: ctx.tenantId, entityType, entityId: id(entityId), action,
       performedBy, details: { version, ...(details ?? {}) }, createdAt: when,
     });
   }
@@ -189,66 +234,66 @@ export async function seed(db: DB) {
 /* Submission 1 — Cardiovex leave-behind, hand-crafted slides, flags   */
 /* ------------------------------------------------------------------ */
 
-async function seedCardiovexSubmission(db: DB) {
+async function seedCardiovexSubmission(db: DB, { id, userFor, tenantId }: Ctx) {
   await db.insert(t.contentSubmissions).values({
-    id: "sub-cardiovex", tenantId: TENANT, productId: "p-cardiovex",
+    id: id("sub-cardiovex"), tenantId, productId: id("p-cardiovex"),
     title: "Cardiovex — Leave Behind HCP Q3 2026", channel: "print",
-    targetAudience: "hcp", submittedBy: "u-dewi", status: "in_review",
+    targetAudience: "hcp", submittedBy: userFor("marketing"), status: "in_review",
     currentStage: "medical_reviewer", createdAt: daysAgo(3),
   });
 
   await db.insert(t.contentVersions).values({
-    id: "v-cvx-1", submissionId: "sub-cardiovex", versionNumber: 1,
+    id: id("v-cvx-1"), submissionId: id("sub-cardiovex"), versionNumber: 1,
     fileName: "cardiovex-leave-behind-q3.pptx",
     textContent: null, isLocked: false, processingStatus: "ready", createdAt: daysAgo(3),
   });
 
   await db.insert(t.contentVersionPages).values([
-    { id: "pg-cvx-1", versionId: "v-cvx-1", pageNumber: 1, renderedSvg: cardiovexSlide1(), width: 1240, height: 877 },
-    { id: "pg-cvx-2", versionId: "v-cvx-1", pageNumber: 2, renderedSvg: cardiovexSlide2(), width: 1240, height: 877 },
+    { id: id("pg-cvx-1"), versionId: id("v-cvx-1"), pageNumber: 1, renderedSvg: cardiovexSlide1(), width: 1240, height: 877 },
+    { id: id("pg-cvx-2"), versionId: id("v-cvx-1"), pageNumber: 2, renderedSvg: cardiovexSlide2(), width: 1240, height: 877 },
   ]);
 
   await db.insert(t.contentElements).values([
     {
-      id: "el-cvx-brand", versionId: "v-cvx-1", pageNumber: 1, elementType: "text_block",
+      id: id("el-cvx-brand"), versionId: id("v-cvx-1"), pageNumber: 1, elementType: "text_block",
       extractionMethod: "native_text",
       extractedText: "CARDIOVEX® 10 mg — amlodipine besylate",
       boundingBox: { x: 64, y: 66, width: 620, height: 74 },
     },
     {
-      id: "el-cvx-headline", versionId: "v-cvx-1", pageNumber: 1, elementType: "text_block",
+      id: id("el-cvx-headline"), versionId: id("v-cvx-1"), pageNumber: 1, elementType: "text_block",
       extractionMethod: "native_text",
       extractedText: "Turunkan tekanan darah sistolik hingga 15 mmHg dalam 8 minggu terapi",
       boundingBox: { x: 64, y: 168, width: 780, height: 150 },
     },
     {
-      id: "el-cvx-body", versionId: "v-cvx-1", pageNumber: 1, elementType: "text_block",
+      id: id("el-cvx-body"), versionId: id("v-cvx-1"), pageNumber: 1, elementType: "text_block",
       extractionMethod: "native_text",
       extractedText:
         "Cardiovex diindikasikan untuk pengobatan hipertensi esensial pada pasien dewasa, dengan dosis sekali sehari yang mendukung kepatuhan terapi jangka panjang.",
       boundingBox: { x: 64, y: 356, width: 780, height: 128 },
     },
     {
-      id: "el-cvx-tagline", versionId: "v-cvx-1", pageNumber: 1, elementType: "text_block",
+      id: id("el-cvx-tagline"), versionId: id("v-cvx-1"), pageNumber: 1, elementType: "text_block",
       extractionMethod: "native_text",
       extractedText: "Pilihan #1 dokter spesialis jantung di Indonesia",
       boundingBox: { x: 64, y: 540, width: 640, height: 86 },
     },
     {
-      id: "el-cvx-chart", versionId: "v-cvx-1", pageNumber: 2, elementType: "chart",
+      id: id("el-cvx-chart"), versionId: id("v-cvx-1"), pageNumber: 2, elementType: "chart",
       extractionMethod: "ocr", extractedText: "mmHg 15 9 4 Plasebo Kompetitor",
       ocrConfidence: 0.41, requiresManualReview: true,
       boundingBox: { x: 64, y: 186, width: 660, height: 486 },
     },
     {
-      id: "el-cvx-tolerability", versionId: "v-cvx-1", pageNumber: 2, elementType: "text_block",
+      id: id("el-cvx-tolerability"), versionId: id("v-cvx-1"), pageNumber: 2, elementType: "text_block",
       extractionMethod: "native_text",
       extractedText:
         "Umumnya ditoleransi dengan baik; efek samping tersering adalah edema perifer ringan.",
       boundingBox: { x: 764, y: 226, width: 420, height: 210 },
     },
     {
-      id: "el-cvx-footnote", versionId: "v-cvx-1", pageNumber: 2, elementType: "footnote",
+      id: id("el-cvx-footnote"), versionId: id("v-cvx-1"), pageNumber: 2, elementType: "footnote",
       extractionMethod: "native_text",
       extractedText: "*Data on file. Studi internal NP-2025-04, n=240.",
       boundingBox: { x: 64, y: 742, width: 620, height: 44 },
@@ -257,12 +302,12 @@ async function seedCardiovexSubmission(db: DB) {
 
   await db.insert(t.claimFlags).values([
     {
-      id: "fl-cvx-1", versionId: "v-cvx-1", elementId: "el-cvx-headline",
+      id: id("fl-cvx-1"), versionId: id("v-cvx-1"), elementId: id("el-cvx-headline"),
       flaggedText: "Turunkan tekanan darah sistolik hingga 15 mmHg dalam 8 minggu terapi",
-      matchedClaimId: "c-cvx-1", similarityScore: 0.62, flagType: "matched",
+      matchedClaimId: id("c-cvx-1"), similarityScore: 0.62, flagType: "matched",
     },
     {
-      id: "fl-cvx-2", versionId: "v-cvx-1", elementId: "el-cvx-tagline",
+      id: id("fl-cvx-2"), versionId: id("v-cvx-1"), elementId: id("el-cvx-tagline"),
       flaggedText: "Pilihan #1 dokter spesialis jantung di Indonesia",
       matchedClaimId: null, similarityScore: 0.08, flagType: "no_match",
     },
@@ -270,7 +315,7 @@ async function seedCardiovexSubmission(db: DB) {
 
   await db.insert(t.reviewComments).values([
     {
-      id: "cm-cvx-1", versionId: "v-cvx-1", elementId: "el-cvx-chart", reviewerId: "u-budi",
+      id: id("cm-cvx-1"), versionId: id("v-cvx-1"), elementId: id("el-cvx-chart"), reviewerId: userFor("medical_reviewer"),
       comment:
         "Grafik menyiratkan superioritas langsung terhadap kompetitor. Perlu referensi studi head-to-head yang valid, atau ganti dengan data vs plasebo saja.",
       resolved: false, createdAt: daysAgo(1),
@@ -278,9 +323,9 @@ async function seedCardiovexSubmission(db: DB) {
   ]);
 
   await db.insert(t.reviewStages).values([
-    { id: "st-cvx-1", submissionId: "sub-cardiovex", stageOrder: 1, reviewerRole: "medical_reviewer", assignedTo: "u-budi", status: "in_progress" },
-    { id: "st-cvx-2", submissionId: "sub-cardiovex", stageOrder: 2, reviewerRole: "legal_reviewer", assignedTo: "u-ratna", status: "pending" },
-    { id: "st-cvx-3", submissionId: "sub-cardiovex", stageOrder: 3, reviewerRole: "regulatory_reviewer", assignedTo: "u-agus", status: "pending" },
+    { id: id("st-cvx-1"), submissionId: id("sub-cardiovex"), stageOrder: 1, reviewerRole: "medical_reviewer", assignedTo: userFor("medical_reviewer"), status: "in_progress" },
+    { id: id("st-cvx-2"), submissionId: id("sub-cardiovex"), stageOrder: 2, reviewerRole: "legal_reviewer", assignedTo: userFor("legal_reviewer"), status: "pending" },
+    { id: id("st-cvx-3"), submissionId: id("sub-cardiovex"), stageOrder: 3, reviewerRole: "regulatory_reviewer", assignedTo: userFor("regulatory_reviewer"), status: "pending" },
   ]);
 }
 
@@ -288,11 +333,11 @@ async function seedCardiovexSubmission(db: DB) {
 /* Submission 2 — Glucofit digital banner, fully approved & locked     */
 /* ------------------------------------------------------------------ */
 
-async function seedGlucofitSubmission(db: DB) {
+async function seedGlucofitSubmission(db: DB, { id, userFor, tenantId }: Ctx) {
   await db.insert(t.contentSubmissions).values({
-    id: "sub-glucofit", tenantId: TENANT, productId: "p-glucofit",
+    id: id("sub-glucofit"), tenantId, productId: id("p-glucofit"),
     title: "Glucofit XR — Banner Digital Kampanye Edukasi", channel: "digital",
-    targetAudience: "public", submittedBy: "u-dewi", status: "approved",
+    targetAudience: "public", submittedBy: userFor("marketing"), status: "approved",
     currentStage: null, createdAt: daysAgo(18), decidedAt: daysAgo(10),
   });
 
@@ -308,26 +353,26 @@ async function seedGlucofitSubmission(db: DB) {
   });
 
   await db.insert(t.contentVersions).values({
-    id: "v-glf-1", submissionId: "sub-glucofit", versionNumber: 1,
+    id: id("v-glf-1"), submissionId: id("sub-glucofit"), versionNumber: 1,
     fileName: null, textContent: paragraphs.join("\n\n"),
     isLocked: true, processingStatus: "ready", createdAt: daysAgo(18),
   });
 
   for (const [i, p] of pages.entries())
     await db.insert(t.contentVersionPages).values({
-      id: `pg-glf-${i + 1}`, versionId: "v-glf-1", pageNumber: p.pageNumber,
+      id: id(`pg-glf-${i + 1}`), versionId: id("v-glf-1"), pageNumber: p.pageNumber,
       renderedSvg: p.svg, width: p.width, height: p.height,
     });
   for (const [i, el] of elements.entries())
     await db.insert(t.contentElements).values({
-      id: `el-glf-${i + 1}`, versionId: "v-glf-1", pageNumber: el.pageNumber,
+      id: id(`el-glf-${i + 1}`), versionId: id("v-glf-1"), pageNumber: el.pageNumber,
       elementType: el.elementType, extractionMethod: "native_text",
       extractedText: el.text, boundingBox: el.bbox,
     });
 
   await db.insert(t.reviewStages).values([
-    { id: "st-glf-1", submissionId: "sub-glucofit", stageOrder: 1, reviewerRole: "medical_reviewer", assignedTo: "u-budi", status: "approved", decidedAt: daysAgo(15), decisionNote: "Sesuai label dan claims library." },
-    { id: "st-glf-2", submissionId: "sub-glucofit", stageOrder: 2, reviewerRole: "regulatory_reviewer", assignedTo: "u-agus", status: "approved", decidedAt: daysAgo(10), decisionNote: "Sesuai Pedoman Promosi Obat untuk media publik." },
+    { id: id("st-glf-1"), submissionId: id("sub-glucofit"), stageOrder: 1, reviewerRole: "medical_reviewer", assignedTo: userFor("medical_reviewer"), status: "approved", decidedAt: daysAgo(15), decisionNote: "Sesuai label dan claims library." },
+    { id: id("st-glf-2"), submissionId: id("sub-glucofit"), stageOrder: 2, reviewerRole: "regulatory_reviewer", assignedTo: userFor("regulatory_reviewer"), status: "approved", decidedAt: daysAgo(10), decisionNote: "Sesuai Pedoman Promosi Obat untuk media publik." },
   ]);
 }
 
@@ -335,11 +380,11 @@ async function seedGlucofitSubmission(db: DB) {
 /* Submission 3 — Respira e-detail aid, changes requested by Legal     */
 /* ------------------------------------------------------------------ */
 
-async function seedRespiraSubmission(db: DB) {
+async function seedRespiraSubmission(db: DB, { id, userFor, tenantId }: Ctx) {
   await db.insert(t.contentSubmissions).values({
-    id: "sub-respira", tenantId: TENANT, productId: "p-respira",
+    id: id("sub-respira"), tenantId, productId: id("p-respira"),
     title: "Respira Sirup — E-Detail Aid Apoteker", channel: "e-detail",
-    targetAudience: "hcp", submittedBy: "u-dewi", status: "changes_requested",
+    targetAudience: "hcp", submittedBy: userFor("marketing"), status: "changes_requested",
     currentStage: "legal_reviewer", createdAt: daysAgo(9),
   });
 
@@ -356,22 +401,22 @@ async function seedRespiraSubmission(db: DB) {
   });
 
   await db.insert(t.contentVersions).values({
-    id: "v-rsp-1", submissionId: "sub-respira", versionNumber: 1,
+    id: id("v-rsp-1"), submissionId: id("sub-respira"), versionNumber: 1,
     fileName: null, textContent: paragraphs.join("\n\n"),
     isLocked: false, processingStatus: "ready", createdAt: daysAgo(9),
   });
 
   for (const [i, p] of pages.entries())
     await db.insert(t.contentVersionPages).values({
-      id: `pg-rsp-${i + 1}`, versionId: "v-rsp-1", pageNumber: p.pageNumber,
+      id: id(`pg-rsp-${i + 1}`), versionId: id("v-rsp-1"), pageNumber: p.pageNumber,
       renderedSvg: p.svg, width: p.width, height: p.height,
     });
   const elIds: string[] = [];
   for (const [i, el] of elements.entries()) {
-    const id = `el-rsp-${i + 1}`;
-    elIds.push(id);
+    const elId = id(`el-rsp-${i + 1}`);
+    elIds.push(elId);
     await db.insert(t.contentElements).values({
-      id, versionId: "v-rsp-1", pageNumber: el.pageNumber,
+      id: elId, versionId: id("v-rsp-1"), pageNumber: el.pageNumber,
       elementType: el.elementType, extractionMethod: "native_text",
       extractedText: el.text, boundingBox: el.bbox,
     });
@@ -379,23 +424,23 @@ async function seedRespiraSubmission(db: DB) {
 
   // Paragraph 3 (comparative superiority claim) has no approved-claim match
   await db.insert(t.claimFlags).values({
-    id: "fl-rsp-1", versionId: "v-rsp-1", elementId: elIds[2],
-    flaggedText: paragraphs[2], matchedClaimId: "c-rsp-1",
+    id: id("fl-rsp-1"), versionId: id("v-rsp-1"), elementId: elIds[2],
+    flaggedText: paragraphs[2], matchedClaimId: id("c-rsp-1"),
     similarityScore: 0.31, flagType: "no_match",
-    reviewerDecision: "accepted", decidedBy: "u-budi",
+    reviewerDecision: "accepted", decidedBy: userFor("medical_reviewer"),
   });
 
   await db.insert(t.reviewComments).values({
-    id: "cm-rsp-1", versionId: "v-rsp-1", elementId: elIds[2], reviewerId: "u-ratna",
+    id: id("cm-rsp-1"), versionId: id("v-rsp-1"), elementId: elIds[2], reviewerId: userFor("legal_reviewer"),
     comment:
       "Klaim komparatif “lebih efektif dibanding merek lain” tanpa studi pembanding berisiko hukum dan melanggar Pedoman Promosi Obat. Hapus kalimat ini atau lampirkan bukti studi head-to-head.",
     resolved: false, createdAt: daysAgo(5),
   });
 
   await db.insert(t.reviewStages).values([
-    { id: "st-rsp-1", submissionId: "sub-respira", stageOrder: 1, reviewerRole: "medical_reviewer", assignedTo: "u-budi", status: "approved", decidedAt: daysAgo(7), decisionNote: "Klaim mukolitik sesuai label." },
-    { id: "st-rsp-2", submissionId: "sub-respira", stageOrder: 2, reviewerRole: "legal_reviewer", assignedTo: "u-ratna", status: "changes_requested", decidedAt: daysAgo(5), decisionNote: "Klaim komparatif tanpa bukti — lihat komentar pada elemen terkait." },
-    { id: "st-rsp-3", submissionId: "sub-respira", stageOrder: 3, reviewerRole: "regulatory_reviewer", assignedTo: "u-agus", status: "pending" },
+    { id: id("st-rsp-1"), submissionId: id("sub-respira"), stageOrder: 1, reviewerRole: "medical_reviewer", assignedTo: userFor("medical_reviewer"), status: "approved", decidedAt: daysAgo(7), decisionNote: "Klaim mukolitik sesuai label." },
+    { id: id("st-rsp-2"), submissionId: id("sub-respira"), stageOrder: 2, reviewerRole: "legal_reviewer", assignedTo: userFor("legal_reviewer"), status: "changes_requested", decidedAt: daysAgo(5), decisionNote: "Klaim komparatif tanpa bukti — lihat komentar pada elemen terkait." },
+    { id: id("st-rsp-3"), submissionId: id("sub-respira"), stageOrder: 3, reviewerRole: "regulatory_reviewer", assignedTo: userFor("regulatory_reviewer"), status: "pending" },
   ]);
 }
 
