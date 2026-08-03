@@ -113,6 +113,16 @@ export function isBillablePlan(def: PlanDef): boolean {
 /** Plans a workspace can move onto by paying an invoice, cheapest first. */
 export const UPGRADABLE_PLANS: PlanId[] = ["growth", "enterprise"];
 
+/**
+ * Paid plans an on-`current` workspace may move to: the same plan (renew) or a
+ * pricier one. Never a cheaper plan — a mid-cycle downgrade would forfeit the
+ * paid-through days already bought, so downgrades aren't offered here.
+ */
+export function upgradeOptionsFor(current: string | null | undefined): PlanId[] {
+  const curPrice = planDef(current).monthlyPriceIdr ?? 0;
+  return UPGRADABLE_PLANS.filter((id) => (PLANS[id].monthlyPriceIdr ?? 0) >= curPrice);
+}
+
 export function promoActive(def: PlanDef, now = new Date()): boolean {
   return (
     def.promoPriceIdr != null &&

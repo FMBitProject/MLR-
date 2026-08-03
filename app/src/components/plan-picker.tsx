@@ -8,7 +8,9 @@ import type { Dict } from "@/lib/i18n";
 
 /**
  * Plan chooser on the billing card. A free-tier workspace picks the plan it
- * wants; a paid one defaults to renewing what it already has but can switch.
+ * wants; a paid one defaults to renewing what it already has but can switch to
+ * a pricier one. `options` is pre-filtered to same-or-pricier plans, so no
+ * downgrade is ever offered.
  */
 export function PlanPicker({
   currentPlan,
@@ -26,17 +28,34 @@ export function PlanPicker({
   const [selected, setSelected] = useState<PlanId>(
     options.includes(currentPlan as PlanId) ? (currentPlan as PlanId) : options[0],
   );
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const label = hasPendingInvoice
-    ? dict.settings.billingPayPending
-    : isFree || selected !== currentPlan
+  // Selection drives the label first: switching plans always reads as an
+  // upgrade; only when staying on the current plan does a pending invoice
+  // turn it into "continue payment", else a plain renewal.
+  const label =
+    selected !== currentPlan
       ? dict.settings.billingUpgrade
-      : dict.settings.billingPay;
+      : hasPendingInvoice
+        ? dict.settings.billingPayPending
+        : isFree
+          ? dict.settings.billingUpgrade
+          : dict.settings.billingPay;
 
   return (
     <form
-      action={(fd) => startTransition(() => payRenewalInvoice(fd))}
+      action={(fd) =>
+        startTransition(async () => {
+          setError(null);
+          const res = await payRenewalInvoice(null, fd);
+          if (res?.redirectTo) {
+            window.location.href = res.redirectTo;
+            return;
+          }
+          if (res?.error) setError(res.error);
+        })
+      }
       className="space-y-3"
     >
       <div className="grid gap-2 sm:grid-cols-2">
@@ -87,6 +106,11 @@ export function PlanPicker({
           );
         })}
       </div>
+      {error ? (
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-[12px] font-medium text-rose-700 ring-1 ring-inset ring-rose-200">
+          {dict.settings.billingError}
+        </p>
+      ) : null}
       <button
         disabled={pending}
         className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3.5 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-slate-700 disabled:opacity-50"

@@ -23,7 +23,7 @@ import {
   formatIdr,
   effectivePriceIdr,
   isFreePlan,
-  UPGRADABLE_PLANS,
+  upgradeOptionsFor,
 } from "@/lib/plans";
 import { PlanPicker } from "@/components/plan-picker";
 import { submissionQuota } from "@/lib/usage";
@@ -272,7 +272,7 @@ export default async function SettingsPage() {
                   <div className="mt-4">
                     <PlanPicker
                       currentPlan={tenant?.plan ?? "starter"}
-                      options={UPGRADABLE_PLANS}
+                      options={upgradeOptionsFor(tenant?.plan)}
                       isFree={onFreePlan}
                       hasPendingInvoice={!!pending?.snapRedirectUrl}
                       dict={dict}

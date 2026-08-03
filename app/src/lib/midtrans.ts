@@ -27,6 +27,40 @@ function snapBaseUrl(key: string): string {
     : "https://app.midtrans.com/snap/v1";
 }
 
+// The core (non-Snap) API, used to cancel a transaction by order id.
+function coreBaseUrl(key: string): string {
+  return key.startsWith("SB-")
+    ? "https://api.sandbox.midtrans.com/v2"
+    : "https://api.midtrans.com/v2";
+}
+
+/**
+ * Best-effort cancel of a Snap transaction at Midtrans so its hosted payment
+ * page stops accepting payment — called when the app supersedes an invoice
+ * (e.g. the admin switches plans). Never throws: if the transaction was never
+ * charged, already settled, or the API is unreachable, we log and move on;
+ * the DB-side invoice status is the source of truth either way.
+ */
+export async function cancelSnapTransaction(orderId: string): Promise<void> {
+  if (!midtransConfigured()) return;
+  const key = process.env.MIDTRANS_SERVER_KEY!;
+  try {
+    const res = await fetch(`${coreBaseUrl(key)}/${encodeURIComponent(orderId)}/cancel`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Basic ${Buffer.from(`${key}:`).toString("base64")}`,
+      },
+    });
+    // 404 (no transaction yet) and 412 (not cancelable) are expected and benign.
+    if (!res.ok && ![404, 412].includes(res.status)) {
+      console.error(`Midtrans cancel for ${orderId} returned ${res.status}: ${await res.text()}`);
+    }
+  } catch (err) {
+    console.error(`Midtrans cancel for ${orderId} failed:`, err);
+  }
+}
+
 export type SnapTransaction = { token: string; redirectUrl: string };
 
 /**

@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db, t } from "./db";
 import { planDef, effectivePriceIdr, isBillablePlan, type PlanDef, type PlanId } from "./plans";
-import { createSnapTransaction } from "./midtrans";
+import { createSnapTransaction, cancelSnapTransaction } from "./midtrans";
 import { appUrl, sendInvoiceEmail } from "./email";
 import type { Locale } from "./i18n";
 
@@ -107,15 +107,8 @@ export async function ensureRenewalInvoice(
   targetPlan?: PlanId,
 ): Promise<Invoice> {
   const existing = await pendingInvoice(tenant.id);
-  // An open invoice for a different plan is stale once the admin picks
-  // another one; cancel it so the new choice gets a fresh Snap link.
-  if (existing) {
-    if (!targetPlan || existing.plan === targetPlan) return existing;
-    await db
-      .update(t.invoices)
-      .set({ status: "canceled" })
-      .where(eq(t.invoices.id, existing.id));
-  }
+  // Reuse an open invoice for the same plan; only a plan switch supersedes it.
+  if (existing && (!targetPlan || existing.plan === targetPlan)) return existing;
 
   const isUpgrade = !!targetPlan && targetPlan !== tenant.plan;
   const def: PlanDef = planDef(targetPlan ?? tenant.plan);
@@ -145,6 +138,9 @@ export async function ensureRenewalInvoice(
     createdAt: now,
   };
 
+  // Create the payment link BEFORE touching the old invoice: if Midtrans is
+  // unreachable this throws and we've changed nothing — the old invoice and
+  // its still-live Snap link remain the tenant's working way to pay.
   const snap = await createSnapTransaction({
     orderId: id,
     grossAmountIdr: amount,
@@ -160,21 +156,35 @@ export async function ensureRenewalInvoice(
   }
 
   await db.insert(t.invoices).values(invoice);
+
+  // Only now supersede the old invoice: mark it canceled and kill its Snap
+  // link at Midtrans so it can no longer be paid into the wrong plan.
+  if (existing) {
+    await db
+      .update(t.invoices)
+      .set({ status: "canceled" })
+      .where(eq(t.invoices.id, existing.id));
+    await cancelSnapTransaction(existing.id);
+  }
+
   return invoice;
 }
 
 /**
  * Marks an invoice paid, moves the tenant onto the plan that invoice was
- * raised for, and extends the paid-through date by one month. Idempotent —
- * Midtrans retries notifications, and settlement can follow a pending one.
+ * raised for, and extends the paid-through date by one month.
+ *
+ * The status→paid write is a single conditional UPDATE guarded on
+ * status='pending', which is the concurrency lock: only the first caller to
+ * win that row proceeds, so Midtrans's repeated notifications can't extend the
+ * plan twice, and an invoice that was canceled (plan switched away) or expired
+ * can never be paid into the wrong plan. Losers get null and touch nothing.
  */
 export async function applyInvoicePaid(
   invoice: Invoice,
   paymentType: string | null,
   now = new Date(),
 ): Promise<{ newActiveUntil: Date; plan: string } | null> {
-  if (invoice.status === "paid") return null;
-
   const tenant = (
     await db.select().from(t.tenants).where(eq(t.tenants.id, invoice.tenantId))
   )[0];
@@ -189,7 +199,7 @@ export async function applyInvoicePaid(
       : now;
   const newActiveUntil = addOneMonth(start);
 
-  await db
+  const claimed = await db
     .update(t.invoices)
     .set({
       status: "paid",
@@ -198,7 +208,11 @@ export async function applyInvoicePaid(
       periodStart: start,
       periodEnd: newActiveUntil,
     })
-    .where(eq(t.invoices.id, invoice.id));
+    .where(and(eq(t.invoices.id, invoice.id), eq(t.invoices.status, "pending")))
+    .returning({ id: t.invoices.id });
+  // Already paid, canceled, or expired — someone/something else got here first.
+  if (claimed.length === 0) return null;
+
   await db
     .update(t.tenants)
     .set({ plan: invoice.plan, planActiveUntil: newActiveUntil })

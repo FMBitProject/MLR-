@@ -28,7 +28,7 @@ import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
 import { consumeAttempt, clearThrottle } from "./throttle";
-import { planLimits, planHas, UPGRADABLE_PLANS, type PlanId } from "./plans";
+import { planLimits, planHas, upgradeOptionsFor, type PlanId } from "./plans";
 import { submissionQuota } from "./usage";
 import { assertTenantWritable, ensureRenewalInvoice } from "./billing";
 import { MAX_UPLOAD_BYTES } from "./upload";
@@ -1777,24 +1777,40 @@ export async function createProduct(formData: FormData) {
 // renewing the current one; the tenant moves onto it once the invoice is paid.
 // Without a MIDTRANS_SERVER_KEY (dev) the invoice is created but there's no
 // page to redirect to, so the settings card re-renders showing it as pending.
-export async function payRenewalInvoice(formData?: FormData) {
+export async function payRenewalInvoice(
+  _prev: { error?: string } | null,
+  formData: FormData,
+): Promise<{ error?: string; redirectTo?: string }> {
   const user = await requireUser();
-  if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
-
-  const requested = String(formData?.get("plan") ?? "");
-  const targetPlan = UPGRADABLE_PLANS.includes(requested as PlanId)
-    ? (requested as PlanId)
-    : undefined;
+  if (!["compliance_admin", "super_admin"].includes(user.role)) return { error: "FORBIDDEN" };
 
   const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
-  if (!tenant) throw new Error("NOT_FOUND");
+  if (!tenant) return { error: "NOT_FOUND" };
 
-  const invoice = await ensureRenewalInvoice(
-    tenant,
-    { name: user.name, email: user.email },
-    new Date(),
-    targetPlan,
-  );
+  const requested = String(formData.get("plan") ?? "");
+  // Only same-or-pricier plans are payable; a cheaper pick would be a
+  // downgrade that forfeits paid days, so the UI never offers it and this
+  // rejects it if it arrives anyway.
+  const allowed = upgradeOptionsFor(tenant.plan);
+  const targetPlan = allowed.includes(requested as PlanId)
+    ? (requested as PlanId)
+    : undefined;
+  if (requested && !targetPlan) return { error: "PLAN_INVALID" };
+
+  let invoice;
+  try {
+    invoice = await ensureRenewalInvoice(
+      tenant,
+      { name: user.name, email: user.email },
+      new Date(),
+      targetPlan,
+    );
+  } catch (err) {
+    // Most likely Midtrans was unreachable while creating the payment link.
+    console.error("payRenewalInvoice failed:", err);
+    return { error: "PAYMENT_INIT_FAILED" };
+  }
+
   await logAudit({
     tenantId: user.tenantId,
     entityType: "invoice",
@@ -1804,6 +1820,9 @@ export async function payRenewalInvoice(formData?: FormData) {
     details: { number: invoice.number, amountIdr: invoice.amountIdr, plan: invoice.plan },
   });
 
-  if (invoice.snapRedirectUrl) redirect(invoice.snapRedirectUrl);
   revalidatePath("/settings");
+  // Hand the Snap URL back to the client to navigate — redirect() to an
+  // external host from a server action is unnecessary here and the client
+  // can open it directly.
+  return invoice.snapRedirectUrl ? { redirectTo: invoice.snapRedirectUrl } : {};
 }

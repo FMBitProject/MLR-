@@ -2,7 +2,9 @@ import type { LegalSection } from "@/lib/legal";
 
 // Highlights any "[BELUM DIISI: …]" / "[NOT YET SPECIFIED: …]" placeholder so
 // an unfilled legal detail is impossible to miss on a published page.
-const PLACEHOLDER = /(\[(?:BELUM DIISI|NOT YET SPECIFIED)[^\]]*\])/g;
+// Not global: split still captures the delimiter without /g, and a non-global
+// regex keeps .test() stateless (no lastIndex carried between calls).
+const PLACEHOLDER = /(\[(?:BELUM DIISI|NOT YET SPECIFIED)[^\]]*\])/;
 
 function withPlaceholders(text: string) {
   return text.split(PLACEHOLDER).map((part, i) =>
