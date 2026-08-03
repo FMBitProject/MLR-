@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db, t } from "./db";
-import { planDef, effectivePriceIdr, type PlanDef } from "./plans";
+import { planDef, effectivePriceIdr, isBillablePlan, type PlanDef, type PlanId } from "./plans";
 import { createSnapTransaction } from "./midtrans";
 import { appUrl, sendInvoiceEmail } from "./email";
 import type { Locale } from "./i18n";
@@ -11,8 +11,6 @@ export type Invoice = typeof t.invoices.$inferSelect;
 // After the paid-through date lapses, the workspace keeps full access for
 // this many days (with warnings), then drops to read-only until payment.
 export const GRACE_DAYS = 7;
-// New workspaces can evaluate the product this long before the first invoice.
-export const TRIAL_DAYS = 14;
 // A Snap payment link stays valid this long; the renewal sweep also starts
 // generating the next invoice this many days before the paid-through date.
 export const INVOICE_WINDOW_DAYS = 7;
@@ -36,9 +34,9 @@ export function billingState(
 ): BillingState {
   const def = planDef(tenant?.plan);
   const activeUntil = tenant?.planActiveUntil ?? null;
-  // No list price (enterprise) or no managed paid-through date: billing is
-  // handled outside the app; never lock these workspaces.
-  if (def.monthlyPriceIdr === null || !activeUntil) {
+  // Free tier, custom-quote plans, or no managed paid-through date: the app
+  // raises no invoice and never locks these workspaces.
+  if (!isBillablePlan(def) || !activeUntil) {
     return { status: "active", activeUntil, graceUntil: null, managed: false };
   }
   const graceUntil = new Date(activeUntil.getTime() + GRACE_DAYS * DAY_MS);
@@ -93,25 +91,41 @@ export async function pendingInvoice(tenantId: string): Promise<Invoice | undefi
 }
 
 /**
- * Returns the tenant's open renewal invoice, creating one (and its Snap
- * payment link) if none exists. The projected period is anchored at
- * max(now, planActiveUntil) and finalized again at payment time.
+ * Returns the tenant's open invoice, creating one (and its Snap payment link)
+ * if none exists. `targetPlan` bills a different plan than the tenant is on
+ * — an upgrade from the free tier, or a move between paid plans — and the
+ * plan is applied to the tenant once that invoice is paid.
+ *
+ * The projected period is anchored at max(now, planActiveUntil) and finalized
+ * again at payment time. Upgrades start their period now rather than after
+ * the current one, since the tenant gets the new plan immediately.
  */
 export async function ensureRenewalInvoice(
   tenant: Tenant,
   requestedBy: { name: string; email: string },
   now = new Date(),
+  targetPlan?: PlanId,
 ): Promise<Invoice> {
   const existing = await pendingInvoice(tenant.id);
-  if (existing) return existing;
+  // An open invoice for a different plan is stale once the admin picks
+  // another one; cancel it so the new choice gets a fresh Snap link.
+  if (existing) {
+    if (!targetPlan || existing.plan === targetPlan) return existing;
+    await db
+      .update(t.invoices)
+      .set({ status: "canceled" })
+      .where(eq(t.invoices.id, existing.id));
+  }
 
-  const def: PlanDef = planDef(tenant.plan);
+  const isUpgrade = !!targetPlan && targetPlan !== tenant.plan;
+  const def: PlanDef = planDef(targetPlan ?? tenant.plan);
   const amount = effectivePriceIdr(def, now);
-  if (amount === null) throw new Error("BILLING_UNMANAGED");
+  if (amount === null || amount === 0) throw new Error("BILLING_UNMANAGED");
 
-  const start = tenant.planActiveUntil && tenant.planActiveUntil > now
-    ? tenant.planActiveUntil
-    : now;
+  const start =
+    !isUpgrade && tenant.planActiveUntil && tenant.planActiveUntil > now
+      ? tenant.planActiveUntil
+      : now;
   const id = crypto.randomUUID();
   const invoice: Invoice = {
     id,
@@ -150,15 +164,15 @@ export async function ensureRenewalInvoice(
 }
 
 /**
- * Marks an invoice paid and extends the tenant's paid-through date by one
- * month anchored at max(now, current planActiveUntil). Idempotent — Midtrans
- * retries notifications, and settlement can follow a pending notification.
+ * Marks an invoice paid, moves the tenant onto the plan that invoice was
+ * raised for, and extends the paid-through date by one month. Idempotent —
+ * Midtrans retries notifications, and settlement can follow a pending one.
  */
 export async function applyInvoicePaid(
   invoice: Invoice,
   paymentType: string | null,
   now = new Date(),
-): Promise<{ newActiveUntil: Date } | null> {
+): Promise<{ newActiveUntil: Date; plan: string } | null> {
   if (invoice.status === "paid") return null;
 
   const tenant = (
@@ -166,8 +180,13 @@ export async function applyInvoicePaid(
   )[0];
   if (!tenant) return null;
 
+  // An upgrade starts a fresh month; a renewal of the same plan stacks onto
+  // whatever is left, so paying early never costs the tenant days.
+  const isUpgrade = invoice.plan !== tenant.plan;
   const start =
-    tenant.planActiveUntil && tenant.planActiveUntil > now ? tenant.planActiveUntil : now;
+    !isUpgrade && tenant.planActiveUntil && tenant.planActiveUntil > now
+      ? tenant.planActiveUntil
+      : now;
   const newActiveUntil = addOneMonth(start);
 
   await db
@@ -182,10 +201,10 @@ export async function applyInvoicePaid(
     .where(eq(t.invoices.id, invoice.id));
   await db
     .update(t.tenants)
-    .set({ planActiveUntil: newActiveUntil })
+    .set({ plan: invoice.plan, planActiveUntil: newActiveUntil })
     .where(eq(t.tenants.id, tenant.id));
 
-  return { newActiveUntil };
+  return { newActiveUntil, plan: invoice.plan };
 }
 
 export type BillingSweepStats = {

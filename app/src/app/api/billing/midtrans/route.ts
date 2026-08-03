@@ -64,6 +64,7 @@ export async function POST(req: Request) {
           number: invoice.number,
           amountIdr: invoice.amountIdr,
           paymentType: n.payment_type ?? null,
+          plan: result.plan,
           planActiveUntil: result.newActiveUntil.toISOString(),
         },
       });

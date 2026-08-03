@@ -2,7 +2,14 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
-import { PLANS, formatIdr, promoActive, effectivePriceIdr, type PlanId } from "@/lib/plans";
+import {
+  PLANS,
+  formatIdr,
+  promoActive,
+  effectivePriceIdr,
+  isFreePlan,
+  type PlanId,
+} from "@/lib/plans";
 import { BrandLogo } from "@/components/brand-logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
@@ -64,7 +71,15 @@ export default async function PricingPage() {
                   {name}
                 </h2>
                 <p className="mt-3">
-                  {plan.monthlyPriceIdr !== null ? (
+                  {plan.monthlyPriceIdr === null ? (
+                    <span className="text-[28px] font-semibold tracking-tight text-slate-900">
+                      {p.customPrice}
+                    </span>
+                  ) : isFreePlan(plan) ? (
+                    <span className="text-[28px] font-semibold tracking-tight text-slate-900">
+                      {p.free}
+                    </span>
+                  ) : (
                     <>
                       {promoActive(plan) ? (
                         <span className="mr-2 text-[15px] font-medium text-slate-400 line-through">
@@ -76,10 +91,6 @@ export default async function PricingPage() {
                       </span>
                       <span className="text-[13px] text-slate-400">{p.perMonth}</span>
                     </>
-                  ) : (
-                    <span className="text-[28px] font-semibold tracking-tight text-slate-900">
-                      {p.customPrice}
-                    </span>
                   )}
                 </p>
                 {promoActive(plan) && plan.promoEndsAt ? (
@@ -108,26 +119,27 @@ export default async function PricingPage() {
                 </ul>
 
                 <div className="mt-auto pt-7">
-                  {id === "enterprise" ? (
+                  {/* Every plan is self-serve now: sign up free, then upgrade
+                      from Settings whenever the team outgrows Starter. */}
+                  <Link
+                    href="/register"
+                    className={
+                      "block rounded-xl px-5 py-2.5 text-center text-sm font-semibold shadow-sm transition " +
+                      (highlighted
+                        ? "bg-brand-700 text-white hover:bg-brand-800"
+                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50")
+                    }
+                  >
+                    {isFreePlan(plan) ? p.startFreeCta : p.startCta}
+                  </Link>
+                  {id === "enterprise" && salesEmail ? (
                     <a
-                      href={salesEmail ? `mailto:${salesEmail}` : "/register"}
-                      className="block rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-center text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                      href={`mailto:${salesEmail}`}
+                      className="mt-2 block text-center text-[12.5px] font-medium text-slate-500 hover:text-brand-700 hover:underline"
                     >
                       {p.contactSales}
                     </a>
-                  ) : (
-                    <Link
-                      href="/register"
-                      className={
-                        "block rounded-xl px-5 py-2.5 text-center text-sm font-semibold shadow-sm transition " +
-                        (highlighted
-                          ? "bg-brand-700 text-white hover:bg-brand-800"
-                          : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50")
-                      }
-                    >
-                      {p.startCta}
-                    </Link>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );

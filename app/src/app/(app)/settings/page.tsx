@@ -14,11 +14,18 @@ import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
-import { saveWorkflow, payRenewalInvoice } from "@/lib/actions";
+import { saveWorkflow } from "@/lib/actions";
 import { billingState, latestInvoices } from "@/lib/billing";
 import { midtransConfigured } from "@/lib/midtrans";
 import { getLlmProvider } from "@/lib/llm";
-import { planDef, formatIdr, effectivePriceIdr } from "@/lib/plans";
+import {
+  planDef,
+  formatIdr,
+  effectivePriceIdr,
+  isFreePlan,
+  UPGRADABLE_PLANS,
+} from "@/lib/plans";
+import { PlanPicker } from "@/components/plan-picker";
 import { submissionQuota } from "@/lib/usage";
 import { Avatar, Card, CardHeader, Chip, PageHeader } from "@/components/ui";
 import { TeammateForm } from "@/components/teammate-form";
@@ -48,6 +55,10 @@ export default async function SettingsPage() {
   const limits = plan.limits;
   const quota = await submissionQuota(user.tenantId, tenant?.plan);
   const billing = billingState(tenant);
+  const onFreePlan = isFreePlan(plan);
+  // Only custom-quote plans are billed outside the app; the free tier still
+  // shows the card so the workspace can upgrade itself.
+  const customQuote = plan.monthlyPriceIdr === null;
   const invoices = await latestInvoices(user.tenantId);
   const pending = invoices.find((i) => i.status === "pending");
   const billingTone = { active: "brand", grace: "amber", delinquent: "red" } as const;
@@ -89,9 +100,11 @@ export default async function SettingsPage() {
                   <Chip tone="brand">{tenant?.plan?.toUpperCase()}</Chip>
                 </p>
                 <p className="mt-1.5 text-[12.5px] font-medium text-slate-600">
-                  {plan.monthlyPriceIdr !== null
-                    ? `${formatIdr(effectivePriceIdr(plan) ?? plan.monthlyPriceIdr)}${dict.settings.planPerMonth}`
-                    : dict.settings.planCustomPrice}
+                  {plan.monthlyPriceIdr === null
+                    ? dict.settings.planCustomPrice
+                    : onFreePlan
+                      ? dict.settings.billingFree
+                      : `${formatIdr(effectivePriceIdr(plan) ?? plan.monthlyPriceIdr)}${dict.settings.planPerMonth}`}
                 </p>
                 <p className="mt-0.5 text-[12px] text-slate-400">
                   {formatDate(tenant?.createdAt ?? null, locale)}
@@ -231,29 +244,39 @@ export default async function SettingsPage() {
               desc={dict.settings.billingDesc}
             />
             <div className="px-6 py-5">
-              {!billing.managed ? (
+              {customQuote ? (
                 <p className="text-[12.5px] leading-relaxed text-slate-500">
                   {dict.settings.billingUnmanaged}
                 </p>
               ) : (
                 <>
                   <div className="flex flex-wrap items-center gap-3">
-                    <Chip tone={billingTone[billing.status]}>
-                      {dict.settings.billingStatus[billing.status]}
+                    <Chip tone={onFreePlan ? "slate" : billingTone[billing.status]}>
+                      {onFreePlan
+                        ? dict.settings.billingFree
+                        : dict.settings.billingStatus[billing.status]}
                     </Chip>
                     <p className="text-[13px] text-slate-600">
-                      {dict.settings.billingActiveUntil}{" "}
-                      <span className="font-semibold text-slate-800">
-                        {formatDate(billing.activeUntil, locale)}
-                      </span>
+                      {onFreePlan ? (
+                        dict.settings.billingFreeNote
+                      ) : (
+                        <>
+                          {dict.settings.billingActiveUntil}{" "}
+                          <span className="font-semibold text-slate-800">
+                            {formatDate(billing.activeUntil, locale)}
+                          </span>
+                        </>
+                      )}
                     </p>
-                    <form action={payRenewalInvoice} className="ml-auto">
-                      <button className="rounded-lg bg-slate-900 px-3.5 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-slate-700">
-                        {pending?.snapRedirectUrl
-                          ? dict.settings.billingPayPending
-                          : dict.settings.billingPay}
-                      </button>
-                    </form>
+                  </div>
+                  <div className="mt-4">
+                    <PlanPicker
+                      currentPlan={tenant?.plan ?? "starter"}
+                      options={UPGRADABLE_PLANS}
+                      isFree={onFreePlan}
+                      hasPendingInvoice={!!pending?.snapRedirectUrl}
+                      dict={dict}
+                    />
                   </div>
                   {pending && !pending.snapRedirectUrl && !midtransConfigured() ? (
                     <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-800 ring-1 ring-inset ring-amber-200">

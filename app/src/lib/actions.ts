@@ -28,9 +28,9 @@ import type { ClaimReference } from "./db/schema";
 import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./svg";
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
 import { consumeAttempt, clearThrottle } from "./throttle";
-import { planLimits, planHas } from "./plans";
+import { planLimits, planHas, UPGRADABLE_PLANS, type PlanId } from "./plans";
 import { submissionQuota } from "./usage";
-import { assertTenantWritable, ensureRenewalInvoice, TRIAL_DAYS } from "./billing";
+import { assertTenantWritable, ensureRenewalInvoice } from "./billing";
 import { MAX_UPLOAD_BYTES } from "./upload";
 import { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail } from "./email";
 import { notifyCurrentStageReviewers, notifySubmitterDecision } from "./notify";
@@ -138,9 +138,10 @@ export async function register(
       id: tenantId,
       name: companyName,
       slug,
+      // Starter is free forever, so there is nothing to expire — a paid-through
+      // date only starts existing once the workspace upgrades.
       plan: "starter",
-      // Free trial: the first invoice becomes payable as this date approaches.
-      planActiveUntil: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60_000),
+      planActiveUntil: null,
       createdAt: new Date(),
     });
   await db.insert(t.users)
@@ -1771,18 +1772,29 @@ export async function createProduct(formData: FormData) {
 
 /* ----------------------------- billing ----------------------------- */
 
-// Opens (creating if needed) the tenant's renewal invoice and sends the
-// admin to the Midtrans Snap payment page. Without a MIDTRANS_SERVER_KEY
-// (dev) the invoice is created but there's no page to redirect to, so the
-// settings card re-renders showing it as pending.
-export async function payRenewalInvoice() {
+// Opens (creating if needed) an invoice and sends the admin to the Midtrans
+// Snap payment page. `plan` in the form data upgrades to that plan instead of
+// renewing the current one; the tenant moves onto it once the invoice is paid.
+// Without a MIDTRANS_SERVER_KEY (dev) the invoice is created but there's no
+// page to redirect to, so the settings card re-renders showing it as pending.
+export async function payRenewalInvoice(formData?: FormData) {
   const user = await requireUser();
   if (!["compliance_admin", "super_admin"].includes(user.role)) throw new Error("FORBIDDEN");
+
+  const requested = String(formData?.get("plan") ?? "");
+  const targetPlan = UPGRADABLE_PLANS.includes(requested as PlanId)
+    ? (requested as PlanId)
+    : undefined;
 
   const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
   if (!tenant) throw new Error("NOT_FOUND");
 
-  const invoice = await ensureRenewalInvoice(tenant, { name: user.name, email: user.email });
+  const invoice = await ensureRenewalInvoice(
+    tenant,
+    { name: user.name, email: user.email },
+    new Date(),
+    targetPlan,
+  );
   await logAudit({
     tenantId: user.tenantId,
     entityType: "invoice",

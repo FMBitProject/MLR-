@@ -8,7 +8,11 @@ export type PlanId = "starter" | "growth" | "enterprise";
 
 export type PlanDef = {
   id: PlanId;
-  /** Regular (list) monthly price in IDR; null = custom quote (enterprise). */
+  /**
+   * Regular (list) monthly price in IDR.
+   *   0    = free forever (Starter) — never invoiced, never locked
+   *   null = custom quote, billed outside the app
+   */
   monthlyPriceIdr: number | null;
   /** Time-limited launch promo price; applies while today <= promoEndsAt. */
   promoPriceIdr?: number;
@@ -35,9 +39,10 @@ export type PlanDef = {
 export const PLANS: Record<PlanId, PlanDef> = {
   starter: {
     id: "starter",
-    monthlyPriceIdr: 3_500_000,
-    promoPriceIdr: 2_500_000,
-    promoEndsAt: "2026-12-31",
+    // Free tier: lets a pharma company run a real submission through the full
+    // MLR workflow before committing. The quota limits below are what push an
+    // active team onto Growth.
+    monthlyPriceIdr: 0,
     limits: { users: 15, products: 3, submissionsPerMonth: 25 },
     features: {
       aiClaimsCheck: true,
@@ -49,8 +54,8 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
   growth: {
     id: "growth",
-    monthlyPriceIdr: 9_500_000,
-    promoPriceIdr: 6_500_000,
+    monthlyPriceIdr: 1_000_000,
+    promoPriceIdr: 799_000,
     promoEndsAt: "2026-12-31",
     limits: { users: 50, products: 15, submissionsPerMonth: 150 },
     features: {
@@ -63,7 +68,9 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
   enterprise: {
     id: "enterprise",
-    monthlyPriceIdr: null,
+    monthlyPriceIdr: 3_000_000,
+    promoPriceIdr: 1_500_000,
+    promoEndsAt: "2026-12-31",
     limits: { users: Infinity, products: Infinity, submissionsPerMonth: Infinity },
     features: {
       aiClaimsCheck: true,
@@ -89,6 +96,22 @@ export function planHas(
 ) {
   return planDef(plan).features[feature];
 }
+
+/** Free forever — no invoice is ever raised and the workspace is never locked. */
+export function isFreePlan(def: PlanDef): boolean {
+  return def.monthlyPriceIdr === 0;
+}
+
+/**
+ * Whether the app bills this plan itself through Midtrans. False for the free
+ * tier and for custom-quote plans, which are handled outside the app.
+ */
+export function isBillablePlan(def: PlanDef): boolean {
+  return def.monthlyPriceIdr !== null && def.monthlyPriceIdr > 0;
+}
+
+/** Plans a workspace can move onto by paying an invoice, cheapest first. */
+export const UPGRADABLE_PLANS: PlanId[] = ["growth", "enterprise"];
 
 export function promoActive(def: PlanDef, now = new Date()): boolean {
   return (

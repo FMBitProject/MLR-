@@ -3,7 +3,14 @@ import { redirect } from "next/navigation";
 import { GitBranch, Sparkles, FileSearch, ShieldCheck, ArrowRight } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
-import { PLANS, formatIdr, promoActive, effectivePriceIdr, type PlanId } from "@/lib/plans";
+import {
+  PLANS,
+  formatIdr,
+  promoActive,
+  effectivePriceIdr,
+  isFreePlan,
+  type PlanId,
+} from "@/lib/plans";
 import { BrandLogo } from "@/components/brand-logo";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
@@ -136,7 +143,15 @@ export default async function Home() {
                   {name}
                 </p>
                 <p className="mt-2">
-                  {price !== null ? (
+                  {price === null ? (
+                    <span className="text-[22px] font-semibold tracking-tight text-slate-900">
+                      {p.customPrice}
+                    </span>
+                  ) : isFreePlan(plan) ? (
+                    <span className="text-[22px] font-semibold tracking-tight text-slate-900">
+                      {p.free}
+                    </span>
+                  ) : (
                     <>
                       {promoActive(plan) && plan.monthlyPriceIdr !== null ? (
                         <span className="mr-2 text-[13px] font-medium text-slate-400 line-through">
@@ -148,10 +163,6 @@ export default async function Home() {
                       </span>
                       <span className="text-[12.5px] text-slate-400">{p.perMonth}</span>
                     </>
-                  ) : (
-                    <span className="text-[22px] font-semibold tracking-tight text-slate-900">
-                      {p.customPrice}
-                    </span>
                   )}
                 </p>
                 <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
@@ -175,7 +186,23 @@ export default async function Home() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
           <BrandLogo appName={dict.appName} tagline={dict.tagline} />
-          <p className="text-[12.5px] text-slate-400">{l.footerCompliance}</p>
+          <div className="flex flex-col items-center gap-3 sm:items-end">
+            <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[12.5px]">
+              <Link href="/pricing" className="text-slate-500 hover:text-brand-700">
+                {dict.legal.pricing}
+              </Link>
+              <Link href="/faq" className="text-slate-500 hover:text-brand-700">
+                {dict.legal.faq}
+              </Link>
+              <Link href="/terms" className="text-slate-500 hover:text-brand-700">
+                {dict.legal.terms}
+              </Link>
+              <Link href="/privacy" className="text-slate-500 hover:text-brand-700">
+                {dict.legal.privacy}
+              </Link>
+            </nav>
+            <p className="text-[12.5px] text-slate-400">{l.footerCompliance}</p>
+          </div>
         </div>
       </footer>
     </div>
