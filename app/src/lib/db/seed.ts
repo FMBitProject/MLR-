@@ -3,7 +3,11 @@ import * as t from "./schema";
 import { renderTextPages } from "../svg";
 import { hashPassword } from "../password";
 
-type DB = ReturnType<typeof drizzle<typeof t>>;
+// Only `insert` is needed, which lets callers hand in either the db handle or
+// a transaction — seeding a whole tenant must be all-or-nothing, otherwise a
+// failure halfway leaves a tenant row that later runs mistake for a complete
+// workspace.
+type DB = Pick<ReturnType<typeof drizzle<typeof t>>, "insert">;
 
 const now = Date.now();
 const daysAgo = (n: number) => new Date(now - n * 86_400_000);
@@ -55,6 +59,11 @@ type Ctx = SeedOptions & {
 };
 
 function context(opts: SeedOptions): Ctx {
+  // Every role lookup falls back to users[0], so an empty list would fail
+  // deep inside an insert with an unreadable "cannot read .id of undefined".
+  if (opts.users.length === 0) {
+    throw new Error("seed(): `users` must contain at least one account");
+  }
   return {
     ...opts,
     id: (raw) => `${opts.prefix}${raw}`,

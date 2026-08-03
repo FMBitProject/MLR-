@@ -73,10 +73,19 @@ async function reset(pool: Pool) {
     account_tokens:
       "delete from account_tokens where user_id in (select id from users where tenant_id = $1)",
   };
-  for (const table of TABLES_IN_DELETE_ORDER) {
-    await pool.query(scoped[table] ?? `delete from ${table} where tenant_id = $1`, [TENANT_ID]);
+  // One transaction: a reset that dies halfway would otherwise leave the
+  // workspace stripped of its content but still holding a tenants row.
+  await pool.query("begin");
+  try {
+    for (const table of TABLES_IN_DELETE_ORDER) {
+      await pool.query(scoped[table] ?? `delete from ${table} where tenant_id = $1`, [TENANT_ID]);
+    }
+    await pool.query("delete from tenants where id = $1", [TENANT_ID]);
+    await pool.query("commit");
+  } catch (e) {
+    await pool.query("rollback");
+    throw e;
   }
-  await pool.query("delete from tenants where id = $1", [TENANT_ID]);
 }
 
 async function main() {
@@ -98,29 +107,50 @@ async function main() {
     await pool.end();
     return;
   }
+  // users.email is UNIQUE across every tenant, so a DEMO_EMAIL that belongs
+  // to a real account would otherwise fail deep in the seed with a raw
+  // "duplicate key value violates unique constraint" and no explanation.
+  // Checked before the reset below — bailing out afterwards would destroy the
+  // existing demo workspace on the way to reporting the clash. The demo
+  // tenant's own account doesn't count: the reset is about to remove it.
+  const clash = (
+    await db.select().from(schema.users).where(eq(schema.users.email, DEMO_ACCOUNT.email))
+  )[0];
+  if (clash && clash.tenantId !== TENANT_ID) {
+    await pool.end();
+    throw new Error(
+      `${DEMO_ACCOUNT.email} already belongs to workspace ${clash.tenantId}. ` +
+        `Set DEMO_EMAIL to a different address, or remove that account first.`,
+    );
+  }
+
   if (existing) {
     console.log("Resetting the existing demo workspace…");
     await reset(pool);
   }
 
-  await seed(db, {
-    tenantId: TENANT_ID,
-    tenantName: "PT Demo Pharma Indonesia",
-    slug: "demo",
-    plan: "enterprise",
-    planActiveUntil: PLAN_ACTIVE_UNTIL,
-    prefix: PREFIX,
-    password: DEMO_ACCOUNT.password,
-    // One account, wearing every hat: it authors the submissions and signs
-    // each review stage, so the whole workflow is demoable from one login.
-    users: [
-      {
-        id: USER_ID,
-        email: DEMO_ACCOUNT.email,
-        name: DEMO_ACCOUNT.name,
-        role: "super_admin",
-      },
-    ],
+  // All-or-nothing: without this, a failure partway through leaves a tenants
+  // row behind and the next run reports the broken workspace as complete.
+  await db.transaction(async (tx) => {
+    await seed(tx, {
+      tenantId: TENANT_ID,
+      tenantName: "PT Demo Pharma Indonesia",
+      slug: "demo",
+      plan: "enterprise",
+      planActiveUntil: PLAN_ACTIVE_UNTIL,
+      prefix: PREFIX,
+      password: DEMO_ACCOUNT.password,
+      // One account, wearing every hat: it authors the submissions and signs
+      // each review stage, so the whole workflow is demoable from one login.
+      users: [
+        {
+          id: USER_ID,
+          email: DEMO_ACCOUNT.email,
+          name: DEMO_ACCOUNT.name,
+          role: "super_admin",
+        },
+      ],
+    });
   });
 
   await pool.end();
