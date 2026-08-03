@@ -61,6 +61,45 @@ body {
   animation: fade-up 0.35s ease-out;
 }
 
+/* Decorative backdrop for the auth brand panel: a fine clinical grid faded
+   out toward the edges, with two soft brand-teal glows layered over it.
+   Apply it to a dedicated absolutely-positioned child, never to an element
+   that carries content or a Tailwind background utility: this rule is
+   unlayered, so it outranks Tailwind's layered utilities and its
+   background-image would silently replace theirs — and mask-image applies
+   to the element's children too, fading the content along with the grid. */
+.auth-mesh {
+  background-image:
+    radial-gradient(circle at 22% 18%, rgb(45 212 191 / 0.14), transparent 45%),
+    radial-gradient(circle at 82% 72%, rgb(20 184 166 / 0.12), transparent 48%),
+    linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 34px 34px, 34px 34px;
+  -webkit-mask-image: radial-gradient(ellipse 120% 90% at 50% 35%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 120% 90% at 50% 35%, #000 55%, transparent 100%);
+}
+
+/* Invalid credentials: a short nudge on the form, paired with the rose
+   error styling. Suppressed for users who ask for reduced motion. */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake,
+  .animate-fade-up {
+    animation: none;
+  }
+}
+
 @keyframes pulse-ring {
   0% {
     box-shadow: 0 0 0 0 rgb(245 158 11 / 0.45);

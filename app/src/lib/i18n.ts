@@ -30,6 +30,31 @@ const dictionaries = {
       noAccount: "Perusahaan Anda belum punya workspace?",
       registerLink: "Daftar di sini",
       forgot: "Lupa kata sandi?",
+      signingIn: "Memproses…",
+      showPassword: "Tampilkan kata sandi",
+      hidePassword: "Sembunyikan kata sandi",
+    },
+    // Left-hand brand panel shared by /login and /register. The badges state
+    // only what the product actually does — MLR Flow is deliberately NOT
+    // claimed as a CSV-validated GxP/21 CFR Part 11 system (see lib/legal.ts),
+    // so no certification badge belongs here.
+    authPanel: {
+      eyebrow: "Platform Review MLR",
+      loginHeadline: "Satu sumber kebenaran untuk persetujuan konten promosi farmasi.",
+      registerHeadline:
+        "Workspace terpisah untuk setiap perusahaan — data Anda tidak pernah tercampur dengan tenant lain.",
+      badgesLabel: "Yang Anda dapatkan",
+      badges: {
+        workflow: { title: "Review Bertahap", body: "Medical → Legal → Regulatory dalam satu alur" },
+        claims: { title: "AI Claims Check", body: "Menandai teks di luar Claims Library" },
+        signature: { title: "E-Signature", body: "Setiap keputusan review ditandatangani" },
+        audit: { title: "Audit Trail", body: "Jejak lengkap, siap inspeksi BPOM" },
+      },
+      pipelineLabel: "Alur persetujuan",
+      pipeline: { medical: "Medical", legal: "Legal", regulatory: "Regulatory", approved: "Disetujui" },
+      restrictedTitle: "Akses terbatas.",
+      restrictedBody:
+        "Hanya untuk pengguna terdaftar. Setiap akses dicatat dalam audit trail workspace Anda.",
     },
     register: {
       title: "Daftarkan perusahaan Anda",
@@ -39,6 +64,7 @@ const dictionaries = {
       yourName: "Nama Anda",
       passwordHint: "Minimal 8 karakter. Anda akan menjadi Admin Perusahaan dan dapat menambah pengguna lain di Pengaturan.",
       submit: "Buat Workspace",
+      creating: "Membuat workspace…",
       invalid: "Data tidak lengkap atau kata sandi terlalu pendek (min. 8 karakter).",
       emailTaken: "Email ini sudah terdaftar. Silakan masuk atau gunakan email lain.",
       throttled: "Terlalu banyak pendaftaran dari jaringan ini. Coba lagi sekitar satu jam lagi.",
@@ -591,6 +617,27 @@ const dictionaries = {
       noAccount: "Your company doesn't have a workspace yet?",
       registerLink: "Register here",
       forgot: "Forgot your password?",
+      signingIn: "Signing in…",
+      showPassword: "Show password",
+      hidePassword: "Hide password",
+    },
+    authPanel: {
+      eyebrow: "MLR Review Platform",
+      loginHeadline: "One source of truth for pharma promotional content approval.",
+      registerHeadline:
+        "A separate workspace per company — your data never mixes with another tenant.",
+      badgesLabel: "What you get",
+      badges: {
+        workflow: { title: "Staged Review", body: "Medical → Legal → Regulatory in one flow" },
+        claims: { title: "AI Claims Check", body: "Flags copy outside the Claims Library" },
+        signature: { title: "E-Signature", body: "Every review decision is signed" },
+        audit: { title: "Audit Trail", body: "Complete history, ready for BPOM inspection" },
+      },
+      pipelineLabel: "Approval flow",
+      pipeline: { medical: "Medical", legal: "Legal", regulatory: "Regulatory", approved: "Approved" },
+      restrictedTitle: "Restricted access.",
+      restrictedBody:
+        "Registered users only. Every sign-in is recorded in your workspace audit trail.",
     },
     register: {
       title: "Register your company",
@@ -600,6 +647,7 @@ const dictionaries = {
       yourName: "Your name",
       passwordHint: "Minimum 8 characters. You'll become the Company Admin and can add other users in Settings.",
       submit: "Create Workspace",
+      creating: "Creating workspace…",
       invalid: "Missing fields or password too short (min. 8 characters).",
       emailTaken: "This email is already registered. Please sign in or use a different email.",
       throttled: "Too many registrations from this network. Try again in about an hour.",

@@ -102,8 +102,16 @@ function slugify(name: string): string {
   );
 }
 
+/** Field the failure belongs to, so the form can mark the right input.
+ *  `required` in the browser doesn't catch whitespace-only values — those
+ *  only fail here, after trim(), which is why the field has to travel back. */
+export type RegisterField = "companyName" | "name" | "email" | "password";
+
 export async function register(
-  _prev: { error: string; sent?: undefined } | { sent: boolean; error?: undefined } | null,
+  _prev:
+    | { error: string; field?: RegisterField; sent?: undefined }
+    | { sent: boolean; error?: undefined; field?: undefined }
+    | null,
   formData: FormData,
 ) {
   const companyName = String(formData.get("companyName") ?? "").trim();
@@ -111,15 +119,24 @@ export async function register(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!companyName || !name || !email || password.length < 8) {
-    return { error: "validation" };
+  const missing: RegisterField | null = !companyName
+    ? "companyName"
+    : !name
+      ? "name"
+      : !email
+        ? "email"
+        : password.length < 8
+          ? "password"
+          : null;
+  if (missing) {
+    return { error: "validation", field: missing };
   }
   // Throttle workspace creation per source IP: 5 per hour.
   if (!(await consumeAttempt(`register:${await clientIp()}`, 5, 60 * 60_000))) {
     return { error: "throttled" };
   }
   if ((await db.select().from(t.users).where(eq(t.users.email, email)))[0]) {
-    return { error: "email_taken" };
+    return { error: "email_taken", field: "email" as const };
   }
 
   const base = slugify(companyName);
