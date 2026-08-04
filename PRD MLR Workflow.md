@@ -324,11 +324,15 @@ Implemented in `src/lib/plans.ts` (the single source of truth the app enforces) 
 
 | Plan | List price | Launch promo (through Dec 31, 2026) | Limits | Feature access |
 |---|---|---|---|---|
-| Starter | Rp 3,500,000/month | Rp 2,500,000/month | 3 products, 15 users, 25 submissions/month | Standard 3-stage workflow, AI claims check, Approved Content Library, audit trail, bilingual UI, email support |
-| Growth | Rp 9,500,000/month | Rp 6,500,000/month | 15 products, 50 users, 150 submissions/month | Everything in Starter + AI journal substantiation (PubMed/full-text), per-channel workflow customization, priority support |
-| Enterprise | Custom | — | unlimited products/users/submissions | Everything in Growth + dedicated onboarding, custom SLA |
+| Starter | Free forever | — | 3 products, 15 users, 25 submissions/month | Standard 3-stage workflow, AI claims check, Approved Content Library, audit trail, bilingual UI, email support |
+| Growth | Rp 1,000,000/month | Rp 799,000/month | 15 products, 50 users, 150 submissions/month | Everything in Starter + AI journal substantiation (PubMed/full-text), per-channel workflow customization, priority support |
+| Enterprise | Rp 3,000,000/month | Rp 1,500,000/month | unlimited products/users/submissions | Everything in Growth + dedicated onboarding, custom SLA |
+
+Starter is free rather than a trial: a pharma company can run a real submission through the full MLR workflow before committing, and it is the quota limits — not an expiry date — that push an active team onto Growth. A free tenant is never invoiced and never locked.
 
 The promo price is what new and existing tenants pay while the promo runs; after it ends, pricing reverts to list automatically (`promoEndsAt` in `plans.ts`). The `/pricing` page shows the list price struck through next to the promo price with an explicit end date.
+
+Paid plans are self-serve: the workspace admin pays a monthly invoice through Midtrans (bank transfer/VA, QRIS, e-wallet, card) from Settings. Once the paid-through date passes, the workspace keeps full access for a 7-day grace period, then drops to read-only — data and in-flight reviews stay intact, only new writes stop. The plan and its paid-through date are shown in the sidebar to every member, not just admins.
 
 Enforcement points: user/product creation, monthly submission count, journal substantiation action, and workflow customization are all gated server-side by plan; the UI hides or locks gated features with an upgrade hint. Prices exclude VAT.
 
@@ -362,7 +366,7 @@ Pricing is set deliberately low relative to the estimated $50–200/user/month r
 | Dimension | Veeva Vault PromoMats | This Product (MVP) |
 |---|---|---|
 | Target segment | Large multinational pharma | Mid-size local/regional pharma |
-| Pricing | Enterprise, quote-based, reportedly ~$50–200/user/month | Transparent tiered pricing, positioned well below enterprise range |
+| Pricing | Enterprise, quote-based, reportedly ~$50–200/user/month | Transparent tiered pricing with a free Starter tier, positioned well below enterprise range |
 | Implementation | Complex, often requires dedicated system owners and training | Lightweight, self-serve onboarding |
 | Regulatory scope | Global (FDA/EMA-oriented), broad Vault ecosystem | Focused on core MLR workflow + Indonesia-specific promotional guideline alignment |
 | AI claims checking | Full AI Agents suite (broader scope) | Simple, transparent flagging assistant — no black-box claim generation |
