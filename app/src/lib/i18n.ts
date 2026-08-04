@@ -458,6 +458,20 @@ const dictionaries = {
         canceled: "Dibatalkan",
       },
     },
+    planCard: {
+      statusActive: "Aktif",
+      statusGrace: "Tenggang",
+      statusLocked: "Baca-saja",
+      free: "Gratis",
+      manual: "Manual",
+      freeNote: "Gratis selamanya",
+      manualNote: "Perpanjangan diatur manual",
+      activeUntil: "Aktif s.d.",
+      endedOn: "Berakhir",
+      readOnlyFrom: "Baca-saja mulai",
+      manage: "Kelola paket",
+      upgrade: "Lihat paket",
+    },
     billingBanner: {
       grace:
         "Langganan workspace ini telah berakhir. Selesaikan pembayaran sebelum masa tenggang habis agar workspace tidak beralih ke mode baca-saja.",
@@ -1041,6 +1055,20 @@ const dictionaries = {
         canceled: "Canceled",
       },
     },
+    planCard: {
+      statusActive: "Active",
+      statusGrace: "Grace",
+      statusLocked: "Read-only",
+      free: "Free",
+      manual: "Manual",
+      freeNote: "Free forever",
+      manualNote: "Renewed manually",
+      activeUntil: "Active until",
+      endedOn: "Ended",
+      readOnlyFrom: "Read-only from",
+      manage: "Manage plan",
+      upgrade: "See plans",
+    },
     billingBanner: {
       grace:
         "This workspace's subscription has lapsed. Complete the payment before the grace period ends to avoid read-only mode.",
@@ -1184,6 +1212,15 @@ export function formatDate(d: Date | number | null | undefined, locale: Locale):
     month: "short",
     year: "numeric",
   }).format(typeof d === "number" ? new Date(d) : d);
+}
+
+/** "39 hari lagi" / "39 days left" — days remaining until d. */
+export function daysUntil(d: Date | number, locale: Locale): string {
+  const ms = (typeof d === "number" ? d : d.getTime()) - Date.now();
+  const days = Math.ceil(ms / 86_400_000);
+  if (days <= 0) return locale === "id" ? "hari terakhir" : "last day";
+  if (days === 1) return locale === "id" ? "1 hari lagi" : "1 day left";
+  return locale === "id" ? `${days} hari lagi` : `${days} days left`;
 }
 
 export function relativeDays(d: Date | number, locale: Locale): string {

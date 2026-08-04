@@ -5,9 +5,12 @@ import { LogOut, ShieldCheck, TriangleAlert } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { billingState } from "@/lib/billing";
+import { isFreePlan, planDef } from "@/lib/plans";
+import { formatDate } from "@/lib/i18n";
 import { getDict } from "@/lib/i18n-server";
 import { logout } from "@/lib/actions";
 import { SidebarNav, type NavItem } from "@/components/sidebar-nav";
+import { PlanBadge } from "@/components/plan-badge";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Avatar } from "@/components/ui";
 
@@ -46,10 +49,14 @@ export default async function AppLayout({
     { key: "library", href: "/library", label: dict.nav.library },
     { key: "claims", href: "/claims", label: dict.nav.claims },
   ];
-  if (["compliance_admin", "super_admin"].includes(user.role)) {
+  const isAdmin = ["compliance_admin", "super_admin"].includes(user.role);
+  if (isAdmin) {
     items.push({ key: "audit", href: "/audit", label: dict.nav.audit });
     items.push({ key: "settings", href: "/settings", label: dict.nav.settings });
   }
+
+  const plan = planDef(tenant?.plan);
+  const billing = billingState(tenant);
 
   return (
     <div className="flex min-h-screen">
@@ -71,6 +78,14 @@ export default async function AppLayout({
         <SidebarNav items={items} />
 
         <div className="mt-auto">
+          <PlanBadge
+            plan={plan.id}
+            billing={billing}
+            free={isFreePlan(plan)}
+            isAdmin={isAdmin}
+            dict={dict}
+            locale={locale}
+          />
           <div className="rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
             <div className="flex items-center gap-2.5">
               <Avatar name={user.name} size={34} />
@@ -99,9 +114,7 @@ export default async function AppLayout({
           <LocaleSwitcher locale={locale} />
         </header>
         {(() => {
-          const billing = billingState(tenant);
           if (billing.status === "active") return null;
-          const isAdmin = ["compliance_admin", "super_admin"].includes(user.role);
           const grace = billing.status === "grace";
           return (
             <div
@@ -115,6 +128,11 @@ export default async function AppLayout({
               <TriangleAlert className="mt-0.5 size-4 shrink-0" />
               <p>
                 {grace ? dict.billingBanner.grace : dict.billingBanner.delinquent}{" "}
+                {grace && billing.graceUntil ? (
+                  <span className="font-semibold">
+                    {dict.planCard.readOnlyFrom} {formatDate(billing.graceUntil, locale)}.{" "}
+                  </span>
+                ) : null}
                 {isAdmin ? (
                   <Link href="/settings" className="font-semibold underline underline-offset-2">
                     {grace ? dict.billingBanner.graceAdmin : dict.billingBanner.delinquentAdmin}
