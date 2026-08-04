@@ -10,7 +10,7 @@
 const TODO = (what: string) => `[BELUM DIISI: ${what}]`;
 
 export const COMPANY = {
-  /** Registered legal entity, e.g. "PT Contoh Sejahtera". */
+  /** Registered legal entity, or full name if operating as a sole proprietor. */
   legalName: process.env.COMPANY_LEGAL_NAME || TODO("nama badan hukum"),
   /** Product/trading name — this one is known. */
   productName: "MLR Flow",
@@ -24,10 +24,8 @@ export const COMPANY = {
     process.env.COMPANY_EMAIL ||
     TODO("email urusan data pribadi"),
   phone: process.env.COMPANY_PHONE || TODO("nomor telepon"),
-  /** City whose courts govern disputes, e.g. "Jakarta Selatan". */
-  jurisdiction: process.env.COMPANY_JURISDICTION || TODO("kota yurisdiksi"),
   /** Last substantive revision of the legal documents (YYYY-MM-DD). */
-  legalUpdatedAt: process.env.LEGAL_UPDATED_AT || "2026-07-21",
+  legalUpdatedAt: process.env.LEGAL_UPDATED_AT || "2026-08-04",
 } as const;
 
 /** True when any legal detail is still an unfilled placeholder. */

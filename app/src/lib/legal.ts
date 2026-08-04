@@ -133,7 +133,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
       {
         heading: "13. Hukum yang berlaku",
         body: [
-          `Ketentuan ini tunduk pada hukum Republik Indonesia. Sengketa yang tidak dapat diselesaikan secara musyawarah akan diselesaikan melalui pengadilan di ${COMPANY.jurisdiction}.`,
+          "Ketentuan ini tunduk pada hukum Republik Indonesia. Sengketa yang tidak dapat diselesaikan secara musyawarah akan diselesaikan melalui pengadilan yang berwenang di wilayah Republik Indonesia.",
         ],
       },
       {
@@ -248,7 +248,7 @@ export const TERMS: Record<Locale, LegalDoc> = {
       {
         heading: "13. Governing law",
         body: [
-          `These terms are governed by the laws of the Republic of Indonesia. Disputes that cannot be settled amicably will be resolved by the courts of ${COMPANY.jurisdiction}.`,
+          "These terms are governed by the laws of the Republic of Indonesia. Disputes that cannot be settled amicably will be resolved by the competent courts of the Republic of Indonesia.",
         ],
       },
       {
