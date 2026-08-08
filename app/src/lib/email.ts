@@ -59,13 +59,18 @@ const button = (href: string, label: string) => `
   ${label}
 </a>`;
 
+// User-provided strings (names, company names) go into HTML bodies — escape
+// them. Declared before first use since verification/invite emails need it too.
+const esc = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
 export async function sendVerificationEmail(to: string, name: string, token: string) {
   const link = `${appUrl()}/verify-email?token=${token}`;
   await sendEmail(
     to,
     "Verifikasi email Anda — MLR Flow",
     shell(
-      `Halo ${name}, konfirmasi email Anda`,
+      `Halo ${esc(name)}, konfirmasi email Anda`,
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">
         Klik tombol di bawah untuk mengaktifkan akun MLR Flow Anda. Tautan berlaku 24 jam.
       </p>
@@ -114,10 +119,6 @@ export async function sendPasswordResetEmail(
     ),
   );
 }
-
-// User-provided strings (titles, notes, names) go into HTML bodies — escape them.
-const esc = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const noReplyFooter: Record<Locale, string> = {
   id: "Anda menerima email ini karena terdaftar di workspace MLR Flow perusahaan Anda.",
@@ -488,9 +489,9 @@ export async function sendInviteEmail(to: string, name: string, tenantName: stri
     to,
     `Anda diundang ke workspace ${tenantName} — MLR Flow`,
     shell(
-      `Halo ${name}, atur akun Anda`,
+      `Halo ${esc(name)}, atur akun Anda`,
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">
-        Anda ditambahkan ke workspace <strong>${tenantName}</strong> di MLR Flow. Klik tombol di bawah
+        Anda ditambahkan ke workspace <strong>${esc(tenantName)}</strong> di MLR Flow. Klik tombol di bawah
         untuk membuat kata sandi dan mengaktifkan akun. Tautan berlaku 24 jam.
       </p>
       ${button(link, "Atur Akun Saya")}

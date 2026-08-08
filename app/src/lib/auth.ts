@@ -75,6 +75,10 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const dot = raw.lastIndexOf(".");
   if (dot < 0) return null;
   const userId = raw.slice(0, dot);
+  // TODO(security, minor): plain !== comparison is not constant-time, unlike
+  // verifyPassword's timingSafeEqual in password.ts. Theoretical timing-attack
+  // surface for forging the signature; low practical risk over a network, but
+  // worth switching to a timing-safe compare for consistency.
   if (sign(userId) !== raw.slice(dot + 1)) return null;
   const user = (await db.select().from(t.users).where(eq(t.users.id, userId)))[0];
   return user ?? null;

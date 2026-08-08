@@ -10,12 +10,15 @@ export async function GET(
   if (!user) return new Response("Unauthorized", { status: 401 });
 
   const { id } = await ctx.params;
-  const page = (await db
-    .select()
+  const row = (await db
+    .select({ page: t.contentVersionPages, tenantId: t.contentSubmissions.tenantId })
     .from(t.contentVersionPages)
+    .innerJoin(t.contentVersions, eq(t.contentVersionPages.versionId, t.contentVersions.id))
+    .innerJoin(t.contentSubmissions, eq(t.contentVersions.submissionId, t.contentSubmissions.id))
     .where(eq(t.contentVersionPages.id, id))
     )[0];
-  if (!page) return new Response("Not found", { status: 404 });
+  if (!row || row.tenantId !== user.tenantId) return new Response("Not found", { status: 404 });
+  const page = row.page;
 
   return new Response(page.renderedSvg, {
     headers: {
