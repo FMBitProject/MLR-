@@ -63,6 +63,10 @@ export const users = pgTable("users", {
   // super_admin | marketing | medical_reviewer | legal_reviewer | regulatory_reviewer | compliance_admin
   role: text("role").notNull(),
   locale: text("locale").notNull().default("id"),
+  // Restricts reviewer/marketing visibility & stage-assignment eligibility to
+  // these product ids. Null/empty = unrestricted (all products) — the
+  // default for every existing account, so this is additive-only.
+  productScope: jsonb("product_scope").$type<string[] | null>(),
   passwordHash: text("password_hash").notNull(),
   // Null until the owner proves they control the address (register/invite
   // link). Login is blocked while null — see requireVerifiedUser in auth.ts.
@@ -240,6 +244,12 @@ export const claimFlags = pgTable("claim_flags", {
   flagType: text("flag_type").notNull().default("no_match"),
   reviewerDecision: text("reviewer_decision"), // accepted | dismissed | escalated
   decidedBy: text("decided_by").references(() => users.id),
+  // Snapshot of the specific approvedClaims.references[] entry the reviewer
+  // pointed to as substantiation when accepting this flag — captured at
+  // decision time so the citation survives even if the claim's reference
+  // list is edited later. Null when the flag has no matched claim, the claim
+  // carries no references, or the decision wasn't "accepted".
+  citedReference: jsonb("cited_reference").$type<ClaimReference | null>(),
   // On-demand AI substantiation vs the cited journal's PubMed abstract:
   // supported | not_supported | unclear | abstract_only (no API key)
   journalVerdict: text("journal_verdict"),
