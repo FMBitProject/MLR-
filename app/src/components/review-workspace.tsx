@@ -21,6 +21,7 @@ import {
   FileDown,
   Download,
   BookOpenCheck,
+  ChevronDown,
 } from "lucide-react";
 import {
   addComment,
@@ -137,6 +138,53 @@ export type WorkspaceData = {
   libraryHasJournals: boolean;
   journalCheckAllowed: boolean;
 };
+
+// A right-rail card that opens/closes, so a role that has nothing to act on
+// in a given section (e.g. an observer skimming AI flags) can collapse it
+// instead of scrolling past it. `defaultOpen` should reflect whether the
+// section needs this viewer's attention right now, not just its content type.
+function Section({
+  icon,
+  title,
+  badge,
+  defaultOpen,
+  children,
+  className,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  badge?: React.ReactNode;
+  defaultOpen: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  // `defaultOpen` seeds the initial state only (useState's initializer runs
+  // once) — once mounted, the section owns its own open/closed state via
+  // onToggle, so a re-render triggered by an unrelated action (deciding a
+  // flag, adding a comment) never snaps a manually-toggled section back.
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card className={className}>
+      <details
+        open={open}
+        onToggle={(e) => setOpen(e.currentTarget.open)}
+        className="group"
+      >
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 marker:content-none [&::-webkit-details-marker]:hidden">
+          {icon}
+          <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">
+            {title}
+          </h3>
+          <span className="ml-auto flex items-center gap-2">
+            {badge}
+            <ChevronDown className="size-4 shrink-0 text-slate-400 transition-transform duration-200 group-open:rotate-180" />
+          </span>
+        </summary>
+        <div className="px-5 pb-4">{children}</div>
+      </details>
+    </Card>
+  );
+}
 
 export function ReviewWorkspace({
   data,
@@ -876,45 +924,47 @@ export function ReviewWorkspace({
           ) : null}
 
           {/* AI flags */}
-          <Card>
-            <div className="px-5 py-4">
-              <div className="mb-1 flex items-center gap-2">
-                <Sparkles className="size-4 text-amber-500" />
-                <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">
-                  {dict.detail.aiFlags}
-                </h3>
-                <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-                  {visibleFlags.length}
-                  {scopeFlagsToPage && !selectedElement
-                    ? ` / ${data.flags.length}`
-                    : ""}
-                </span>
-                {data.canReview && !currentVersion.isLocked ? (
-                  <form action={(fd) => startTransition(() => rerunClaimsCheck(fd))}>
-                    <input type="hidden" name="submissionId" value={sub.id} />
-                    <button
-                      disabled={pending || processing}
-                      title={dict.detail.rerunCheckHint}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60"
-                    >
-                      <RefreshCw
-                        className={clsx("size-3", (pending || processing) && "animate-spin")}
-                      />
-                      {dict.detail.rerunCheck}
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-              <p className="mb-4 text-[12px] leading-relaxed text-slate-400">
+          <Section
+            icon={<Sparkles className="size-4 text-amber-500" />}
+            title={dict.detail.aiFlags}
+            defaultOpen={data.canReview || data.flags.some((f) => !f.reviewerDecision)}
+            badge={
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                {visibleFlags.length}
+                {scopeFlagsToPage && !selectedElement ? ` / ${data.flags.length}` : ""}
+              </span>
+            }
+          >
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-[12px] leading-relaxed text-slate-400">
                 {dict.detail.aiFlagsDesc}
               </p>
-              {processing ? (
-                <p className="mb-4 flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-[12px] text-sky-800 ring-1 ring-inset ring-sky-200">
-                  <span className="size-2 animate-pulse rounded-full bg-sky-500" />
-                  {dict.detail.checkRunning}
-                </p>
+              {data.canReview && !currentVersion.isLocked ? (
+                <form
+                  action={(fd) => startTransition(() => rerunClaimsCheck(fd))}
+                  className="shrink-0"
+                >
+                  <input type="hidden" name="submissionId" value={sub.id} />
+                  <button
+                    disabled={pending || processing}
+                    title={dict.detail.rerunCheckHint}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60"
+                  >
+                    <RefreshCw
+                      className={clsx("size-3", (pending || processing) && "animate-spin")}
+                    />
+                    {dict.detail.rerunCheck}
+                  </button>
+                </form>
               ) : null}
-              <div className="space-y-3">
+            </div>
+            {processing ? (
+              <p className="mb-4 flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-[12px] text-sky-800 ring-1 ring-inset ring-sky-200">
+                <span className="size-2 animate-pulse rounded-full bg-sky-500" />
+                {dict.detail.checkRunning}
+              </p>
+            ) : null}
+            <div className="space-y-3">
                 {visibleFlags.map((f) => (
                   <div
                     key={f.id}
@@ -1157,21 +1207,19 @@ export function ReviewWorkspace({
                   </div>
                 </div>
               ) : null}
-            </div>
-          </Card>
+          </Section>
 
           {/* comments */}
-          <Card>
-            <div className="px-5 py-4">
-              <div className="mb-3 flex items-center gap-2">
-                <MessageSquare className="size-4 text-sky-500" />
-                <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">
-                  {dict.detail.comments}
-                </h3>
-                <span className="ml-auto rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-800">
-                  {visibleComments.length}
-                </span>
-              </div>
+          <Section
+            icon={<MessageSquare className="size-4 text-sky-500" />}
+            title={dict.detail.comments}
+            defaultOpen={data.comments.length > 0 || data.canReview}
+            badge={
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+                {visibleComments.length}
+              </span>
+            }
+          >
               <div className="space-y-3">
                 {visibleComments.map((c) => (
                   <div
@@ -1254,18 +1302,20 @@ export function ReviewWorkspace({
                   </button>
                 </div>
               </form>
-            </div>
-          </Card>
+          </Section>
 
-          {/* mini audit trail */}
-          <Card>
-            <div className="px-5 py-4">
-              <div className="mb-3 flex items-center gap-2">
-                <History className="size-4 text-slate-400" />
-                <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">
-                  {dict.detail.auditTrailFor}
-                </h3>
-              </div>
+          {/* mini audit trail — collapsed by default, it's a record to check
+              rather than something any role needs to act on */}
+          <Section
+            icon={<History className="size-4 text-slate-400" />}
+            title={dict.detail.auditTrailFor}
+            defaultOpen={false}
+            badge={
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                {data.audit.length}
+              </span>
+            }
+          >
               <ul className="space-y-2.5">
                 {data.audit.map((a) => (
                   <li key={a.id} className="flex items-baseline gap-2 text-[12.5px]">
@@ -1282,8 +1332,7 @@ export function ReviewWorkspace({
                   </li>
                 ))}
               </ul>
-            </div>
-          </Card>
+          </Section>
         </div>
       </div>
     </div>
