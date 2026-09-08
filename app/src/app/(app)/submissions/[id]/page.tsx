@@ -31,7 +31,19 @@ export default async function SubmissionDetailPage(
     db.select().from(t.products).where(eq(t.products.id, sub.productId)).then((r) => r[0]),
     db.select().from(t.users).where(eq(t.users.tenantId, user.tenantId)),
     db
-      .select()
+      // Everything but fileData — the bytes are served by /api/files/[id],
+      // never by this page. textContent is needed for the version diff.
+      .select({
+        id: t.contentVersions.id,
+        submissionId: t.contentVersions.submissionId,
+        versionNumber: t.contentVersions.versionNumber,
+        fileName: t.contentVersions.fileName,
+        textContent: t.contentVersions.textContent,
+        changeNote: t.contentVersions.changeNote,
+        isLocked: t.contentVersions.isLocked,
+        processingStatus: t.contentVersions.processingStatus,
+        createdAt: t.contentVersions.createdAt,
+      })
       .from(t.contentVersions)
       .where(eq(t.contentVersions.submissionId, sub.id))
       .orderBy(asc(t.contentVersions.versionNumber)),
@@ -77,7 +89,13 @@ export default async function SubmissionDetailPage(
   const [pages, elements, flags, comments, hasOriginalFile, audit, priorComments] =
     await Promise.all([
       db
-        .select()
+        // Not renderedSvg: the viewer loads each page from /api/pages/[id].
+        .select({
+          id: t.contentVersionPages.id,
+          pageNumber: t.contentVersionPages.pageNumber,
+          width: t.contentVersionPages.width,
+          height: t.contentVersionPages.height,
+        })
         .from(t.contentVersionPages)
         .where(eq(t.contentVersionPages.versionId, version.id))
         .orderBy(asc(t.contentVersionPages.pageNumber)),

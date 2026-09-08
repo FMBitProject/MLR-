@@ -27,7 +27,13 @@ export default async function ApprovalPackagePage(
   if (!sub) notFound();
 
   const versions = await db
-    .select()
+    .select({
+      id: t.contentVersions.id,
+      versionNumber: t.contentVersions.versionNumber,
+      fileName: t.contentVersions.fileName,
+      isLocked: t.contentVersions.isLocked,
+      createdAt: t.contentVersions.createdAt,
+    })
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, sub.id))
     .orderBy(asc(t.contentVersions.versionNumber));
@@ -46,7 +52,11 @@ export default async function ApprovalPackagePage(
     .where(eq(t.reviewStages.submissionId, sub.id))
     .orderBy(asc(t.reviewStages.stageOrder));
   const pages = await db
-    .select()
+    // Not renderedSvg: each page is embedded as /api/pages/[id] below.
+    .select({
+      id: t.contentVersionPages.id,
+      pageNumber: t.contentVersionPages.pageNumber,
+    })
     .from(t.contentVersionPages)
     .where(eq(t.contentVersionPages.versionId, version.id))
     .orderBy(asc(t.contentVersionPages.pageNumber));

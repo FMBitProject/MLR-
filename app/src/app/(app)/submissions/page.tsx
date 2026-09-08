@@ -33,10 +33,14 @@ export default async function SubmissionsPage(props: PageProps<"/submissions">) 
   const subIds = subs.map((s) => s.sub.id);
   const versions = subIds.length
     ? await db
-        .select()
+        // Only the version number is shown; selecting the whole row would
+        // pull every listed submission's uploaded file bytes with it.
+        .select({
+          submissionId: t.contentVersions.submissionId,
+          versionNumber: t.contentVersions.versionNumber,
+        })
         .from(t.contentVersions)
         .where(inArray(t.contentVersions.submissionId, subIds))
-        
     : [];
   const stages = subIds.length
     ? await db

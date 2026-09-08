@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { LogOut, TriangleAlert } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
@@ -25,9 +25,11 @@ export default async function AppLayout({
 
   const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
 
+  // Counted in SQL: this runs on every authenticated page (the sidebar
+  // badge), so it must never pull the matching rows just to size them.
   const queueCount = (
     await db
-      .select()
+      .select({ n: count() })
       .from(t.contentSubmissions)
       .where(
         and(
@@ -36,7 +38,7 @@ export default async function AppLayout({
           eq(t.contentSubmissions.currentStage, user.role),
         ),
       )
-  ).length;
+  )[0].n;
 
   const items: NavItem[] = [
     { key: "dashboard", href: "/dashboard", label: dict.nav.dashboard },

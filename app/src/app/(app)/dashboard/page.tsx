@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray } from "drizzle-orm";
 import { TrendingDown, TimerReset } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -33,14 +33,21 @@ export default async function DashboardPage() {
     : 0;
 
   const subIds = subs.map((s) => s.id);
-  const versions = subIds.length
-    ? await db.select().from(t.contentVersions).where(inArray(t.contentVersions.submissionId, subIds))
-    : [];
-  const versionIds = versions.map((v) => v.id);
-  const flags = versionIds.length
-    ? await db.select().from(t.claimFlags).where(inArray(t.claimFlags.versionId, versionIds))
-    : [];
-  const flagRate = subs.length ? flags.length / subs.length : 0;
+  // Joined and counted entirely in SQL. Reading the tenant's versions just to
+  // collect their ids would both pull the inline file bytes and put every id
+  // into an IN list — two things that stop scaling with the tenant's history.
+  const flagCount = (
+    await db
+      .select({ n: count() })
+      .from(t.claimFlags)
+      .innerJoin(t.contentVersions, eq(t.claimFlags.versionId, t.contentVersions.id))
+      .innerJoin(
+        t.contentSubmissions,
+        eq(t.contentVersions.submissionId, t.contentSubmissions.id),
+      )
+      .where(eq(t.contentSubmissions.tenantId, user.tenantId))
+  )[0].n;
+  const flagRate = subs.length ? flagCount / subs.length : 0;
 
   // Average days spent per stage (decided stages only); longest = bottleneck
   const stages = subIds.length

@@ -647,7 +647,7 @@ export async function resubmitVersion(formData: FormData) {
   if (sub.status === "approved") throw new Error("LOCKED");
 
   const versions = await db
-    .select()
+    .select({ versionNumber: t.contentVersions.versionNumber })
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, submissionId));
   const nextVersion = Math.max(...versions.map((v) => v.versionNumber)) + 1;
@@ -753,7 +753,14 @@ export async function reuseApprovedContent(formData: FormData) {
   if (source.expiresAt && source.expiresAt < new Date()) throw new Error("SOURCE_EXPIRED");
 
   const versions = await db
-    .select()
+    // fileData is fetched through storage.get() below, only for the one
+    // version actually being reused.
+    .select({
+      id: t.contentVersions.id,
+      versionNumber: t.contentVersions.versionNumber,
+      fileName: t.contentVersions.fileName,
+      textContent: t.contentVersions.textContent,
+    })
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, sourceId))
     .orderBy(asc(t.contentVersions.versionNumber));
@@ -904,7 +911,10 @@ export async function decideStage(formData: FormData) {
   if (!canDecide || stage.status === "approved") throw new Error("FORBIDDEN");
 
   const versions = await db
-    .select()
+    .select({
+      id: t.contentVersions.id,
+      versionNumber: t.contentVersions.versionNumber,
+    })
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, sub.id))
     .orderBy(asc(t.contentVersions.versionNumber));
@@ -1166,7 +1176,11 @@ export async function rerunClaimsCheck(formData: FormData) {
   if (!sub) throw new Error("NOT_FOUND");
 
   const versions = await db
-    .select()
+    .select({
+      id: t.contentVersions.id,
+      versionNumber: t.contentVersions.versionNumber,
+      isLocked: t.contentVersions.isLocked,
+    })
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, submissionId));
   const latest = versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
@@ -1208,7 +1222,7 @@ export async function verifyFlagJournal(formData: FormData) {
 
   // Resolve the submission's product so we check against its claims library
   const version = (await db
-    .select()
+    .select({ submissionId: t.contentVersions.submissionId })
     .from(t.contentVersions)
     .where(eq(t.contentVersions.id, flag.versionId))
     )[0];
@@ -1630,7 +1644,10 @@ export async function publishDistribution(formData: FormData) {
   if (!sub) throw new Error("NOT_FOUND");
 
   const version = (await db
-    .select()
+    .select({
+      id: t.contentVersions.id,
+      versionNumber: t.contentVersions.versionNumber,
+    })
     .from(t.contentVersions)
     .where(eq(t.contentVersions.submissionId, submissionId))
     .orderBy(desc(t.contentVersions.versionNumber)))[0];
