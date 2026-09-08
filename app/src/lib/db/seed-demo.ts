@@ -7,13 +7,11 @@ import * as schema from "./schema";
 import { seed } from "./seed";
 
 /**
- * Seeds a self-contained demo workspace: one super_admin account that owns a
- * fully populated tenant (products, claims library, three submissions in
- * different review states, audit trail). Separate from the `tn-nusantara`
- * seed and from any real workspace, so it can be reset freely between demos.
- *
- * A single super_admin can drive the whole demo alone — that role may submit
- * content *and* decide any review stage (see canDecide in lib/actions.ts).
+ * Seeds a self-contained demo workspace: one account per review role,
+ * mirroring the `tn-nusantara` seed's cast, so the full MLR workflow
+ * (submit → medical → legal → regulatory → approved) can be walked through
+ * by logging in as each role in turn. Separate from the `tn-nusantara` seed
+ * and from any real workspace, so it can be reset freely between demos.
  *
  *   npm run db:demo            # create (no-op if it already exists)
  *   npm run db:demo -- --reset # delete and recreate
@@ -21,16 +19,41 @@ import { seed } from "./seed";
 
 const TENANT_ID = "tn-demo";
 const PREFIX = "demo-";
-const USER_ID = "u-demo";
 
 // This file is committed to a public repo, so the default password is only a
 // convenience for a throwaway tenant of fake data. Set DEMO_PASSWORD (and
-// re-run with --reset) to give the demo account a credential that isn't public.
-export const DEMO_ACCOUNT = {
-  email: process.env.DEMO_EMAIL ?? "demo@mlrflow.id",
-  name: "Ferel — Demo",
-  password: process.env.DEMO_PASSWORD ?? "DemoMLR2026!",
-};
+// re-run with --reset) to give every demo account a credential that isn't public.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "DemoMLR2026!";
+const DEMO_DOMAIN = "mlrflow-demo.id";
+
+export const DEMO_USERS = [
+  { id: "u-demo-dewi", email: `dewi@${DEMO_DOMAIN}`, name: "Dewi Lestari", role: "marketing" },
+  {
+    id: "u-demo-budi",
+    email: `budi@${DEMO_DOMAIN}`,
+    name: "dr. Budi Santoso, Sp.JP",
+    role: "medical_reviewer",
+  },
+  {
+    id: "u-demo-ratna",
+    email: `ratna@${DEMO_DOMAIN}`,
+    name: "Ratna Wijaya, S.H.",
+    role: "legal_reviewer",
+  },
+  {
+    id: "u-demo-agus",
+    email: `agus@${DEMO_DOMAIN}`,
+    name: "Agus Prasetyo, Apt.",
+    role: "regulatory_reviewer",
+  },
+  {
+    id: "u-demo-sari",
+    email: `sari@${DEMO_DOMAIN}`,
+    name: "Sari Handayani",
+    role: "compliance_admin",
+  },
+  { id: "u-demo-rudi", email: `rudi@${DEMO_DOMAIN}`, name: "Rudi Hartono", role: "super_admin" },
+] as const;
 
 // Enterprise so no plan limit or feature gate can interrupt a demo, paid
 // through far enough out that billing never shows a grace/locked state.
@@ -38,6 +61,7 @@ const PLAN_ACTIVE_UNTIL = new Date(Date.now() + 5 * 365 * 86_400_000);
 
 // Child rows first — every table below references the ones after it.
 const TABLES_IN_DELETE_ORDER = [
+  "content_distributions",
   "claim_flags",
   "review_comments",
   "review_stages",
@@ -58,6 +82,7 @@ const TABLES_IN_DELETE_ORDER = [
 async function reset(pool: Pool) {
   // Tables without a tenant_id are reached through their parent's tenant.
   const scoped: Record<string, string> = {
+    content_distributions: "delete from content_distributions where tenant_id = $1",
     claim_flags:
       "delete from claim_flags where version_id in (select cv.id from content_versions cv join content_submissions cs on cs.id = cv.submission_id where cs.tenant_id = $1)",
     review_comments:
@@ -107,21 +132,23 @@ async function main() {
     await pool.end();
     return;
   }
-  // users.email is UNIQUE across every tenant, so a DEMO_EMAIL that belongs
+  // users.email is UNIQUE across every tenant, so a demo email that belongs
   // to a real account would otherwise fail deep in the seed with a raw
   // "duplicate key value violates unique constraint" and no explanation.
   // Checked before the reset below — bailing out afterwards would destroy the
   // existing demo workspace on the way to reporting the clash. The demo
-  // tenant's own account doesn't count: the reset is about to remove it.
-  const clash = (
-    await db.select().from(schema.users).where(eq(schema.users.email, DEMO_ACCOUNT.email))
-  )[0];
-  if (clash && clash.tenantId !== TENANT_ID) {
-    await pool.end();
-    throw new Error(
-      `${DEMO_ACCOUNT.email} already belongs to workspace ${clash.tenantId}. ` +
-        `Set DEMO_EMAIL to a different address, or remove that account first.`,
-    );
+  // tenant's own accounts don't count: the reset is about to remove them.
+  for (const u of DEMO_USERS) {
+    const clash = (
+      await db.select().from(schema.users).where(eq(schema.users.email, u.email))
+    )[0];
+    if (clash && clash.tenantId !== TENANT_ID) {
+      await pool.end();
+      throw new Error(
+        `${u.email} already belongs to workspace ${clash.tenantId}. ` +
+          `Remove that account first, or change DEMO_DOMAIN in seed-demo.ts.`,
+      );
+    }
   }
 
   if (existing) {
@@ -139,26 +166,16 @@ async function main() {
       plan: "enterprise",
       planActiveUntil: PLAN_ACTIVE_UNTIL,
       prefix: PREFIX,
-      password: DEMO_ACCOUNT.password,
-      // One account, wearing every hat: it authors the submissions and signs
-      // each review stage, so the whole workflow is demoable from one login.
-      users: [
-        {
-          id: USER_ID,
-          email: DEMO_ACCOUNT.email,
-          name: DEMO_ACCOUNT.name,
-          role: "super_admin",
-        },
-      ],
+      password: DEMO_PASSWORD,
+      users: DEMO_USERS.map((u) => ({ ...u })),
     });
   });
 
   await pool.end();
   console.log(
-    `Demo workspace ready.\n` +
-      `  Email:    ${DEMO_ACCOUNT.email}\n` +
-      `  Password: ${DEMO_ACCOUNT.password}\n` +
-      `  Plan:     enterprise (through ${PLAN_ACTIVE_UNTIL.toISOString().slice(0, 10)})`,
+    `Demo workspace ready. Password for every account: ${DEMO_PASSWORD}\n` +
+      DEMO_USERS.map((u) => `  ${u.role.padEnd(20)} ${u.email}`).join("\n") +
+      `\n  Plan: enterprise (through ${PLAN_ACTIVE_UNTIL.toISOString().slice(0, 10)})`,
   );
 }
 

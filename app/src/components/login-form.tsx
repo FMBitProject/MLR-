@@ -6,10 +6,15 @@ import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { login, resendVerificationEmail } from "@/lib/actions";
 import type { Dict } from "@/lib/i18n";
 
-// The demo workspace (tn-demo) has a single super_admin account that can
-// drive the whole workflow alone — see db/seed-demo.ts.
+// One account per review role in the demo workspace (tn-demo), so the full
+// submit → review → approve flow can be walked through — see db/seed-demo.ts.
 const DEMO_ACCOUNTS: Array<{ email: string; roleKey: keyof Dict["roles"]; name: string }> = [
-  { email: "demo@mlrflow.id", roleKey: "super_admin", name: "Ferel — Demo" },
+  { email: "dewi@mlrflow-demo.id", roleKey: "marketing", name: "Dewi Lestari" },
+  { email: "budi@mlrflow-demo.id", roleKey: "medical_reviewer", name: "dr. Budi Santoso" },
+  { email: "ratna@mlrflow-demo.id", roleKey: "legal_reviewer", name: "Ratna Wijaya" },
+  { email: "agus@mlrflow-demo.id", roleKey: "regulatory_reviewer", name: "Agus Prasetyo" },
+  { email: "sari@mlrflow-demo.id", roleKey: "compliance_admin", name: "Sari Handayani" },
+  { email: "rudi@mlrflow-demo.id", roleKey: "super_admin", name: "Rudi Hartono" },
 ];
 
 const DEMO_PASSWORD = "DemoMLR2026!";
@@ -236,7 +241,7 @@ export function LoginForm({ dict }: { dict: Dict }) {
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           {dict.login.demoHint}
         </p>
-        <div className="mt-3 grid grid-cols-1 gap-2">
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {DEMO_ACCOUNTS.map((a) => (
             <button
               key={a.email}
