@@ -25,125 +25,126 @@ export default async function SubmissionDetailPage(
     )[0];
   if (!sub) notFound();
 
-  const product = (await db.select().from(t.products).where(eq(t.products.id, sub.productId)))[0];
-  const tenantUsers = await db
-    .select()
-    .from(t.users)
-    .where(eq(t.users.tenantId, user.tenantId));
+  // Independent of each other — run together instead of one round-trip at a
+  // time (each pays full network latency to the database separately).
+  const [product, tenantUsers, versions, stages, tenant, productClaims] = await Promise.all([
+    db.select().from(t.products).where(eq(t.products.id, sub.productId)).then((r) => r[0]),
+    db.select().from(t.users).where(eq(t.users.tenantId, user.tenantId)),
+    db
+      .select()
+      .from(t.contentVersions)
+      .where(eq(t.contentVersions.submissionId, sub.id))
+      .orderBy(asc(t.contentVersions.versionNumber)),
+    db
+      .select()
+      .from(t.reviewStages)
+      .where(eq(t.reviewStages.submissionId, sub.id))
+      .orderBy(asc(t.reviewStages.stageOrder)),
+    db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)).then((r) => r[0]),
+    // Does this product's library carry any journal (PMID)? Drives whether
+    // the "check against journal" action is offered on flags.
+    db
+      .select({ references: t.approvedClaims.references })
+      .from(t.approvedClaims)
+      .where(
+        and(
+          eq(t.approvedClaims.tenantId, user.tenantId),
+          eq(t.approvedClaims.productId, sub.productId),
+          eq(t.approvedClaims.status, "active"),
+        ),
+      ),
+  ]);
   const userName = (uid: string | null) =>
     tenantUsers.find((u) => u.id === uid)?.name ?? "—";
+  const libraryHasJournals = productClaims.some((c) =>
+    (c.references ?? []).some((r) => r.pmid || r.docId),
+  );
+  // Journal substantiation is plan-gated (Growth+, PRD §12) — Starter sees an
+  // upgrade hint where the button would be.
+  const journalCheckAllowed = planHas(tenant?.plan, "journalSubstantiation");
 
-  const versions = await db
-    .select()
-    .from(t.contentVersions)
-    .where(eq(t.contentVersions.submissionId, sub.id))
-    .orderBy(asc(t.contentVersions.versionNumber));
   const requestedV = typeof sp.v === "string" ? Number(sp.v) : NaN;
   const version =
     versions.find((v) => v.versionNumber === requestedV) ?? versions[versions.length - 1];
   const isLatest = version.id === versions[versions.length - 1].id;
-
-  const pages = await db
-    .select()
-    .from(t.contentVersionPages)
-    .where(eq(t.contentVersionPages.versionId, version.id))
-    .orderBy(asc(t.contentVersionPages.pageNumber));
-  const elements = await db
-    .select()
-    .from(t.contentElements)
-    .where(eq(t.contentElements.versionId, version.id));
-  const flags = await db
-    .select()
-    .from(t.claimFlags)
-    .where(eq(t.claimFlags.versionId, version.id));
-  const comments = await db
-    .select()
-    .from(t.reviewComments)
-    .where(eq(t.reviewComments.versionId, version.id))
-    .orderBy(asc(t.reviewComments.createdAt));
-  const stages = await db
-    .select()
-    .from(t.reviewStages)
-    .where(eq(t.reviewStages.submissionId, sub.id))
-    .orderBy(asc(t.reviewStages.stageOrder));
-
-  const claimIds = flags.map((f) => f.matchedClaimId).filter((x): x is string => !!x);
-  const claims = claimIds.length
-    ? await db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, claimIds))
-    : [];
-
-  // Does this product's library carry any journal (PMID)? Drives whether the
-  // "check against journal" action is offered on flags — including no-match.
-  const productClaims = await db
-    .select({ references: t.approvedClaims.references })
-    .from(t.approvedClaims)
-    .where(
-      and(
-        eq(t.approvedClaims.tenantId, user.tenantId),
-        eq(t.approvedClaims.productId, sub.productId),
-        eq(t.approvedClaims.status, "active"),
-      ),
-    );
-  const libraryHasJournals = productClaims.some((c) =>
-    (c.references ?? []).some((r) => r.pmid || r.docId),
-  );
-
-  // Journal substantiation is plan-gated (Growth+, PRD §12) — Starter sees an
-  // upgrade hint where the button would be.
-  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
-  const journalCheckAllowed = planHas(tenant?.plan, "journalSubstantiation");
-
   const versionIds = versions.map((v) => v.id);
-  const audit = (
-    await db
-      .select()
-      .from(t.auditLog)
-      .where(eq(t.auditLog.tenantId, user.tenantId))
-      .orderBy(desc(t.auditLog.createdAt))
-  )
-    .filter((a) => a.entityId === sub.id || versionIds.includes(a.entityId))
-    .slice(0, 12);
-
-  // Diff vs the immediately preceding version (text-based versions only)
   const versionIdx = versions.findIndex((v) => v.id === version.id);
   const prevVersion = versionIdx > 0 ? versions[versionIdx - 1] : null;
+  const priorVersionIds = versions.slice(0, versionIdx).map((v) => v.id);
+
+  // All scoped to the resolved version (or, for audit/prior comments, the
+  // submission's version set) — independent of each other, so run together.
+  const [pages, elements, flags, comments, hasOriginalFile, audit, priorComments] =
+    await Promise.all([
+      db
+        .select()
+        .from(t.contentVersionPages)
+        .where(eq(t.contentVersionPages.versionId, version.id))
+        .orderBy(asc(t.contentVersionPages.pageNumber)),
+      db.select().from(t.contentElements).where(eq(t.contentElements.versionId, version.id)),
+      db.select().from(t.claimFlags).where(eq(t.claimFlags.versionId, version.id)),
+      db
+        .select()
+        .from(t.reviewComments)
+        .where(eq(t.reviewComments.versionId, version.id))
+        .orderBy(asc(t.reviewComments.createdAt)),
+      version.fileName ? storage.exists(version.id) : Promise.resolve(false),
+      // Filtered and limited in SQL, not "fetch the tenant's whole audit
+      // history and slice(0, 12) in JS" — that grows slower as the tenant
+      // accumulates history, for no benefit since only 12 rows are shown.
+      db
+        .select()
+        .from(t.auditLog)
+        .where(
+          and(
+            eq(t.auditLog.tenantId, user.tenantId),
+            inArray(t.auditLog.entityId, [sub.id, ...versionIds]),
+          ),
+        )
+        .orderBy(desc(t.auditLog.createdAt))
+        .limit(12),
+      // Open comments from versions before the one being viewed.
+      priorVersionIds.length
+        ? db
+            .select()
+            .from(t.reviewComments)
+            .where(inArray(t.reviewComments.versionId, priorVersionIds))
+            .then((rows) => rows.filter((c) => !c.resolved))
+        : Promise.resolve([]),
+    ]);
+
   const diff =
     prevVersion && prevVersion.textContent && version.textContent
       ? diffParagraphs(prevVersion.textContent, version.textContent)
       : null;
 
-  // Open comments from all versions before the one being viewed, with the
-  // element text they were pinned to (elements belong to their own version).
-  const priorVersionIds = versions.slice(0, versionIdx).map((v) => v.id);
-  const priorComments = priorVersionIds.length
-    ? (
-        await db
-          .select()
-          .from(t.reviewComments)
-          .where(inArray(t.reviewComments.versionId, priorVersionIds))
-      ).filter((c) => !c.resolved)
-    : [];
-  const prevOpenComments = await Promise.all(
-    priorComments.map(async (c) => {
-      const el = c.elementId
-        ? (
-            await db
-              .select()
-              .from(t.contentElements)
-              .where(eq(t.contentElements.id, c.elementId))
-          )[0]
-        : null;
-      const v = versions.find((x) => x.id === c.versionId);
-      return {
-        id: c.id,
-        reviewerName: userName(c.reviewerId),
-        comment: c.comment,
-        createdAt: c.createdAt.getTime(),
-        versionNumber: v?.versionNumber ?? 0,
-        elementText: el?.extractedText ?? null,
-      };
-    }),
-  );
+  const claimIds = flags.map((f) => f.matchedClaimId).filter((x): x is string => !!x);
+  // The elements prior-version comments are pinned to, batched into one
+  // query instead of one round-trip per comment.
+  const priorElementIds = priorComments
+    .map((c) => c.elementId)
+    .filter((x): x is string => !!x);
+  const [claims, priorElements] = await Promise.all([
+    claimIds.length
+      ? db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, claimIds))
+      : Promise.resolve([]),
+    priorElementIds.length
+      ? db.select().from(t.contentElements).where(inArray(t.contentElements.id, priorElementIds))
+      : Promise.resolve([]),
+  ]);
+
+  const prevOpenComments = priorComments.map((c) => {
+    const el = c.elementId ? priorElements.find((e) => e.id === c.elementId) : null;
+    const v = versions.find((x) => x.id === c.versionId);
+    return {
+      id: c.id,
+      reviewerName: userName(c.reviewerId),
+      comment: c.comment,
+      createdAt: c.createdAt.getTime(),
+      versionNumber: v?.versionNumber ?? 0,
+      elementText: el?.extractedText ?? null,
+    };
+  });
 
   const activeStage = stages.find((s) => s.status === "in_progress");
   const canReview =
@@ -184,7 +185,7 @@ export default async function SubmissionDetailPage(
       processingStatus: version.processingStatus,
       changeNote: version.changeNote,
       fileName: version.fileName,
-      hasOriginalFile: !!version.fileName && (await storage.exists(version.id)),
+      hasOriginalFile,
     },
     diff,
     libraryHasJournals,

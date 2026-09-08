@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db, t } from "./db";
 
 // Storage for uploaded content files, behind a driver interface so the app
@@ -67,13 +67,16 @@ const dbStorage: Storage = {
     return row?.fileData ?? null;
   },
   async exists(key) {
+    // Existence-only check — select a cheap column, not fileData itself
+    // (up to 4MB), which get() and put() already handle when the bytes are
+    // actually needed.
     const row = (
       await db
-        .select({ fileData: t.contentVersions.fileData })
+        .select({ id: t.contentVersions.id })
         .from(t.contentVersions)
-        .where(eq(t.contentVersions.id, key))
+        .where(and(eq(t.contentVersions.id, key), isNotNull(t.contentVersions.fileData)))
     )[0];
-    return !!row?.fileData;
+    return !!row;
   },
 };
 
