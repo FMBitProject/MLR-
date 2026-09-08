@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -289,6 +289,23 @@ export function ReviewWorkspace({
     setSelectedElementId((cur) => (cur === id ? null : id));
   };
 
+  // Pins on the canvas keep toggle behavior (click again to deselect). A
+  // comment/flag in the right rail is a "go to that part" action instead —
+  // always selects (never toggles off) so re-clicking the same comment still
+  // re-scrolls to it, and the target is scrolled into view below.
+  const elementRefs = useRef(new Map<string, HTMLButtonElement>());
+  const jumpToElement = (id: string) => {
+    const el = data.elements.find((e) => e.id === id);
+    if (el && el.pageNumber !== pageNumber) setPageNumber(el.pageNumber);
+    setSelectedElementId(id);
+  };
+  useEffect(() => {
+    if (!selectedElementId) return;
+    elementRefs.current
+      .get(selectedElementId)
+      ?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }, [selectedElementId, pageNumber]);
+
   const roleLabel = (role: string) => dict.roles[role as keyof Dict["roles"]] ?? role;
   const statusLabel = (s: string) => dict.status[s as keyof Dict["status"]] ?? s;
 
@@ -532,6 +549,10 @@ export function ReviewWorkspace({
                       return (
                         <button
                           key={el.id}
+                          ref={(node) => {
+                            if (node) elementRefs.current.set(el.id, node);
+                            else elementRefs.current.delete(el.id);
+                          }}
                           type="button"
                           onClick={() => selectElement(el.id)}
                           className={clsx(
@@ -977,7 +998,7 @@ export function ReviewWorkspace({
                   >
                     <button
                       type="button"
-                      onClick={() => f.elementId && selectElement(f.elementId)}
+                      onClick={() => f.elementId && jumpToElement(f.elementId)}
                       className="block w-full text-left"
                     >
                       <p className="text-[13px] font-medium leading-snug text-slate-800">
@@ -1198,7 +1219,7 @@ export function ReviewWorkspace({
                       <button
                         key={el.id}
                         type="button"
-                        onClick={() => selectElement(el.id)}
+                        onClick={() => jumpToElement(el.id)}
                         className="rounded-lg bg-white px-2.5 py-1 text-[11.5px] font-medium text-violet-700 ring-1 ring-inset ring-violet-200 transition hover:bg-violet-100"
                       >
                         {dict.detail.page} {el.pageNumber} · {el.elementType}
@@ -1238,7 +1259,7 @@ export function ReviewWorkspace({
                       {c.elementId ? (
                         <button
                           type="button"
-                          onClick={() => selectElement(c.elementId!)}
+                          onClick={() => jumpToElement(c.elementId!)}
                           className="ml-auto rounded-md bg-sky-50 px-1.5 py-0.5 text-[10.5px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200"
                         >
                           📌
