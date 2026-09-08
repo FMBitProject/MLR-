@@ -9,6 +9,7 @@ import { reuseApprovedContent } from "@/lib/actions";
 import { contentLifecycle } from "@/lib/content-expiry";
 import { Card, EmptyState, PageHeader, Chip } from "@/components/ui";
 import { LibraryLifecycle } from "@/components/library-lifecycle";
+import { DistributionTracker } from "@/components/distribution-tracker";
 
 export default async function LibraryPage() {
   const user = await requireUser();
@@ -49,6 +50,28 @@ export default async function LibraryPage() {
 
   const canSubmit = SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number]);
   const canManage = ["compliance_admin", "super_admin"].includes(user.role);
+  const canDistribute = ["marketing", "compliance_admin", "super_admin"].includes(user.role);
+
+  const distributions = subIds.length
+    ? await db
+        .select()
+        .from(t.contentDistributions)
+        .where(
+          and(
+            inArray(t.contentDistributions.submissionId, subIds),
+            eq(t.contentDistributions.status, "live"),
+          ),
+        )
+    : [];
+  const liveDistributionsFor = (subId: string) =>
+    distributions
+      .filter((d) => d.submissionId === subId)
+      .map((d) => ({
+        id: d.id,
+        channel: d.channel,
+        label: d.label,
+        publishedAt: d.publishedAt.getTime(),
+      }));
 
   return (
     <div className="animate-fade-up">
@@ -167,6 +190,16 @@ export default async function LibraryPage() {
                         dict={dict}
                       />
                     </div>
+                  ) : null}
+
+                  {!withdrawn ? (
+                    <DistributionTracker
+                      submissionId={sub.id}
+                      live={liveDistributionsFor(sub.id)}
+                      canManage={canDistribute}
+                      dict={dict}
+                      locale={locale}
+                    />
                   ) : null}
                 </div>
               );

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
@@ -1594,6 +1594,109 @@ export async function setContentExpiry(formData: FormData) {
       from: sub.expiresAt?.toISOString() ?? null,
       to: expiresAt.toISOString(),
     },
+  });
+  revalidatePath("/library");
+}
+
+// Marketing publishes to channels; compliance can also record/pull for
+// audit or compliance reasons (label change, geo restriction).
+const DISTRIBUTION_ROLES = ["marketing", "compliance_admin", "super_admin"];
+
+/**
+ * Records that an approved submission's current version has gone live on a
+ * distribution channel — "which version is live where" (PRD Phase 2),
+ * distinct from contentSubmissions.channel (the intended channel at
+ * submission time).
+ */
+export async function publishDistribution(formData: FormData) {
+  const user = await requireUser();
+  if (!DISTRIBUTION_ROLES.includes(user.role)) throw new Error("FORBIDDEN");
+
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const channel = String(formData.get("channel") ?? "");
+  const label = String(formData.get("label") ?? "").trim() || null;
+  if (!submissionId || !channel) throw new Error("VALIDATION");
+
+  const sub = (await db
+    .select()
+    .from(t.contentSubmissions)
+    .where(
+      and(
+        eq(t.contentSubmissions.id, submissionId),
+        eq(t.contentSubmissions.tenantId, user.tenantId),
+        eq(t.contentSubmissions.status, "approved"),
+      ),
+    ))[0];
+  if (!sub) throw new Error("NOT_FOUND");
+
+  const version = (await db
+    .select()
+    .from(t.contentVersions)
+    .where(eq(t.contentVersions.submissionId, submissionId))
+    .orderBy(desc(t.contentVersions.versionNumber)))[0];
+  if (!version) throw new Error("NOT_FOUND");
+
+  const id = crypto.randomUUID();
+  await db.insert(t.contentDistributions)
+    .values({
+      id,
+      tenantId: user.tenantId,
+      submissionId,
+      versionId: version.id,
+      channel,
+      label,
+      status: "live",
+      publishedAt: new Date(),
+      publishedBy: user.id,
+    });
+
+  await logAudit({
+    tenantId: user.tenantId,
+    entityType: "submission",
+    entityId: submissionId,
+    action: "distribution_published",
+    performedBy: user.id,
+    details: {
+      title: sub.title,
+      channel,
+      label: label ?? undefined,
+      versionNumber: version.versionNumber,
+    },
+  });
+  revalidatePath("/library");
+}
+
+/** Marks a live distribution as pulled — the channel no longer carries this material. */
+export async function pullDistribution(formData: FormData) {
+  const user = await requireUser();
+  if (!DISTRIBUTION_ROLES.includes(user.role)) throw new Error("FORBIDDEN");
+
+  const distributionId = String(formData.get("distributionId") ?? "");
+  if (!distributionId) throw new Error("VALIDATION");
+
+  const dist = (await db
+    .select()
+    .from(t.contentDistributions)
+    .where(
+      and(
+        eq(t.contentDistributions.id, distributionId),
+        eq(t.contentDistributions.tenantId, user.tenantId),
+        eq(t.contentDistributions.status, "live"),
+      ),
+    ))[0];
+  if (!dist) throw new Error("NOT_FOUND");
+
+  await db.update(t.contentDistributions)
+    .set({ status: "pulled", pulledAt: new Date(), pulledBy: user.id })
+    .where(eq(t.contentDistributions.id, distributionId));
+
+  await logAudit({
+    tenantId: user.tenantId,
+    entityType: "submission",
+    entityId: dist.submissionId,
+    action: "distribution_pulled",
+    performedBy: user.id,
+    details: { channel: dist.channel, label: dist.label ?? undefined },
   });
   revalidatePath("/library");
 }

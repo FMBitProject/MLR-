@@ -104,7 +104,7 @@ export async function sendPasswordResetEmail(
     locale === "id"
       ? {
           subject: "Atur ulang kata sandi Anda — MLR Flow",
-          title: `Halo ${name}, atur ulang kata sandi Anda`,
+          title: `Halo ${esc(name)}, atur ulang kata sandi Anda`,
           body: "Kami menerima permintaan untuk mengatur ulang kata sandi akun MLR Flow Anda. Klik tombol di bawah untuk membuat kata sandi baru. Tautan berlaku 1 jam.",
           cta: "Atur Ulang Kata Sandi",
           copyHint: "Atau salin tautan ini:",
@@ -113,7 +113,7 @@ export async function sendPasswordResetEmail(
         }
       : {
           subject: "Reset your password — MLR Flow",
-          title: `Hi ${name}, reset your password`,
+          title: `Hi ${esc(name)}, reset your password`,
           body: "We received a request to reset the password for your MLR Flow account. Click the button below to choose a new password. The link is valid for 1 hour.",
           cta: "Reset Password",
           copyHint: "Or copy this link:",

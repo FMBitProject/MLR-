@@ -276,6 +276,26 @@ export const authThrottle = pgTable("auth_throttle", {
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
 });
 
+// Tracks where an approved submission has actually been published, distinct
+// from contentSubmissions.channel (the intended channel at submission time).
+// One approved submission can go live on several channels/placements
+// independently, each with its own live/pulled lifecycle — mirrors Veeva's
+// "which version is live where" distribution tracking.
+export const contentDistributions = pgTable("content_distributions", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  submissionId: text("submission_id").notNull().references(() => contentSubmissions.id),
+  versionId: text("version_id").notNull().references(() => contentVersions.id),
+  channel: text("channel").notNull(), // print | digital | e-detail | social | hcp_only
+  // Freeform placement detail, e.g. "Instagram @brand" or "Homepage banner"
+  label: text("label"),
+  status: text("status").notNull().default("live"), // live | pulled
+  publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+  publishedBy: text("published_by").notNull().references(() => users.id),
+  pulledAt: timestamp("pulled_at", { withTimezone: true }),
+  pulledBy: text("pulled_by").references(() => users.id),
+});
+
 export const workflowTemplates = pgTable("workflow_templates", {
   id: text("id").primaryKey(),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
