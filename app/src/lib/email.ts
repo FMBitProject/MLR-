@@ -12,7 +12,7 @@ export function appUrl(): string {
   return "http://localhost:3000";
 }
 
-const FROM = process.env.EMAIL_FROM ?? "MLR Flow <onboarding@resend.dev>";
+const FROM = process.env.EMAIL_FROM ?? "Intellibase MLR Flow <onboarding@resend.dev>";
 
 function client(): Resend {
   const key = process.env.RESEND_API_KEY;
@@ -59,7 +59,7 @@ const shell = (
   footer = "Jika Anda tidak meminta ini, abaikan email ini.",
 ) => `
 <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 0 auto;">
-  <p style="color: #0f766e; font-weight: 700; letter-spacing: 0.05em; font-size: 12px; text-transform: uppercase;">MLR Flow</p>
+  <p style="color: #0f766e; font-weight: 700; letter-spacing: 0.05em; font-size: 12px; text-transform: uppercase;">Intellibase MLR Flow</p>
   <h1 style="font-size: 20px; color: #0f172a; margin: 8px 0 16px;">${title}</h1>
   ${body}
   <p style="color: #94a3b8; font-size: 12px; margin-top: 32px;">
@@ -81,11 +81,11 @@ export async function sendVerificationEmail(to: string, name: string, token: str
   const link = `${appUrl()}/verify-email?token=${token}`;
   await sendEmail(
     to,
-    "Verifikasi email Anda — MLR Flow",
+    "Verifikasi email Anda — Intellibase MLR Flow",
     shell(
       `Halo ${esc(name)}, konfirmasi email Anda`,
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">
-        Klik tombol di bawah untuk mengaktifkan akun MLR Flow Anda. Tautan berlaku 24 jam.
+        Klik tombol di bawah untuk mengaktifkan akun Intellibase MLR Flow Anda. Tautan berlaku 24 jam.
       </p>
       ${button(link, "Verifikasi Email")}
       <p style="color: #94a3b8; font-size: 12px;">Atau salin tautan ini: ${link}</p>`,
@@ -103,18 +103,18 @@ export async function sendPasswordResetEmail(
   const copy =
     locale === "id"
       ? {
-          subject: "Atur ulang kata sandi Anda — MLR Flow",
+          subject: "Atur ulang kata sandi Anda — Intellibase MLR Flow",
           title: `Halo ${esc(name)}, atur ulang kata sandi Anda`,
-          body: "Kami menerima permintaan untuk mengatur ulang kata sandi akun MLR Flow Anda. Klik tombol di bawah untuk membuat kata sandi baru. Tautan berlaku 1 jam.",
+          body: "Kami menerima permintaan untuk mengatur ulang kata sandi akun Intellibase MLR Flow Anda. Klik tombol di bawah untuk membuat kata sandi baru. Tautan berlaku 1 jam.",
           cta: "Atur Ulang Kata Sandi",
           copyHint: "Atau salin tautan ini:",
           footer:
             "Jika Anda tidak meminta pengaturan ulang kata sandi, abaikan email ini — kata sandi Anda tidak berubah.",
         }
       : {
-          subject: "Reset your password — MLR Flow",
+          subject: "Reset your password — Intellibase MLR Flow",
           title: `Hi ${esc(name)}, reset your password`,
-          body: "We received a request to reset the password for your MLR Flow account. Click the button below to choose a new password. The link is valid for 1 hour.",
+          body: "We received a request to reset the password for your Intellibase MLR Flow account. Click the button below to choose a new password. The link is valid for 1 hour.",
           cta: "Reset Password",
           copyHint: "Or copy this link:",
           footer:
@@ -134,8 +134,8 @@ export async function sendPasswordResetEmail(
 }
 
 const noReplyFooter: Record<Locale, string> = {
-  id: "Anda menerima email ini karena terdaftar di workspace MLR Flow perusahaan Anda.",
-  en: "You received this email because you are a member of your company's MLR Flow workspace.",
+  id: "Anda menerima email ini karena terdaftar di workspace Intellibase MLR Flow perusahaan Anda.",
+  en: "You received this email because you are a member of your company's Intellibase MLR Flow workspace.",
 };
 
 function roleLabel(role: string, locale: Locale): string {
@@ -188,7 +188,7 @@ export async function sendReviewRequestEmail(
 
   await sendEmail(
     to,
-    `${subject} — MLR Flow`,
+    `${subject} — Intellibase MLR Flow`,
     shell(
       locale === "id" ? "Giliran Anda mereview" : "Your review is needed",
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">
@@ -252,7 +252,7 @@ export async function sendDecisionEmail(
 
   await sendEmail(
     to,
-    `${copy.subject} — MLR Flow`,
+    `${copy.subject} — Intellibase MLR Flow`,
     shell(
       copy.heading,
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${copy.body}</p>
@@ -306,7 +306,7 @@ export async function sendReviewReminderEmail(
       : `The following materials have been waiting for your review longer than they should. Other reviewers and the marketing team are queued behind you:`;
   await sendEmail(
     to,
-    `${subject} — MLR Flow`,
+    `${subject} — Intellibase MLR Flow`,
     shell(
       locale === "id" ? "Pengingat review harian" : "Daily review reminder",
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${body}</p>
@@ -333,7 +333,7 @@ export async function sendBottleneckDigestEmail(
       : `The following materials are stuck in review longer than they should be:`;
   await sendEmail(
     to,
-    `${subject} — MLR Flow`,
+    `${subject} — Intellibase MLR Flow`,
     shell(
       locale === "id" ? "Ringkasan bottleneck review" : "Review bottleneck summary",
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${body}</p>
@@ -383,8 +383,8 @@ export async function sendInvoiceEmail(
       heading: locale === "id" ? "Tagihan langganan Anda" : "Your subscription invoice",
       body:
         locale === "id"
-          ? `Langganan MLR Flow workspace <strong>${esc(opts.tenantName)}</strong> (paket ${esc(opts.plan)}) aktif sampai <strong>${until}</strong>. Bayar tagihan <strong>${esc(opts.invoiceNumber)}</strong> sebesar <strong>${amount}</strong> untuk memperpanjang satu bulan.`
-          : `The MLR Flow subscription for workspace <strong>${esc(opts.tenantName)}</strong> (${esc(opts.plan)} plan) is active until <strong>${until}</strong>. Pay invoice <strong>${esc(opts.invoiceNumber)}</strong> of <strong>${amount}</strong> to extend it by one month.`,
+          ? `Langganan Intellibase MLR Flow workspace <strong>${esc(opts.tenantName)}</strong> (paket ${esc(opts.plan)}) aktif sampai <strong>${until}</strong>. Bayar tagihan <strong>${esc(opts.invoiceNumber)}</strong> sebesar <strong>${amount}</strong> untuk memperpanjang satu bulan.`
+          : `The Intellibase MLR Flow subscription for workspace <strong>${esc(opts.tenantName)}</strong> (${esc(opts.plan)} plan) is active until <strong>${until}</strong>. Pay invoice <strong>${esc(opts.invoiceNumber)}</strong> of <strong>${amount}</strong> to extend it by one month.`,
     },
     grace: {
       subject:
@@ -420,7 +420,7 @@ export async function sendInvoiceEmail(
 
   await sendEmail(
     to,
-    `${copy.subject} — MLR Flow`,
+    `${copy.subject} — Intellibase MLR Flow`,
     shell(
       copy.heading,
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${copy.body}</p>
@@ -489,7 +489,7 @@ export async function sendContentExpiryEmail(
 
   await sendEmail(
     to,
-    `${subject} — MLR Flow`,
+    `${subject} — Intellibase MLR Flow`,
     shell(
       locale === "id" ? "Pengingat kedaluwarsa materi" : "Material expiry reminder",
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">${body}</p>
@@ -504,11 +504,11 @@ export async function sendInviteEmail(to: string, name: string, tenantName: stri
   const link = `${appUrl()}/verify-email?token=${token}`;
   await sendEmail(
     to,
-    `Anda diundang ke workspace ${tenantName} — MLR Flow`,
+    `Anda diundang ke workspace ${tenantName} — Intellibase MLR Flow`,
     shell(
       `Halo ${esc(name)}, atur akun Anda`,
       `<p style="color: #334155; font-size: 14px; line-height: 1.6;">
-        Anda ditambahkan ke workspace <strong>${esc(tenantName)}</strong> di MLR Flow. Klik tombol di bawah
+        Anda ditambahkan ke workspace <strong>${esc(tenantName)}</strong> di Intellibase MLR Flow. Klik tombol di bawah
         untuk membuat kata sandi dan mengaktifkan akun. Tautan berlaku 24 jam.
       </p>
       ${button(link, "Atur Akun Saya")}

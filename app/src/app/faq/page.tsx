@@ -2,7 +2,7 @@ import { getDict } from "@/lib/i18n-server";
 import { FAQ } from "@/lib/legal";
 import { PublicPage } from "@/components/public-page";
 
-export const metadata = { title: "FAQ — MLR Flow" };
+export const metadata = { title: "FAQ — Intellibase MLR Flow" };
 
 export default async function FaqPage() {
   const { dict, locale } = await getDict();

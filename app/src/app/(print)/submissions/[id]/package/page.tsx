@@ -238,7 +238,7 @@ export default async function ApprovalPackagePage(
         <p>{dict.pkg.disclaimer}</p>
         <p className="mt-1">
           {dict.pkg.generated}: {formatDate(new Date(), locale)} ·{" "}
-          {userName(user.id)} · MLR Flow — {tenant?.name}
+          {userName(user.id)} · Intellibase MLR Flow — {tenant?.name}
         </p>
       </footer>
     </div>

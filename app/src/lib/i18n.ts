@@ -2,7 +2,7 @@ export type Locale = "id" | "en";
 
 const dictionaries = {
   id: {
-    appName: "MLR Flow",
+    appName: "Intellibase MLR Flow",
     tagline: "Medical • Legal • Regulatory Review",
     nav: {
       dashboard: "Dasbor",
@@ -35,7 +35,7 @@ const dictionaries = {
       hidePassword: "Sembunyikan kata sandi",
     },
     // Left-hand brand panel shared by /login and /register. The badges state
-    // only what the product actually does — MLR Flow is deliberately NOT
+    // only what the product actually does — Intellibase MLR Flow is deliberately NOT
     // claimed as a CSV-validated GxP/21 CFR Part 11 system (see lib/legal.ts),
     // so no certification badge belongs here.
     authPanel: {
@@ -312,7 +312,7 @@ const dictionaries = {
       renderedPages: "Materi yang disetujui (render halaman)",
       generated: "Dokumen dibuat",
       disclaimer:
-        "Dokumen ini dihasilkan otomatis dari jejak audit MLR Flow dan merepresentasikan versi terkunci yang disetujui. Perubahan apa pun memerlukan versi baru dengan siklus review penuh.",
+        "Dokumen ini dihasilkan otomatis dari jejak audit Intellibase MLR Flow dan merepresentasikan versi terkunci yang disetujui. Perubahan apa pun memerlukan versi baru dengan siklus review penuh.",
       signatures: "Tanda tangan elektronik",
       signedElectronically: "Ditandatangani elektronik oleh",
       signMeaning: "Makna tanda tangan",
@@ -499,7 +499,7 @@ const dictionaries = {
       heroBadge: "Untuk perusahaan farmasi Indonesia",
       heroTitle: "Persetujuan konten promosi farmasi — cepat, tertib, siap audit.",
       heroSubtitle:
-        "MLR Flow menyatukan review Medical, Legal, dan Regulatory dalam satu alur kerja: AI claims check, review visual per halaman, dan jejak audit lengkap yang siap inspeksi BPOM.",
+        "Intellibase MLR Flow menyatukan review Medical, Legal, dan Regulatory dalam satu alur kerja: AI claims check, review visual per halaman, dan jejak audit lengkap yang siap inspeksi BPOM.",
       ctaPrimary: "Buat Workspace",
       ctaSecondary: "Lihat Paket & Harga",
       featuresTitle: "Semua yang tim MLR Anda butuhkan",
@@ -615,7 +615,7 @@ const dictionaries = {
     },
   },
   en: {
-    appName: "MLR Flow",
+    appName: "Intellibase MLR Flow",
     tagline: "Medical • Legal • Regulatory Review",
     nav: {
       dashboard: "Dashboard",
@@ -921,7 +921,7 @@ const dictionaries = {
       renderedPages: "Approved material (rendered pages)",
       generated: "Document generated",
       disclaimer:
-        "This document is generated automatically from the MLR Flow audit trail and represents the locked, approved version. Any change requires a new version with a full review cycle.",
+        "This document is generated automatically from the Intellibase MLR Flow audit trail and represents the locked, approved version. Any change requires a new version with a full review cycle.",
       signatures: "Electronic signatures",
       signedElectronically: "Electronically signed by",
       signMeaning: "Meaning of signature",
@@ -1108,7 +1108,7 @@ const dictionaries = {
       heroBadge: "Built for Indonesian pharma companies",
       heroTitle: "Pharma promotional content approval — fast, orderly, audit-ready.",
       heroSubtitle:
-        "MLR Flow unifies Medical, Legal, and Regulatory review in one workflow: AI claims check, visual page-by-page review, and a complete audit trail ready for BPOM inspection.",
+        "Intellibase MLR Flow unifies Medical, Legal, and Regulatory review in one workflow: AI claims check, visual page-by-page review, and a complete audit trail ready for BPOM inspection.",
       ctaPrimary: "Create a Workspace",
       ctaSecondary: "See Plans & Pricing",
       featuresTitle: "Everything your MLR team needs",

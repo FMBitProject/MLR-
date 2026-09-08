@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MLR Flow — Medical · Legal · Regulatory Review",
+  title: "Intellibase MLR Flow — Medical · Legal · Regulatory Review",
   description:
     "Workflow review konten promosi farmasi: Medical, Legal, Regulatory — audit-ready dan selaras Pedoman Promosi Obat.",
 };

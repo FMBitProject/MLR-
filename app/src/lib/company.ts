@@ -1,4 +1,4 @@
-// Legal identity of the operator behind MLR Flow, surfaced on the public
+// Legal identity of the operator behind Intellibase MLR Flow, surfaced on the public
 // Terms, Privacy, and FAQ pages.
 //
 // These are deliberately NOT hardcoded: they are legal facts, not product
@@ -13,7 +13,7 @@ export const COMPANY = {
   /** Registered legal entity, or full name if operating as a sole proprietor. */
   legalName: process.env.COMPANY_LEGAL_NAME || TODO("nama badan hukum"),
   /** Product/trading name — this one is known. */
-  productName: "MLR Flow",
+  productName: "Intellibase MLR Flow",
   /** Full registered address. */
   address: process.env.COMPANY_ADDRESS || TODO("alamat terdaftar"),
   /** General/support contact. */

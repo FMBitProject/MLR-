@@ -59,7 +59,7 @@ export default async function VerifyEmailPage(props: PageProps<"/verify-email">)
     )[0];
     return (
       <Shell locale={locale}>
-        <AcceptInviteForm dict={dict} token={token} tenantName={tenant?.name ?? "MLR Flow"} />
+        <AcceptInviteForm dict={dict} token={token} tenantName={tenant?.name ?? "Intellibase MLR Flow"} />
       </Shell>
     );
   }

@@ -1818,7 +1818,7 @@ export async function createTeammate(formData: FormData) {
   });
 
   const token = await createAccountToken(teammateId, "invite");
-  await sendInviteEmail(email, name, tenant[0]?.name ?? "MLR Flow", token);
+  await sendInviteEmail(email, name, tenant[0]?.name ?? "Intellibase MLR Flow", token);
 
   revalidatePath("/settings");
   return {};

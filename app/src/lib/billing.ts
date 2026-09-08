@@ -144,7 +144,7 @@ export async function ensureRenewalInvoice(
   const snap = await createSnapTransaction({
     orderId: id,
     grossAmountIdr: amount,
-    itemName: `MLR Flow ${def.id} — 1 bulan`,
+    itemName: `Intellibase MLR Flow ${def.id} — 1 bulan`,
     customerName: requestedBy.name,
     customerEmail: requestedBy.email,
     finishUrl: `${appUrl()}/settings`,

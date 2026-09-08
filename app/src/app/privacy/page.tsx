@@ -5,7 +5,7 @@ import { COMPANY } from "@/lib/company";
 import { PublicPage } from "@/components/public-page";
 import { LegalBody } from "@/components/legal-body";
 
-export const metadata = { title: "Kebijakan Privasi — MLR Flow" };
+export const metadata = { title: "Kebijakan Privasi — Intellibase MLR Flow" };
 
 export default async function PrivacyPage() {
   const { dict, locale } = await getDict();
