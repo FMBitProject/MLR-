@@ -11,6 +11,11 @@ const FONT_SIZE = 22;
 const LINE_H = 34;
 const BLOCK_GAP = 30;
 const MAX_CHARS = 88;
+// A text-only draft (no uploaded file) is usually short — one or two lines of
+// revised copy. Without a floor/adaptive height it renders on a nearly-empty
+// A4-sized canvas that reads as broken. Clamp between a compact minimum and
+// the standard page size instead of always using the full height.
+export const PAGE_MIN_H = 340;
 
 export type Bbox = { x: number; y: number; width: number; height: number };
 
@@ -80,24 +85,28 @@ export function renderTextPages(opts: {
   let inner = "";
 
   const startPage = (first: boolean) => {
-    cursorY = MARGIN + 20;
-    inner = "";
+    cursorY = MARGIN + 8;
+    inner = `<text x="${MARGIN}" y="${cursorY}" font-size="13" letter-spacing="2.5" fill="#94a3b8" font-family="Arial, sans-serif" font-weight="bold">TEXT DRAFT — COPY ONLY, NOT FINAL ARTWORK</text>\n`;
+    cursorY += 30;
     if (first) {
       inner += `<text x="${MARGIN}" y="${cursorY + 26}" font-size="40" font-weight="bold" fill="#0f172a">${escapeXml(opts.title)}</text>\n`;
       cursorY += 66;
       inner += `<text x="${MARGIN}" y="${cursorY + 10}" font-size="19" fill="#0f766e" font-family="Arial, sans-serif">${escapeXml(opts.subtitle)}</text>\n`;
       cursorY += 30;
-      inner += `<line x1="${MARGIN}" y1="${cursorY + 12}" x2="${PAGE_W - MARGIN}" y2="${cursorY + 12}" stroke="#e2e8f0" stroke-width="2"/>\n`;
-      cursorY += 44;
     }
+    inner += `<line x1="${MARGIN}" y1="${cursorY + 12}" x2="${PAGE_W - MARGIN}" y2="${cursorY + 12}" stroke="#e2e8f0" stroke-width="2"/>\n`;
+    cursorY += 44;
   };
 
+  // Height adapts to what actually got laid out on the page (clamped to a
+  // sane range) instead of always the full A4-ish canvas — see PAGE_MIN_H.
   const flushPage = () => {
+    const height = Math.min(PAGE_H, Math.max(PAGE_MIN_H, cursorY + MARGIN));
     pages.push({
       pageNumber,
-      svg: pageShell(inner, `${escapeXml(opts.title)} — page ${pageNumber}`),
+      svg: pageShell(inner, `${escapeXml(opts.title)} — page ${pageNumber}`, height),
       width: PAGE_W,
-      height: PAGE_H,
+      height,
     });
   };
 
@@ -117,6 +126,9 @@ export function renderTextPages(opts: {
       width: PAGE_W - 2 * (MARGIN - 12),
       height: blockH + 12,
     };
+    // Left accent bar marks each paragraph as its own reviewable element,
+    // the same visual language as a real slide/leaflet's callout blocks.
+    inner += `<rect x="${bbox.x}" y="${bbox.y}" width="4" height="${bbox.height}" fill="#0f766e" opacity="0.35"/>\n`;
     let tspan = "";
     lines.forEach((ln, i) => {
       tspan += `<tspan x="${MARGIN}" dy="${i === 0 ? 0 : LINE_H}">${escapeXml(ln)}</tspan>`;

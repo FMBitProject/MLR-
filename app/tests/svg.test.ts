@@ -8,6 +8,7 @@ import {
   renderFilePlaceholderPage,
   PAGE_W,
   PAGE_H,
+  PAGE_MIN_H,
 } from "../src/lib/svg.ts";
 
 test("svg: escapeXml neutralises every XML metacharacter", () => {
@@ -61,14 +62,32 @@ test("svg: a word longer than the budget is not dropped", () => {
   assert.deepEqual(wrapText(long, 40), [long], "an over-long token stays on its own line");
 });
 
-test("svg: renderTextPages produces well-formed pages at the standard size", () => {
+test("svg: renderTextPages produces well-formed pages within the height range", () => {
   const { pages } = renderTextPages({ title: "Judul", subtitle: "Sub", paragraphs: ["Satu.", "Dua."] });
   assert.equal(pages.length, 1);
   assert.equal(pages[0].pageNumber, 1);
   assert.equal(pages[0].width, PAGE_W);
-  assert.equal(pages[0].height, PAGE_H);
+  assert.ok(pages[0].height >= PAGE_MIN_H && pages[0].height <= PAGE_H);
   assert.ok(pages[0].svg.startsWith("<svg"));
   assert.ok(pages[0].svg.trimEnd().endsWith("</svg>"));
+});
+
+test("svg: a short text draft shrinks below the standard canvas height", () => {
+  const { pages } = renderTextPages({ title: "Judul", subtitle: "Sub", paragraphs: ["Naskah revisi singkat."] });
+  assert.ok(
+    pages[0].height >= PAGE_MIN_H && pages[0].height < PAGE_H,
+    `expected a shrunk page, got height ${pages[0].height}`,
+  );
+});
+
+test("svg: a page filled to the break boundary approaches the standard canvas height", () => {
+  const paragraphs = Array.from({ length: 40 }, (_, i) => `Paragraf panjang nomor ${i}.`);
+  const { pages } = renderTextPages({ title: "Judul", subtitle: "Sub", paragraphs });
+  // Every page but the last was filled right up until the next paragraph no
+  // longer fit, so it should sit close to (never above) the standard height.
+  for (const p of pages.slice(0, -1)) {
+    assert.ok(p.height <= PAGE_H && p.height > PAGE_H - 100, `page ${p.pageNumber} height ${p.height}`);
+  }
 });
 
 test("svg: every paragraph gets exactly one element with a sane bbox", () => {
