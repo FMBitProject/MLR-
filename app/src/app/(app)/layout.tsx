@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { LogOut, ShieldCheck, TriangleAlert } from "lucide-react";
+import { LogOut, TriangleAlert } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { billingState } from "@/lib/billing";
@@ -61,18 +61,17 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-30 flex w-[248px] flex-col bg-gradient-to-b from-[#0b1220] via-[#0d1626] to-brand-950 px-4 py-6">
-        <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-400/25">
-            <ShieldCheck className="size-[18px] text-brand-300" />
-          </div>
-          <div>
-            <p className="text-[15px] font-semibold tracking-tight text-white">
-              {dict.appName}
-            </p>
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
-              {tenant?.name}
-            </p>
-          </div>
+        <div className="mb-8 px-2">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center rounded-xl bg-white/95 px-2.5 py-1.5 shadow-sm transition hover:scale-105"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/logo.png" alt={dict.appName} className="h-6 w-auto" />
+          </Link>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-slate-500">
+            {tenant?.name}
+          </p>
         </div>
 
         <SidebarNav items={items} />
