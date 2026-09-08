@@ -141,7 +141,7 @@ test("email: an ordinary subject is left alone", async () => {
     () => captureRaw(() => m.sendInviteEmail("a@b.co", "Budi", "Acme Pharma", "tok")),
   );
   const subject = raw.match(/subject="([^"]*)"/)?.[1] ?? "";
-  assert.equal(subject, "Anda diundang ke workspace Acme Pharma — MLR Flow");
+  assert.equal(subject, "Anda diundang ke workspace Acme Pharma — Intellibase MLR Flow");
 });
 
 test("email: reminder item titles are escaped", async () => {

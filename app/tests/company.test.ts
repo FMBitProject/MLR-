@@ -82,7 +82,7 @@ test("company: one missing field is enough to report incomplete", async () => {
 test("company: the product name is fixed, not env-driven", async () => {
   await withEnv(COMPANY_ENV, async () => {
     const m = await freshImport<Mod>("../src/lib/company.ts");
-    assert.equal(m.COMPANY.productName, "MLR Flow");
+    assert.equal(m.COMPANY.productName, "Intellibase MLR Flow");
   });
 });
 
