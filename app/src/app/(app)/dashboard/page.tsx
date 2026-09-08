@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, count, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { TrendingDown, TimerReset } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -13,31 +13,40 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const { dict, locale } = await getDict();
 
-  const subs = await db
-    .select()
-    .from(t.contentSubmissions)
-    .where(eq(t.contentSubmissions.tenantId, user.tenantId));
+  // Every figure on this page is an aggregate over the tenant's whole
+  // history, so all of it is computed in SQL. Reading the submissions and
+  // stages to reduce them in JS made the dashboard the heaviest page in the
+  // app, growing with the workspace's age rather than with what it shows.
+  const now = new Date();
+  const cutoff30 = new Date(now.getTime() - 30 * 86_400_000);
+  const in30Days = new Date(now.getTime() + 30 * 86_400_000);
 
-  const inReview = subs.filter((s) => s.status === "in_review").length;
-  const cutoff30 = new Date(Date.now() - 30 * 86_400_000);
-  const approved30 = subs.filter(
-    (s) => s.status === "approved" && s.decidedAt && s.decidedAt >= cutoff30,
-  ).length;
+  const [totals, flagCount, stageWaits, expiring, recent] = await Promise.all([
+    db
+      .select({
+        total: count(),
+        inReview: count(
+          sql`case when ${t.contentSubmissions.status} = 'in_review' then 1 end`,
+        ),
+        approved30: count(
+          sql`case when ${t.contentSubmissions.status} = 'approved'
+                    and ${t.contentSubmissions.decidedAt} >= ${cutoff30} then 1 end`,
+        ),
+        // Seconds, so the driver hands back a plain number rather than an
+        // interval; converted to days below.
+        avgCycleSeconds: sql<number | null>`
+          avg(extract(epoch from (${t.contentSubmissions.decidedAt}
+                                  - ${t.contentSubmissions.createdAt})))
+        `.mapWith(Number),
+      })
+      .from(t.contentSubmissions)
+      .where(eq(t.contentSubmissions.tenantId, user.tenantId))
+      .then((r) => r[0]),
 
-  const decided = subs.filter((s) => s.decidedAt);
-  const avgCycle = decided.length
-    ? decided.reduce(
-        (sum, s) => sum + (s.decidedAt!.getTime() - s.createdAt.getTime()) / 86_400_000,
-        0,
-      ) / decided.length
-    : 0;
-
-  const subIds = subs.map((s) => s.id);
-  // Joined and counted entirely in SQL. Reading the tenant's versions just to
-  // collect their ids would both pull the inline file bytes and put every id
-  // into an IN list — two things that stop scaling with the tenant's history.
-  const flagCount = (
-    await db
+    // Joined and counted entirely in SQL. Reading the tenant's versions just
+    // to collect their ids would both pull the inline file bytes and put
+    // every id into an IN list.
+    db
       .select({ n: count() })
       .from(t.claimFlags)
       .innerJoin(t.contentVersions, eq(t.claimFlags.versionId, t.contentVersions.id))
@@ -46,39 +55,36 @@ export default async function DashboardPage() {
         eq(t.contentVersions.submissionId, t.contentSubmissions.id),
       )
       .where(eq(t.contentSubmissions.tenantId, user.tenantId))
-  )[0].n;
-  const flagRate = subs.length ? flagCount / subs.length : 0;
+      .then((r) => r[0].n),
 
-  // Average days spent per stage (decided stages only); longest = bottleneck
-  const stages = subIds.length
-    ? await db.select().from(t.reviewStages).where(inArray(t.reviewStages.submissionId, subIds))
-    : [];
-  const stageRoles = ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"] as const;
-  const stageDays = stageRoles.map((role) => {
-    const durations: number[] = [];
-    for (const sub of subs) {
-      const own = stages
-        .filter((s) => s.submissionId === sub.id)
-        .sort((a, b) => a.stageOrder - b.stageOrder);
-      const idx = own.findIndex((s) => s.reviewerRole === role);
-      if (idx < 0 || !own[idx].decidedAt) continue;
-      const start = idx === 0 ? sub.createdAt : own[idx - 1].decidedAt;
-      if (!start) continue;
-      durations.push((own[idx].decidedAt!.getTime() - start.getTime()) / 86_400_000);
-    }
-    return {
-      role,
-      avg: durations.length
-        ? durations.reduce((a, b) => a + b, 0) / durations.length
-        : 0,
-      n: durations.length,
-    };
-  });
-  const maxAvg = Math.max(...stageDays.map((s) => s.avg), 1);
-  const bottleneck = stageDays.reduce((a, b) => (b.avg > a.avg ? b : a));
+    // Average days a stage sat before being decided: from the previous
+    // stage's decision, or the submission's creation for the first stage.
+    // row_number/lag express "previous stage in order" without assuming
+    // stage_order starts at any particular number; a stage whose predecessor
+    // is still undecided has no measurable wait and drops out.
+    db
+      .execute(sql`
+        select reviewer_role,
+               avg(extract(epoch from (decided_at - start_at))) as avg_seconds,
+               count(*) as n
+        from (
+          select rs.reviewer_role,
+                 rs.decided_at,
+                 case
+                   when row_number() over w = 1 then cs.created_at
+                   else lag(rs.decided_at) over w
+                 end as start_at
+          from ${t.reviewStages} rs
+          join ${t.contentSubmissions} cs on cs.id = rs.submission_id
+          where cs.tenant_id = ${user.tenantId}
+          window w as (partition by rs.submission_id order by rs.stage_order)
+        ) staged
+        where decided_at is not null and start_at is not null
+        group by reviewer_role
+      `)
+      .then((r) => r.rows as Array<{ reviewer_role: string; avg_seconds: string; n: string }>),
 
-  const expiring = (
-    await db
+    db
       .select({ claim: t.approvedClaims, product: t.products })
       .from(t.approvedClaims)
       .innerJoin(t.products, eq(t.approvedClaims.productId, t.products.id))
@@ -86,21 +92,36 @@ export default async function DashboardPage() {
         and(
           eq(t.approvedClaims.tenantId, user.tenantId),
           eq(t.approvedClaims.status, "active"),
-          gte(t.approvedClaims.expiresAt, new Date()),
+          gte(t.approvedClaims.expiresAt, now),
+          lt(t.approvedClaims.expiresAt, in30Days),
         ),
-      )
-  ).filter(
-    ({ claim }) =>
-      claim.expiresAt && claim.expiresAt.getTime() - Date.now() < 30 * 86_400_000,
-  );
+      ),
 
-  const recent = await db
-    .select({ log: t.auditLog, actor: t.users })
-    .from(t.auditLog)
-    .innerJoin(t.users, eq(t.auditLog.performedBy, t.users.id))
-    .where(eq(t.auditLog.tenantId, user.tenantId))
-    .orderBy(desc(t.auditLog.createdAt))
-    .limit(8);
+    db
+      .select({ log: t.auditLog, actor: t.users })
+      .from(t.auditLog)
+      .innerJoin(t.users, eq(t.auditLog.performedBy, t.users.id))
+      .where(eq(t.auditLog.tenantId, user.tenantId))
+      .orderBy(desc(t.auditLog.createdAt))
+      .limit(8),
+  ]);
+
+  const inReview = totals.inReview;
+  const approved30 = totals.approved30;
+  const avgCycle = (totals.avgCycleSeconds ?? 0) / 86_400;
+  const flagRate = totals.total ? flagCount / totals.total : 0;
+
+  const stageRoles = ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"] as const;
+  const stageDays = stageRoles.map((role) => {
+    const row = stageWaits.find((s) => s.reviewer_role === role);
+    return {
+      role,
+      avg: row ? Number(row.avg_seconds) / 86_400 : 0,
+      n: row ? Number(row.n) : 0,
+    };
+  });
+  const maxAvg = Math.max(...stageDays.map((s) => s.avg), 1);
+  const bottleneck = stageDays.reduce((a, b) => (b.avg > a.avg ? b : a));
 
   const nf = new Intl.NumberFormat(locale === "id" ? "id-ID" : "en-US", {
     maximumFractionDigits: 1,
@@ -247,7 +268,7 @@ export default async function DashboardPage() {
               {expiring.length ? (
                 expiring.map(({ claim, product }) => {
                   const daysLeft = Math.ceil(
-                    (claim.expiresAt!.getTime() - Date.now()) / 86_400_000,
+                    (claim.expiresAt!.getTime() - now.getTime()) / 86_400_000,
                   );
                   return (
                     <div key={claim.id} className="px-6 py-3.5">
