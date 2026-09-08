@@ -64,7 +64,7 @@ export default async function AppLayout({
         <div className="mb-8 px-2">
           <Link href="/dashboard" className="inline-flex items-center transition hover:scale-105">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/logo-dark.png" alt={dict.appName} className="h-6 w-auto" />
+            <img src="/brand/logo-dark.png" alt={dict.appName} className="h-11 w-auto" />
           </Link>
           <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-slate-500">
             {tenant?.name}
