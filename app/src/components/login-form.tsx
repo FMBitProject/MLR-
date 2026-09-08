@@ -6,14 +6,13 @@ import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { login, resendVerificationEmail } from "@/lib/actions";
 import type { Dict } from "@/lib/i18n";
 
+// The demo workspace (tn-demo) has a single super_admin account that can
+// drive the whole workflow alone — see db/seed-demo.ts.
 const DEMO_ACCOUNTS: Array<{ email: string; roleKey: keyof Dict["roles"]; name: string }> = [
-  { email: "dewi@nusantara-pharma.co.id", roleKey: "marketing", name: "Dewi Lestari" },
-  { email: "budi@nusantara-pharma.co.id", roleKey: "medical_reviewer", name: "dr. Budi Santoso" },
-  { email: "ratna@nusantara-pharma.co.id", roleKey: "legal_reviewer", name: "Ratna Wijaya" },
-  { email: "agus@nusantara-pharma.co.id", roleKey: "regulatory_reviewer", name: "Agus Prasetyo" },
-  { email: "sari@nusantara-pharma.co.id", roleKey: "compliance_admin", name: "Sari Handayani" },
-  { email: "rudi@nusantara-pharma.co.id", roleKey: "super_admin", name: "Rudi Hartono" },
+  { email: "demo@mlrflow.id", roleKey: "super_admin", name: "Ferel — Demo" },
 ];
+
+const DEMO_PASSWORD = "DemoMLR2026!";
 
 const LABEL = "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.09em] text-slate-700";
 
@@ -59,7 +58,7 @@ export function LoginForm({ dict }: { dict: Dict }) {
 
   const fill = (address: string) => {
     if (emailRef.current) emailRef.current.value = address;
-    if (passwordRef.current) passwordRef.current.value = "demo123";
+    if (passwordRef.current) passwordRef.current.value = DEMO_PASSWORD;
     setEmail(address);
     emailRef.current?.form?.requestSubmit();
   };
@@ -237,7 +236,7 @@ export function LoginForm({ dict }: { dict: Dict }) {
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           {dict.login.demoHint}
         </p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-2">
           {DEMO_ACCOUNTS.map((a) => (
             <button
               key={a.email}
