@@ -4,6 +4,7 @@ import {
   integer,
   real,
   boolean,
+  index,
   jsonb,
   timestamp,
   customType,
@@ -18,6 +19,18 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
 // Runs on Postgres (Neon in production, local Postgres in dev) via the
 // node-postgres driver — see db/index.ts. Every query is filtered by
 // tenantId from the authenticated session at the application layer.
+//
+// Indexes: Postgres indexes the primary key but NOT the foreign key columns,
+// and every read here filters on one (tenant_id, submission_id, version_id),
+// so without these each page scans whole tables. Only columns that actually
+// appear in a WHERE/ORDER BY are indexed — an unused index still costs on
+// every write. Composite indexes lead with the column that is always
+// present, so they also serve queries that filter on that column alone.
+//
+// Adding an index to a table that has grown large needs care: drizzle runs
+// every pending migration inside one transaction, and Postgres rejects
+// CREATE INDEX CONCURRENTLY there — so a migration-applied index locks the
+// table against writes while it builds. Build those outside the migrator.
 
 export const tenants = pgTable("tenants", {
   id: text("id").primaryKey(),
@@ -53,7 +66,9 @@ export const invoices = pgTable("invoices", {
   paymentType: text("payment_type"), // from the Midtrans notification, e.g. bank_transfer
   lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  index("invoices_tenant_created_idx").on(table.tenantId, table.createdAt),
+]);
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -72,7 +87,9 @@ export const users = pgTable("users", {
   // link). Login is blocked while null — see requireVerifiedUser in auth.ts.
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  index("users_tenant_idx").on(table.tenantId),
+]);
 
 // Single-use tokens for the two account-activation flows: "verify" (the
 // account already has a password — self-registration — just confirm the
@@ -84,7 +101,9 @@ export const accountTokens = pgTable("account_tokens", {
   purpose: text("purpose").notNull(), // verify | invite
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  index("account_tokens_user_idx").on(table.userId),
+]);
 
 export const products = pgTable("products", {
   id: text("id").primaryKey(),
@@ -92,7 +111,9 @@ export const products = pgTable("products", {
   name: text("name").notNull(),
   bpomRegistrationNo: text("bpom_registration_no"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  index("products_tenant_idx").on(table.tenantId),
+]);
 
 // A supporting literature citation attached to an approved claim.
 // pmid links to PubMed, doi to doi.org; url covers data-on-file / other
@@ -121,7 +142,11 @@ export const approvedClaims = pgTable("approved_claims", {
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   status: text("status").notNull().default("active"), // active | expired | withdrawn
-});
+}, (table) => [
+  // Serves both the tenant-wide claims library and the per-product lookups
+  // the AI claims check and journal substantiation run on every submission.
+  index("approved_claims_tenant_product_idx").on(table.tenantId, table.productId),
+]);
 
 // Journal corpus for RAG substantiation: the readable text of every article
 // the tenant has provided (uploaded PDF) or that could be fetched free
@@ -136,7 +161,9 @@ export const journalDocuments = pgTable("journal_documents", {
   source: text("source").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  index("journal_documents_tenant_pmid_idx").on(table.tenantId, table.pmid),
+]);
 
 export const contentSubmissions = pgTable("content_submissions", {
   id: text("id").primaryKey(),
@@ -160,7 +187,20 @@ export const contentSubmissions = pgTable("content_submissions", {
   withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
   withdrawnBy: text("withdrawn_by").references(() => users.id),
   withdrawnReason: text("withdrawn_reason"),
-});
+}, (table) => [
+  // Every list (dashboard, submissions, library) reads this tenant-scoped and
+  // newest-first; Postgres scans the composite backwards for DESC order.
+  index("content_submissions_tenant_created_idx").on(table.tenantId, table.createdAt),
+  // The sidebar's review-queue badge runs on every authenticated page load,
+  // filtering on exactly these three columns.
+  index("content_submissions_tenant_stage_status_idx").on(
+    table.tenantId,
+    table.currentStage,
+    table.status,
+  ),
+  // The audit export filters a tenant's history down to one product.
+  index("content_submissions_product_idx").on(table.productId),
+]);
 
 export const contentVersions = pgTable("content_versions", {
   id: text("id").primaryKey(),
@@ -177,7 +217,9 @@ export const contentVersions = pgTable("content_versions", {
   isLocked: boolean("is_locked").notNull().default(false),
   processingStatus: text("processing_status").notNull().default("ready"), // processing | ready
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  index("content_versions_submission_idx").on(table.submissionId),
+]);
 
 export const contentVersionPages = pgTable("content_version_pages", {
   id: text("id").primaryKey(),
@@ -187,7 +229,9 @@ export const contentVersionPages = pgTable("content_version_pages", {
   renderedSvg: text("rendered_svg").notNull(),
   width: integer("width").notNull(),
   height: integer("height").notNull(),
-});
+}, (table) => [
+  index("content_version_pages_version_page_idx").on(table.versionId, table.pageNumber),
+]);
 
 export const contentElements = pgTable("content_elements", {
   id: text("id").primaryKey(),
@@ -205,7 +249,9 @@ export const contentElements = pgTable("content_elements", {
     height: number;
   }>(),
   requiresManualReview: boolean("requires_manual_review").notNull().default(false),
-});
+}, (table) => [
+  index("content_elements_version_idx").on(table.versionId),
+]);
 
 export const reviewStages = pgTable("review_stages", {
   id: text("id").primaryKey(),
@@ -221,7 +267,9 @@ export const reviewStages = pgTable("review_stages", {
   // re-verifies the account password, and the signature manifest goes to
   // the audit log ("signature" in details).
   decidedBy: text("decided_by").references(() => users.id),
-});
+}, (table) => [
+  index("review_stages_submission_order_idx").on(table.submissionId, table.stageOrder),
+]);
 
 export const reviewComments = pgTable("review_comments", {
   id: text("id").primaryKey(),
@@ -231,7 +279,9 @@ export const reviewComments = pgTable("review_comments", {
   comment: text("comment").notNull(),
   resolved: boolean("resolved").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  index("review_comments_version_idx").on(table.versionId),
+]);
 
 export const claimFlags = pgTable("claim_flags", {
   id: text("id").primaryKey(),
@@ -255,7 +305,9 @@ export const claimFlags = pgTable("claim_flags", {
   journalVerdict: text("journal_verdict"),
   journalNote: text("journal_note"),
   journalPmid: text("journal_pmid"),
-});
+}, (table) => [
+  index("claim_flags_version_idx").on(table.versionId),
+]);
 
 export const auditLog = pgTable("audit_log", {
   id: text("id").primaryKey(),
@@ -266,7 +318,14 @@ export const auditLog = pgTable("audit_log", {
   performedBy: text("performed_by").notNull().references(() => users.id),
   details: jsonb("details").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-});
+}, (table) => [
+  // The audit trail is the fastest-growing table here — one row per action by
+  // every user — and is always read tenant-scoped, newest first.
+  index("audit_log_tenant_created_idx").on(table.tenantId, table.createdAt),
+  // The submission page reads only that submission's/version's entries, newest
+  // first — created_at rides along so the ordering comes from the index too.
+  index("audit_log_entity_created_idx").on(table.entityId, table.createdAt),
+]);
 
 // Fixed-window rate limiting for unauthenticated endpoints (login,
 // registration). DB-backed so it works across serverless instances.
@@ -294,7 +353,11 @@ export const contentDistributions = pgTable("content_distributions", {
   publishedBy: text("published_by").notNull().references(() => users.id),
   pulledAt: timestamp("pulled_at", { withTimezone: true }),
   pulledBy: text("pulled_by").references(() => users.id),
-});
+}, (table) => [
+  // No tenant_id index: the one query that filters on it pairs it with the
+  // primary key, which already resolves to a single row.
+  index("content_distributions_submission_idx").on(table.submissionId),
+]);
 
 export const workflowTemplates = pgTable("workflow_templates", {
   id: text("id").primaryKey(),
@@ -303,4 +366,6 @@ export const workflowTemplates = pgTable("workflow_templates", {
   // ordered list of reviewer roles
   stages: jsonb("stages").$type<string[]>().notNull(),
   mode: text("mode").notNull().default("sequential"), // sequential | parallel
-});
+}, (table) => [
+  index("workflow_templates_tenant_idx").on(table.tenantId),
+]);

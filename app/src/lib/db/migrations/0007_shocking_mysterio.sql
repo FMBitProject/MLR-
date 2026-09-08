@@ -1,0 +1,19 @@
+CREATE INDEX "account_tokens_user_idx" ON "account_tokens" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "approved_claims_tenant_product_idx" ON "approved_claims" USING btree ("tenant_id","product_id");--> statement-breakpoint
+CREATE INDEX "audit_log_tenant_created_idx" ON "audit_log" USING btree ("tenant_id","created_at");--> statement-breakpoint
+CREATE INDEX "audit_log_entity_created_idx" ON "audit_log" USING btree ("entity_id","created_at");--> statement-breakpoint
+CREATE INDEX "claim_flags_version_idx" ON "claim_flags" USING btree ("version_id");--> statement-breakpoint
+CREATE INDEX "content_distributions_submission_idx" ON "content_distributions" USING btree ("submission_id");--> statement-breakpoint
+CREATE INDEX "content_elements_version_idx" ON "content_elements" USING btree ("version_id");--> statement-breakpoint
+CREATE INDEX "content_submissions_tenant_created_idx" ON "content_submissions" USING btree ("tenant_id","created_at");--> statement-breakpoint
+CREATE INDEX "content_submissions_tenant_stage_status_idx" ON "content_submissions" USING btree ("tenant_id","current_stage","status");--> statement-breakpoint
+CREATE INDEX "content_submissions_product_idx" ON "content_submissions" USING btree ("product_id");--> statement-breakpoint
+CREATE INDEX "content_version_pages_version_page_idx" ON "content_version_pages" USING btree ("version_id","page_number");--> statement-breakpoint
+CREATE INDEX "content_versions_submission_idx" ON "content_versions" USING btree ("submission_id");--> statement-breakpoint
+CREATE INDEX "invoices_tenant_created_idx" ON "invoices" USING btree ("tenant_id","created_at");--> statement-breakpoint
+CREATE INDEX "journal_documents_tenant_pmid_idx" ON "journal_documents" USING btree ("tenant_id","pmid");--> statement-breakpoint
+CREATE INDEX "products_tenant_idx" ON "products" USING btree ("tenant_id");--> statement-breakpoint
+CREATE INDEX "review_comments_version_idx" ON "review_comments" USING btree ("version_id");--> statement-breakpoint
+CREATE INDEX "review_stages_submission_order_idx" ON "review_stages" USING btree ("submission_id","stage_order");--> statement-breakpoint
+CREATE INDEX "users_tenant_idx" ON "users" USING btree ("tenant_id");--> statement-breakpoint
+CREATE INDEX "workflow_templates_tenant_idx" ON "workflow_templates" USING btree ("tenant_id");
