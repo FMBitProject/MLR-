@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import tsx --import ./tests/setup.ts --test \"tests/**/*.test.ts\"",
+    "test:watch": "node --import tsx --import ./tests/setup.ts --test --watch \"tests/**/*.test.ts\"",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/lib/db/migrate.ts",
     "db:seed": "tsx src/lib/db/seed-run.ts",

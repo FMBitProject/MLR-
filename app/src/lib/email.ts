@@ -25,7 +25,20 @@ function client(): Resend {
   return new Resend(key);
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
+// A subject is a single header line, and several of them interpolate
+// user-controlled text (workspace names, submission titles). Collapse every
+// whitespace run — newlines included — and cap the length, so an over-long or
+// multi-line name can't produce a mangled subject. Applied centrally here so
+// it holds for every current and future call site.
+const MAX_SUBJECT_CHARS = 180;
+
+function cleanSubject(subject: string): string {
+  const flat = subject.replace(/\s+/g, " ").trim();
+  return flat.length > MAX_SUBJECT_CHARS ? `${flat.slice(0, MAX_SUBJECT_CHARS - 1)}…` : flat;
+}
+
+async function sendEmail(to: string, rawSubject: string, html: string) {
+  const subject = cleanSubject(rawSubject);
   // Dev convenience: without a Resend key, log the email instead of failing
   // the whole registration/invite flow — lets you click through locally.
   if (!process.env.RESEND_API_KEY) {
@@ -443,14 +456,18 @@ export async function sendContentExpiryEmail(
       month: "long",
       year: "numeric",
     });
-  const dayNote = (it: ExpiryItem) =>
-    it.daysLeft < 0
+  const dayNote = (it: ExpiryItem) => {
+    // English inflects on 1, Indonesian does not — same rule as i18n.ts.
+    const n = Math.abs(it.daysLeft);
+    const unit = n === 1 ? "day" : "days";
+    return it.daysLeft < 0
       ? locale === "id"
-        ? `kedaluwarsa ${-it.daysLeft} hari lalu`
-        : `expired ${-it.daysLeft} days ago`
+        ? `kedaluwarsa ${n} hari lalu`
+        : `expired ${n} ${unit} ago`
       : locale === "id"
-        ? `${it.daysLeft} hari lagi`
-        : `${it.daysLeft} days left`;
+        ? `${n} hari lagi`
+        : `${n} ${unit} left`;
+  };
 
   const rows = items
     .map(

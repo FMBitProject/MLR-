@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // Tests import source modules by their real ".ts" path so the Node test
+    // runner (via tsx) resolves them without a build step.
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  // Only the test files: the app's own sources (and the Next-generated route
+  // types they depend on) are checked by ../tsconfig.json.
+  "include": ["**/*.ts"],
+  "exclude": []
+}

@@ -76,7 +76,11 @@ export type RetrievedChunk = {
 };
 
 function chunkDocument(content: string): string[] {
-  if (content.length <= CHUNK_CHARS) return [content];
+  // Trim and drop-if-empty on both paths: a document whose stored content is
+  // blank must yield NO chunks, not one empty one. An empty chunk would make
+  // `chunks.length` truthy in journal-check.ts, which then reports a verdict
+  // over no evidence at all.
+  if (content.length <= CHUNK_CHARS) return [content.trim()].filter(Boolean);
   const chunks: string[] = [];
   let start = 0;
   while (start < content.length) {

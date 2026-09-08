@@ -7,7 +7,11 @@ import { llmComplete } from "./llm";
 
 function heuristicCandidates(text: string): string[] {
   const sentences = text
-    .split(/\n+|(?<=[.!?])\s+/)
+    // Split on sentence ends, but not on the period of a document-reference
+    // abbreviation ("Rev. 3", "No. 12"): splitting there would strip the
+    // marker into its own fragment and leave the tail looking like a clean
+    // sentence, so the header filters below could never match it.
+    .split(/\n+|(?<!\b(?:rev|no|vol|ed|hal|dr|prof)\.)(?<=[.!?])\s+/i)
     .map((s) => s.replace(/^[\d.\-•)\s]+/, "").trim())
     .filter(Boolean);
 

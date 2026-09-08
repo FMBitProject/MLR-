@@ -1227,5 +1227,8 @@ export function relativeDays(d: Date | number, locale: Locale): string {
   const ms = Date.now() - (typeof d === "number" ? d : d.getTime());
   const days = Math.floor(ms / 86_400_000);
   if (days <= 0) return locale === "id" ? "hari ini" : "today";
+  // Singular case, mirroring daysUntil above — English inflects, Indonesian
+  // does not, but keeping the branch symmetric keeps the two helpers aligned.
+  if (days === 1) return locale === "id" ? "1 hari lalu" : "1 day ago";
   return locale === "id" ? `${days} hari lalu` : `${days} days ago`;
 }

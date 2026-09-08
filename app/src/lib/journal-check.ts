@@ -148,8 +148,16 @@ export async function checkAgainstJournal(opts: {
   const docs = new Map<string, JournalDoc>();
   for (const c of order) {
     if (docs.size >= MAX_DOCS) break;
-    const doc = await ensureJournalDocument(opts.tenantId, c.ref);
-    if (doc) docs.set(doc.id, doc);
+    // One unreadable reference must not sink the whole check: log it and try
+    // the next candidate. Substantiation is assistive (PRD §6), so an infra
+    // failure degrades to "unavailable" for the reviewer — the same outcome
+    // as no readable source — rather than erroring out of their action.
+    try {
+      const doc = await ensureJournalDocument(opts.tenantId, c.ref);
+      if (doc) docs.set(doc.id, doc);
+    } catch (err) {
+      console.error(`journal document lookup for ${c.ref.pmid ?? c.ref.docId} failed:`, err);
+    }
   }
   if (!docs.size) return null;
 
