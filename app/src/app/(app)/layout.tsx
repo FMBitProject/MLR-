@@ -62,12 +62,9 @@ export default async function AppLayout({
     <div className="flex min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-30 flex w-[248px] flex-col bg-gradient-to-b from-[#0b1220] via-[#0d1626] to-brand-950 px-4 py-6">
         <div className="mb-8 px-2">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center rounded-xl bg-white/95 px-2.5 py-1.5 shadow-sm transition hover:scale-105"
-          >
+          <Link href="/dashboard" className="inline-flex items-center transition hover:scale-105">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/logo.png" alt={dict.appName} className="h-6 w-auto" />
+            <img src="/brand/logo-dark.png" alt={dict.appName} className="h-6 w-auto" />
           </Link>
           <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-slate-500">
             {tenant?.name}
