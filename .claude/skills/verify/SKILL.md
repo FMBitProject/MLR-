@@ -27,6 +27,14 @@ dewi@ (marketing), budi@ (medical_reviewer), ratna@ (legal_reviewer),
 agus@ (regulatory_reviewer), sari@ (compliance_admin), rudi@ (super_admin)
 — all `@nusantara-pharma.co.id`.
 
+This is `db:seed`'s tenant (`tn-nusantara`, plan `growth`) — separate from
+`db:demo`'s tenant (`tn-demo`, plan `enterprise`, unlimited), which is the one
+seeded into *production* and linked from the public login page's demo
+buttons. Same six-role cast, same password pattern, different domain
+(`@mlrflow-demo.id`) and password (`DemoMLR2026!` by default, or `$DEMO_PASSWORD`).
+Don't run `db:demo` against the local verify DB — it's meant for a real,
+durable Postgres, not the throwaway container above.
+
 ## Driving the UI (playwright-core in app/node_modules; Chromium already in ~/.cache/ms-playwright)
 
 ```js
@@ -40,7 +48,15 @@ Gotchas learned the hard way:
   `button:has(svg.lucide-refresh-cw)`. Fields: `textarea[name="text"]`,
   `textarea[name="changeNote"]` (required).
 - Decision buttons: `button[name="decision"][value="approved"|"changes_requested"|"rejected"]`;
-  reject/changes stay disabled until `textarea[name="note"]` is filled.
+  reject/changes stay disabled until `textarea[name="note"]` is filled — approve
+  also needs `input[name="password"]` (the e-signature re-entry) filled.
+- The review page's right rail (AI Claims Check Flags, Comments, Audit Trail)
+  is now collapsible (`<details>`/`<summary>`, see `Section` in
+  `review-workspace.tsx`). Audit Trail defaults closed; the others open only
+  when the logged-in user can act there. A click on a button inside a closed
+  section will find it but it won't be visible/interactable — force every
+  section open first, locale-independent:
+  `await page.$$eval("details", (els) => els.forEach((d) => (d.open = true)))`.
 - Switch users by `context.clearCookies()` then logging in again.
 - Don't assert on `page.textContent("body")` — it includes the RSC flight payload
   in script tags, which embeds the entire i18n dictionary (every UI string "appears"
