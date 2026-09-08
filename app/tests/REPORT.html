@@ -1,0 +1,869 @@
+<title>MLR Flow Unit Test Report</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap">
+<style>
+  :root {
+    --ground: #f4f7f6;
+    --surface: #ffffff;
+    --surface-sunk: #eef2f1;
+    --ink: #121d1b;
+    --ink-2: #3c4b48;
+    --muted: #6b7a77;
+    --rule: #dce4e2;
+    --rule-strong: #c3cfcc;
+    --accent: #0f766e;
+    --accent-soft: #e2f0ee;
+    --good: #15803d;
+    --good-soft: #e3f2e8;
+    --warn: #a4620a;
+    --warn-soft: #f8eedd;
+    --gap: #56636f;
+    --gap-soft: #e9edf1;
+    --high: #a82a1c;
+    --high-soft: #f9e6e3;
+
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0d1413;
+      --surface: #141d1b;
+      --surface-sunk: #1a2422;
+      --ink: #e8efec;
+      --ink-2: #b6c4c0;
+      --muted: #8b9a96;
+      --rule: #253331;
+      --rule-strong: #33443f;
+      --accent: #4fd1c0;
+      --accent-soft: #12302c;
+      --good: #5cc07f;
+      --good-soft: #102b1a;
+      --warn: #d99b3f;
+      --warn-soft: #2e2313;
+      --gap: #93a3b1;
+      --gap-soft: #1b242c;
+      --high: #f2907f;
+      --high-soft: #331a16;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0d1413;
+    --surface: #141d1b;
+    --surface-sunk: #1a2422;
+    --ink: #e8efec;
+    --ink-2: #b6c4c0;
+    --muted: #8b9a96;
+    --rule: #253331;
+    --rule-strong: #33443f;
+    --accent: #4fd1c0;
+    --accent-soft: #12302c;
+    --good: #5cc07f;
+    --good-soft: #102b1a;
+    --warn: #d99b3f;
+    --warn-soft: #2e2313;
+    --gap: #93a3b1;
+    --gap-soft: #1b242c;
+    --high: #f2907f;
+    --high-soft: #331a16;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 48px 28px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: 20px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(32px, 5.5vw, 46px);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 17px;
+    color: var(--ink-2);
+    max-width: 64ch;
+    margin: 0;
+  }
+
+  .runmeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 28px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .runmeta b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---------- verdict tiles ---------- */
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .tile {
+    background: var(--surface);
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .tile .n {
+    font-family: var(--serif);
+    font-size: 38px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .tile .k {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tile.is-good .n { color: var(--good); }
+  .tile.is-warn .n { color: var(--warn); }
+  .tile.is-zero .n { color: var(--ink); }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 20px; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: 25px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  p { margin: 0; max-width: 68ch; color: var(--ink-2); }
+  p.lede { color: var(--ink-2); }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, .row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  code, .mono { font-family: var(--mono); font-size: 0.88em; }
+  p code, td code, li code {
+    background: var(--surface-sunk);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  /* ---------- findings ---------- */
+
+  .findings { display: flex; flex-direction: column; gap: 14px; }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--stripe, var(--rule-strong));
+    border-radius: 3px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .finding.sev-warn { --stripe: var(--warn); }
+  .finding.sev-note { --stripe: var(--gap); }
+
+  .finding-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 14px;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .chip-warn { background: var(--warn-soft); color: var(--warn); }
+  .chip-note { background: var(--gap-soft); color: var(--gap); }
+  .chip-good { background: var(--good-soft); color: var(--good); }
+
+  .finding-src {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+
+  .finding p { font-size: 15px; max-width: 72ch; }
+
+  .finding .effect {
+    font-size: 14px;
+    color: var(--ink-2);
+    background: var(--surface-sunk);
+    border-radius: 3px;
+    padding: 10px 13px;
+    max-width: none;
+  }
+  .finding .effect b {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 2px;
+    font-weight: 500;
+  }
+
+  /* ---------- coverage table ---------- */
+
+  .tablewrap {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+  }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--surface-sunk); }
+
+  td.unit {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  td.num { font-family: var(--mono); font-weight: 500; color: var(--ink); }
+
+  tfoot td {
+    border-top: 2px solid var(--rule-strong);
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface-sunk);
+  }
+
+  /* ---------- gaps ---------- */
+
+  .gaps { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+  .gap-row {
+    background: var(--surface);
+    padding: 16px 20px;
+    display: grid;
+    grid-template-columns: minmax(150px, 190px) 1fr;
+    gap: 6px 24px;
+    align-items: baseline;
+  }
+  .gap-row .who { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  .gap-row .why { font-size: 14.5px; color: var(--ink-2); }
+  @media (max-width: 620px) { .gap-row { grid-template-columns: 1fr; } }
+
+  /* ---------- run block ---------- */
+
+  pre {
+    background: var(--surface-sunk);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--ink);
+  }
+  pre .c { color: var(--muted); }
+
+  ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--ink-2); max-width: 68ch; }
+  ul.plain li::marker { color: var(--accent); }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ---------- severity + status ---------- */
+
+  .chip-high  { background: var(--high-soft); color: var(--high); }
+  .chip-med   { background: var(--warn-soft); color: var(--warn); }
+  .chip-low   { background: var(--gap-soft);  color: var(--gap); }
+  .chip-fixed { background: var(--good-soft); color: var(--good); }
+
+  .finding.sev-high { --stripe: var(--high); }
+  .finding.sev-med  { --stripe: var(--warn); }
+  .finding.sev-low  { --stripe: var(--gap); }
+
+  .finding .fix {
+    font-size: 14px;
+    color: var(--ink-2);
+    border-left: 2px solid var(--good);
+    padding: 2px 0 2px 13px;
+    max-width: none;
+  }
+  .finding .fix b {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--good);
+    display: block;
+    margin-bottom: 2px;
+    font-weight: 600;
+  }
+
+  .sev-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    align-items: center;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">Unit test run &middot; all findings closed</div>
+    <h1>MLR Flow Unit Test Report</h1>
+    <p class="standfirst">
+      A unit suite built from scratch for the <code>src/lib</code> layer &mdash; the plan gating,
+      billing clock, Midtrans signature check, claims matching, journal retrieval, document
+      extraction and rendering that the MLR workflow rests on. Six findings were raised, triaged by
+      severity, and all six fixed. It runs on Node's built-in test runner through
+      <code>tsx</code>, with no new dependencies added to the project.
+    </p>
+    <div class="runmeta">
+      <span><b>239</b> tests</span>
+      <span><b>21</b> files</span>
+      <span><b>21</b> modules</span>
+      <span><b>6.1 s</b> wall clock</span>
+      <span>exit code <b>0</b></span>
+      <span>2026-09-08</span>
+    </div>
+  </header>
+
+  <div class="tiles">
+    <div class="tile is-good">
+      <div class="n">239</div>
+      <div class="k">Passing</div>
+    </div>
+    <div class="tile is-zero">
+      <div class="n">0</div>
+      <div class="k">Failing</div>
+    </div>
+    <div class="tile is-good">
+      <div class="n">6</div>
+      <div class="k">Findings fixed</div>
+    </div>
+    <div class="tile is-zero">
+      <div class="n">0</div>
+      <div class="k">Open / deferred</div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Triage</h2>
+    <p class="lede">
+      Five findings, none Critical. Severity is judged by what a defect does to a
+      <em>regulated review decision</em>: anything that could mislead a reviewer about whether
+      promotional copy is substantiated ranks above anything cosmetic. High and Medium were fixed
+      first, then the Low one; all six are closed and covered by regression tests. Fixing the Low
+      item surfaced a sixth &mdash; the same pluralisation bug in a second location.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Finding</th>
+            <th>Module</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="chip chip-high">Critical</span></td>
+            <td colspan="3" style="color:var(--muted)">None found.</td>
+          </tr>
+          <tr>
+            <td><span class="chip chip-high">High</span></td>
+            <td>Verdict reported over an empty evidence set</td>
+            <td class="unit">journal-corpus.ts</td>
+            <td><span class="chip chip-fixed">Fixed</span></td>
+          </tr>
+          <tr>
+            <td><span class="chip chip-med">Medium</span></td>
+            <td>Substantiation check hard-fails instead of degrading</td>
+            <td class="unit">journal-check.ts</td>
+            <td><span class="chip chip-fixed">Fixed</span></td>
+          </tr>
+          <tr>
+            <td><span class="chip chip-med">Medium</span></td>
+            <td>Unsanitised user text in outbound email subjects</td>
+            <td class="unit">email.ts</td>
+            <td><span class="chip chip-fixed">Fixed</span></td>
+          </tr>
+          <tr>
+            <td><span class="chip chip-med">Medium</span></td>
+            <td>SOP revision-header filter never fires</td>
+            <td class="unit">claims-extract.ts</td>
+            <td><span class="chip chip-fixed">Fixed</span></td>
+          </tr>
+          <tr>
+            <td><span class="chip chip-low">Low</span></td>
+            <td>English relative dates read &ldquo;1 days ago&rdquo;</td>
+            <td class="unit">i18n.ts</td>
+            <td><span class="chip chip-fixed">Fixed</span></td>
+          </tr>
+          <tr>
+            <td><span class="chip chip-low">Low</span></td>
+            <td>Same pluralisation bug in the expiry digest</td>
+            <td class="unit">email.ts</td>
+            <td><span class="chip chip-fixed">Fixed</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Findings in detail</h2>
+
+    <div class="findings">
+
+      <article class="finding sev-high">
+        <div class="finding-head">
+          <span class="chip chip-high">High</span>
+          <span class="chip chip-fixed">Fixed</span>
+          <h3>A verdict was reported over an empty evidence set</h3>
+          <span class="finding-src">journal-corpus.ts</span>
+        </div>
+        <p>
+          <code>chunkDocument()</code> short-circuited on <code>content.length &lt;= CHUNK_CHARS</code>
+          with <code>return [content]</code>, ahead of the <code>.filter(Boolean)</code> that guards
+          the long-document path. A document whose stored content was empty therefore produced one
+          empty-string chunk instead of none.
+        </p>
+        <div class="effect">
+          <b>Why it matters &mdash; and why High</b>
+          Downstream in <code>journal-check.ts</code>, <code>chunks.length</code> was then truthy, so
+          the no-LLM branch returned verdict <code>abstract_only</code> with an empty note. A reviewer
+          deciding whether a claim is substantiated saw what looked like a completed check with a
+          blank excerpt, rather than &ldquo;no readable source&rdquo;. Presenting an empty result as a
+          performed check is the one failure mode in this suite that can actively mislead a
+          regulated decision &mdash; everything else merely wastes time or looks untidy.
+        </div>
+        <div class="fix">
+          <b>Fix</b>
+          Both paths now trim and drop empties, so a blank document yields no chunks and the
+          substantiation falls through to its existing &ldquo;unavailable&rdquo; state. Three
+          regression tests cover empty content, whitespace-only content, and a blank document
+          sitting alongside a real one.
+        </div>
+      </article>
+
+      <article class="finding sev-med">
+        <div class="finding-head">
+          <span class="chip chip-med">Medium</span>
+          <span class="chip chip-fixed">Fixed</span>
+          <h3>The substantiation check hard-failed instead of degrading</h3>
+          <span class="finding-src">journal-check.ts</span>
+        </div>
+        <p>
+          <code>checkAgainstJournal()</code> wrapped no part of its corpus resolution in
+          <code>try/catch</code>. Every other failure in that module degrades to <code>null</code> &mdash;
+          the module's stated contract is that AI assistance is always optional &mdash; but a database
+          or lookup error thrown by <code>ensureJournalDocument()</code> propagated straight out.
+        </p>
+        <div class="effect">
+          <b>Why it matters</b>
+          The calling server action has a designed <code>unavailable</code> state for exactly this
+          situation, and never reached it: one unreadable reference aborted the whole action, the
+          flag was left un-updated, and the reviewer got a generic server error instead of an
+          honest &ldquo;could not verify&rdquo;.
+        </div>
+        <div class="fix">
+          <b>Fix</b>
+          Each reference lookup is now individually guarded and logged, so one bad reference is
+          skipped and the remaining candidates still resolve. A total failure lands in the existing
+          <code>unavailable</code> state rather than erroring out of the reviewer's action.
+        </div>
+      </article>
+
+      <article class="finding sev-med">
+        <div class="finding-head">
+          <span class="chip chip-med">Medium</span>
+          <span class="chip chip-fixed">Fixed</span>
+          <h3>Unsanitised user text in outbound email subjects</h3>
+          <span class="finding-src">email.ts</span>
+        </div>
+        <p>
+          The audit began at <code>sendInviteEmail()</code>, which escapes the workspace name in the
+          HTML body but interpolated it raw into the subject. Reading the rest of the module showed
+          the same pattern at several more call sites &mdash; submission titles flow unescaped into
+          review-request and decision subjects too.
+        </p>
+        <div class="effect">
+          <b>Why it matters &mdash; and what it is not</b>
+          This is <strong>not</strong> an injection hole. A subject is not rendered as markup, and
+          Resend takes it as a JSON field rather than concatenating SMTP headers, so CRLF header
+          injection is not reachable. What is real: a workspace name or submission title containing
+          newlines, or running to hundreds of characters, produces a mangled subject line in every
+          recipient's inbox.
+        </div>
+        <div class="fix">
+          <b>Fix</b>
+          Sanitising moved to the <code>sendEmail()</code> boundary rather than the one call site
+          that surfaced it &mdash; whitespace runs collapse to single spaces and the subject is capped
+          at 180 characters with an ellipsis. One change covers all present and future callers. Four
+          tests cover newlines, over-length truncation, a non-invite call site, and an ordinary
+          subject passing through untouched.
+        </div>
+      </article>
+
+      <article class="finding sev-med">
+        <div class="finding-head">
+          <span class="chip chip-med">Medium</span>
+          <span class="chip chip-fixed">Fixed</span>
+          <h3>The SOP revision-header filter never fired</h3>
+          <span class="finding-src">claims-extract.ts</span>
+        </div>
+        <p>
+          The heuristic extractor filters document headers with <code>/\brev\.?\s*\d/i</code>, but the
+          sentence splitter ran first and split on <code>(?&lt;=[.!?])\s+</code>. &ldquo;Dokumen ini
+          Rev. 3 berlaku sejak&hellip;&rdquo; was already cut at the period in &ldquo;Rev.&rdquo;
+          before the filter saw it, and the leading-number strip then turned the tail into a
+          clean-looking sentence. The filter was effectively dead code.
+        </p>
+        <div class="effect">
+          <b>Why it matters</b>
+          SOP revision boilerplate leaked into the claim-import candidate list. A human ticks which
+          candidates become approved claims, by design, so nothing wrong could be published &mdash;
+          but it is avoidable noise in a screen meant to be scanned quickly, and a dead filter
+          reads as working.
+        </div>
+        <div class="fix">
+          <b>Fix</b>
+          The splitter no longer breaks on the period of a reference abbreviation
+          (<code>Rev.</code>, <code>No.</code>, <code>Vol.</code>&hellip;), so the sentence reaches the
+          header filters intact. Tests cover the revision marker, a second abbreviation, and that an
+          ordinary sentence boundary still splits normally.
+        </div>
+      </article>
+
+      <article class="finding sev-low">
+        <div class="finding-head">
+          <span class="chip chip-low">Low</span>
+          <span class="chip chip-fixed">Fixed</span>
+          <h3>English relative dates read &ldquo;1 days ago&rdquo;</h3>
+          <span class="finding-src">i18n.ts</span>
+        </div>
+        <p>
+          <code>relativeDays()</code> had no singular branch. Its sibling <code>daysUntil()</code> in
+          the same file already special-cases 1 (&ldquo;1 day left&rdquo;), so this was an
+          inconsistency rather than a deliberate choice. Indonesian is unaffected &mdash; it does not
+          inflect for number.
+        </p>
+        <div class="effect">
+          <b>Why it matters</b>
+          Purely cosmetic, but it appeared on every dashboard, activity log and reminder digest for
+          English-locale users.
+        </div>
+        <div class="fix">
+          <b>Fix</b>
+          A singular branch mirroring <code>daysUntil()</code>. Three tests cover the singular, the
+          agreement between the two sibling helpers, and that every other count still pluralises.
+        </div>
+      </article>
+
+      <article class="finding sev-low">
+        <div class="finding-head">
+          <span class="chip chip-low">Low</span>
+          <span class="chip chip-fixed">Fixed</span>
+          <h3>The same pluralisation bug in the content-expiry digest</h3>
+          <span class="finding-src">email.ts</span>
+        </div>
+        <p>
+          Found while checking what depended on <code>relativeDays()</code>: the expiry digest formats
+          its own day counts rather than reusing the helper, and had the identical defect on both
+          sides &mdash; &ldquo;expired 1 days ago&rdquo; and &ldquo;1 days left&rdquo;. Both counts are
+          reachable, since <code>daysLeft</code> comes from a <code>Math.ceil</code> that returns 1 and
+          &minus;1 routinely.
+        </p>
+        <div class="effect">
+          <b>Why it matters</b>
+          Same cosmetic weight as the one above, but it lands on the material closest to needing
+          action &mdash; the item expiring tomorrow, or that expired yesterday, is exactly the row a
+          compliance admin reads first.
+        </div>
+        <div class="fix">
+          <b>Fix</b>
+          Inflection applied to both the past and future branches, English only. Two tests cover the
+          English singular and plural forms on both sides, and that Indonesian stays uninflected.
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Coverage by unit</h2>
+    <p class="lede">
+      Every module in <code>src/lib</code> with logic that can be exercised without a live Postgres or
+      a Next.js request context. Ordered by test count.
+    </p>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th class="num">Tests</th>
+            <th>What is verified</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="unit">svg.ts</td><td class="num">21</td>
+            <td>XML escaping (incl. injected <code>&lt;script&gt;</code> in titles and paragraphs), text wrapping, pagination and bbox integrity, one-page-per-slide invariant, media badges, adaptive page height</td>
+          </tr>
+          <tr>
+            <td class="unit">claims-extract.ts</td><td class="num">18</td>
+            <td>Heuristic candidate extraction, SOP heading and revision-marker filters, abbreviation-safe sentence splitting, dedupe, 20-item cap, LLM path preferred when valid, silent fallback on malformed output or outage</td>
+          </tr>
+          <tr>
+            <td class="unit">pubmed.ts</td><td class="num">16</td>
+            <td>PMID / DOI / URL parsing, citation formatting, &ldquo;et al&rdquo; threshold, PMC full-text stripping, abstract length gate, NCBI outage and network-failure handling</td>
+          </tr>
+          <tr>
+            <td class="unit">office.ts</td><td class="num">16</td>
+            <td>PPTX/DOCX extraction against real JSZip fixtures: numeric slide ordering across the 9/10 boundary, run rejoining, entity decoding order, media detection, corrupt-file safety</td>
+          </tr>
+          <tr>
+            <td class="unit">journal-corpus.ts</td><td class="num">15</td>
+            <td>TF-IDF retrieval ranking, IDF downweighting of ubiquitous terms, chunk overlap losing no content, cap enforcement, finite scores, and the empty-document regression above</td>
+          </tr>
+          <tr>
+            <td class="unit">claims-check.ts</td><td class="num">15</td>
+            <td>Cosine similarity: symmetry, range, stopword stripping, and threshold behaviour at the 0.72 / 0.35 boundaries that decide whether a reviewer sees a flag</td>
+          </tr>
+          <tr>
+            <td class="unit">plans.ts</td><td class="num">14</td>
+            <td>Plan resolution and fallback, monotonic quotas, feature gating per PRD tier, features never lost on upgrade, promo window at the WIB day boundary, no-downgrade rule</td>
+          </tr>
+          <tr>
+            <td class="unit">email.ts</td><td class="num">16</td>
+            <td>Base-URL resolution precedence, absolute tokenised links, HTML escaping of hostile display names / workspace names / reminder titles, subject flattening and truncation, day-count inflection in the expiry digest, production failure without a key</td>
+          </tr>
+          <tr>
+            <td class="unit">billing.ts</td><td class="num">13</td>
+            <td>active &rarr; grace &rarr; delinquent transitions at exact boundaries, unmanaged free/manual tenants, read-only lock, month arithmetic clamping (Jan 31 &rarr; Feb 28/29)</td>
+          </tr>
+          <tr>
+            <td class="unit">midtrans.ts</td><td class="num">12</td>
+            <td>SHA-512 notification signature verification, forged/foreign-key/tampered-field rejection, paid vs failed status classification, fraud-status challenge handling</td>
+          </tr>
+          <tr>
+            <td class="unit">llm.ts</td><td class="num">12</td>
+            <td>Provider precedence across five backends, <code>AI_PROVIDER</code> forcing, model override, request shape (temperature 0, JSON mode), null-on-any-failure contract</td>
+          </tr>
+          <tr>
+            <td class="unit">i18n.ts</td><td class="num">15</td>
+            <td>Full id/en dictionary key parity and type parity, no empty strings, date formatting, and relative-day phrasing including singular/plural agreement between the two day-counting helpers</td>
+          </tr>
+          <tr>
+            <td class="unit">diff.ts</td><td class="num">12</td>
+            <td>LCS paragraph diff: insert/delete/edit cases, empty sides, reorder, and exact reconstruction of both documents from the diff</td>
+          </tr>
+          <tr>
+            <td class="unit">content-expiry.ts</td><td class="num">8</td>
+            <td>Lifecycle classification: withdrawn precedence, the 30-day warning boundary, the exact expiry instant, total coverage of the four states</td>
+          </tr>
+          <tr>
+            <td class="unit">auth.ts <span class="mono" style="color:var(--muted)">(roles)</span></td><td class="num">8</td>
+            <td>Separation of duties: reviewers cannot submit the content they review, marketing cannot manage the claims library it must comply with, no orphan roles</td>
+          </tr>
+          <tr>
+            <td class="unit">password.ts</td><td class="num">7</td>
+            <td>scrypt round-trip, random salting, malformed and truncated stored values rejected rather than thrown on, unicode and long passwords</td>
+          </tr>
+          <tr>
+            <td class="unit">legal.ts</td><td class="num">7</td>
+            <td>Terms/Privacy/FAQ structural parity across locales, no empty sections or answers, no unfilled TODO markers, unique headings</td>
+          </tr>
+          <tr>
+            <td class="unit">company.ts</td><td class="num">7</td>
+            <td>Visible placeholders for unset legal identity, incompleteness detection, privacy-email fallback chain</td>
+          </tr>
+          <tr>
+            <td class="unit">mime.ts</td><td class="num">4</td>
+            <td>Extension mapping, case-insensitivity, multi-dot names, octet-stream fallback</td>
+          </tr>
+          <tr>
+            <td class="unit">upload.ts</td><td class="num">2</td>
+            <td>Cap consistency and the documented headroom below Vercel's 4.5 MB request-body ceiling</td>
+          </tr>
+          <tr>
+            <td class="unit">journal-check.ts</td><td class="num">2</td>
+            <td>Candidate dedupe and identity guards only &mdash; everything past them needs a database</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr><td>21 modules</td><td class="num">239</td><td>239 passing &middot; 0 failing &middot; 0 deferred</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>What is not covered, and why</h2>
+    <p class="lede">
+      These are deliberate exclusions, not oversights. Each needs a live Postgres or a Next.js
+      request context, which makes it an integration test rather than a unit test.
+    </p>
+
+    <div class="gaps">
+      <div class="gap-row">
+        <span class="who">actions.ts</span>
+        <span class="why">1,948 lines of <code>"use server"</code> actions. Every one opens with <code>requireUser()</code> (cookies) and queries the database. The single largest coverage gap in the app, and the one most worth an integration suite.</span>
+      </div>
+      <div class="gap-row">
+        <span class="who">reminders.ts &middot; notify.ts<br>content-expiry sweep<br>billing sweep</span>
+        <span class="why">Cron fan-out. The pure parts &mdash; <code>contentLifecycle</code>, <code>billingState</code>, <code>addOneMonth</code> &mdash; are covered above; the sweeps themselves query, send, and write back.</span>
+      </div>
+      <div class="gap-row">
+        <span class="who">throttle.ts</span>
+        <span class="why">The rate limiter is one atomic SQL upsert. Its correctness is in the SQL, so a unit test with a mocked db would assert nothing real.</span>
+      </div>
+      <div class="gap-row">
+        <span class="who">account-tokens.ts<br>audit.ts &middot; audit-query.ts<br>usage.ts &middot; storage.ts</span>
+        <span class="why">Thin database wrappers. Token TTLs (24 h verify/invite, 1 h reset) and audit append-only behaviour are worth asserting &mdash; against a real schema.</span>
+      </div>
+      <div class="gap-row">
+        <span class="who">auth.ts <span style="opacity:.7">(sessions)</span><br>i18n-server.ts</span>
+        <span class="why">Cookie signing and reading need <code>next/headers</code> inside a request scope. Role constants and separation-of-duties <em>are</em> covered.</span>
+      </div>
+      <div class="gap-row">
+        <span class="who">components/ &middot; app/</span>
+        <span class="why">React components and route handlers. No renderer is installed; adding one is a larger decision than this task.</span>
+      </div>
+    </div>
+
+    <p style="margin-top:4px">
+      The new guard in <code>checkAgainstJournal()</code> is exercised only indirectly here: proving it
+      degrades correctly needs a database that can be made to fail on demand. Asserting it at unit
+      level would mean depending on Postgres being <em>absent</em>, which would silently invert the
+      moment someone runs <code>docker compose up</code>. It belongs in the integration suite.
+    </p>
+  </section>
+
+  <section>
+    <h2>Running it</h2>
+    <pre><span class="c"># from app/</span>
+npm test          <span class="c"># 239 tests, ~6s, exit 0</span>
+npm run test:watch</pre>
+    <ul class="plain">
+      <li>Node's built-in runner via <code>tsx</code> &mdash; <strong>no new dependencies</strong>. Both were already in the project.</li>
+      <li><code>tests/setup.ts</code> is preloaded with <code>--import</code>. It sets a dummy <code>DATABASE_URL</code> so DB-importing modules load; the <code>pg</code> pool is lazy, so nothing dials Postgres. Any test that did issue a query would fail loudly with <code>ECONNREFUSED</code> rather than quietly hitting a real database.</li>
+      <li>Tests get their own <code>tests/tsconfig.json</code> and are excluded from the app's. <code>npx tsc --noEmit</code> is clean for both &mdash; the Next build is untouched.</li>
+      <li>Network calls are stubbed per test by swapping <code>globalThis.fetch</code> and restoring it in <code>finally</code>. No test reaches NCBI, Midtrans, Resend, or any LLM provider.</li>
+      <li>PPTX and DOCX fixtures are built as real ZIP archives with JSZip, so the extractors run against genuine Office file structure rather than a hand-rolled mock.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Suite at <span class="mono">app/tests/</span> &middot; 21 files &middot;
+    5 production files changed:
+    <span class="mono">journal-corpus.ts</span>, <span class="mono">journal-check.ts</span>,
+    <span class="mono">email.ts</span>, <span class="mono">claims-extract.ts</span>,
+    <span class="mono">i18n.ts</span>
+  </footer>
+
+</div>
