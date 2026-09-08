@@ -4,8 +4,9 @@ import { Download, ScrollText } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
-import { queryAudit } from "@/lib/audit-query";
-import { Card, Chip, EmptyState, PageHeader } from "@/components/ui";
+import { countAudit, queryAudit } from "@/lib/audit-query";
+import { PAGE_SIZE, offsetFor, pageHref, pageParam } from "@/lib/paging";
+import { Card, Chip, EmptyState, PageHeader, Pager } from "@/components/ui";
 
 export default async function AuditPage(props: PageProps<"/audit">) {
   const user = await requireUser();
@@ -18,12 +19,17 @@ export default async function AuditPage(props: PageProps<"/audit">) {
   const to =
     typeof sp.to === "string" && sp.to ? new Date(new Date(sp.to).getTime() + 86_399_000) : null;
 
-  const products = await db
-    .select({ id: t.products.id, name: t.products.name })
-    .from(t.products)
-    .where(eq(t.products.tenantId, user.tenantId));
+  const page = pageParam(sp.page);
+  const filter = { tenantId: user.tenantId, productId, from, to };
 
-  const rows = (await queryAudit({ tenantId: user.tenantId, productId, from, to })).slice(0, 200);
+  const [products, rows, total] = await Promise.all([
+    db
+      .select({ id: t.products.id, name: t.products.name })
+      .from(t.products)
+      .where(eq(t.products.tenantId, user.tenantId)),
+    queryAudit({ ...filter, limit: PAGE_SIZE, offset: offsetFor(page) }),
+    countAudit(filter),
+  ]);
 
   const exportUrl = `/audit/export?product=${productId ?? ""}&from=${
     typeof sp.from === "string" ? sp.from : ""
@@ -119,6 +125,13 @@ export default async function AuditPage(props: PageProps<"/audit">) {
         ) : (
           <EmptyState icon={<ScrollText className="size-8 text-slate-300" />} text="—" />
         )}
+        <Pager
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          hrefFor={(p) => pageHref("/audit", sp, p)}
+          labels={dict.common}
+        />
       </Card>
     </div>
   );
