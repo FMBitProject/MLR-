@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 export function Card({
@@ -158,6 +159,67 @@ export function EmptyState({ icon, text }: { icon?: ReactNode; text: string }) {
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
       {icon}
       <p className="text-sm text-slate-500">{text}</p>
+    </div>
+  );
+}
+
+/**
+ * Page links for a server-paginated list. Renders nothing for a single page.
+ * `hrefFor` keeps the caller's other search params (filters) intact.
+ */
+export function Pager({
+  page,
+  pageSize,
+  total,
+  hrefFor,
+  labels,
+}: {
+  /** 1-based. */
+  page: number;
+  pageSize: number;
+  total: number;
+  hrefFor: (page: number) => string;
+  labels: { prev: string; next: string; showingRange: string };
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  if (pageCount <= 1) return null;
+
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  const range = labels.showingRange
+    .replace("{from}", String(from))
+    .replace("{to}", String(to))
+    .replace("{total}", String(total));
+
+  const step =
+    "rounded-lg px-3 py-1.5 text-[12.5px] font-semibold ring-1 ring-inset transition " +
+    "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50";
+  const disabled = "pointer-events-none opacity-40";
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-6 py-3">
+      <p className="text-[12px] text-slate-500">{range}</p>
+      <div className="flex items-center gap-2">
+        <Link
+          href={hrefFor(page - 1)}
+          aria-disabled={page <= 1}
+          tabIndex={page <= 1 ? -1 : undefined}
+          className={clsx(step, page <= 1 && disabled)}
+        >
+          {labels.prev}
+        </Link>
+        <span className="text-[12px] tabular-nums text-slate-500">
+          {page} / {pageCount}
+        </span>
+        <Link
+          href={hrefFor(page + 1)}
+          aria-disabled={page >= pageCount}
+          tabIndex={page >= pageCount ? -1 : undefined}
+          className={clsx(step, page >= pageCount && disabled)}
+        >
+          {labels.next}
+        </Link>
+      </div>
     </div>
   );
 }

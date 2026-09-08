@@ -605,6 +605,10 @@ const dictionaries = {
       inDays: "hari lagi",
       by: "oleh",
       general: "Umum",
+      prev: "Sebelumnya",
+      next: "Berikutnya",
+      // "1–25 dari 340"
+      showingRange: "{from}–{to} dari {total}",
     },
     channels: {
       print: "Cetak",
@@ -1214,6 +1218,10 @@ const dictionaries = {
       inDays: "days left",
       by: "by",
       general: "General",
+      prev: "Previous",
+      next: "Next",
+      // "1–25 of 340"
+      showingRange: "{from}–{to} of {total}",
     },
     channels: {
       print: "Print",

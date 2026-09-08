@@ -1,54 +1,94 @@
 import Link from "next/link";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { Plus, Inbox } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser, REVIEWER_ROLES, SUBMITTER_ROLES } from "@/lib/auth";
 import { getDict } from "@/lib/i18n-server";
 import { relativeDays } from "@/lib/i18n";
-import { Avatar, Card, EmptyState, PageHeader, StatusBadge, Chip } from "@/components/ui";
+import { PAGE_SIZE, offsetFor, pageHref, pageParam } from "@/lib/paging";
+import { Avatar, Card, EmptyState, PageHeader, Pager, StatusBadge, Chip } from "@/components/ui";
 
 export default async function SubmissionsPage(props: PageProps<"/submissions">) {
   const user = await requireUser();
   const { dict, locale } = await getDict();
   const sp = await props.searchParams;
   const statusFilter = typeof sp.status === "string" ? sp.status : null;
+  const page = pageParam(sp.page);
 
-  const subs = await db
-    .select({
-      sub: t.contentSubmissions,
-      product: t.products,
-      submitter: t.users,
-    })
-    .from(t.contentSubmissions)
-    .innerJoin(t.products, eq(t.contentSubmissions.productId, t.products.id))
-    .innerJoin(t.users, eq(t.contentSubmissions.submittedBy, t.users.id))
-    .where(
-      and(
-        eq(t.contentSubmissions.tenantId, user.tenantId),
-        ...(statusFilter ? [eq(t.contentSubmissions.status, statusFilter)] : []),
-      ),
-    )
-    .orderBy(desc(t.contentSubmissions.createdAt));
+  const listWhere = and(
+    eq(t.contentSubmissions.tenantId, user.tenantId),
+    ...(statusFilter ? [eq(t.contentSubmissions.status, statusFilter)] : []),
+  );
 
-  const subIds = subs.map((s) => s.sub.id);
-  const versions = subIds.length
+  const [subs, total] = await Promise.all([
+    db
+      .select({
+        sub: t.contentSubmissions,
+        product: t.products,
+        submitter: t.users,
+      })
+      .from(t.contentSubmissions)
+      .innerJoin(t.products, eq(t.contentSubmissions.productId, t.products.id))
+      .innerJoin(t.users, eq(t.contentSubmissions.submittedBy, t.users.id))
+      .where(listWhere)
+      .orderBy(desc(t.contentSubmissions.createdAt))
+      .limit(PAGE_SIZE)
+      .offset(offsetFor(page)),
+    db
+      .select({ n: count() })
+      .from(t.contentSubmissions)
+      .where(listWhere)
+      .then((r) => r[0].n),
+  ]);
+
+  const isReviewer = REVIEWER_ROLES.includes(user.role as (typeof REVIEWER_ROLES)[number]);
+  const canSubmit = SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number]);
+
+  // Queried, not filtered out of `subs`: that list is one page now, so
+  // deriving the queue from it would hide work sitting on later pages.
+  const myQueue = isReviewer
     ? await db
-        // Only the version number is shown; selecting the whole row would
-        // pull every listed submission's uploaded file bytes with it.
         .select({
-          submissionId: t.contentVersions.submissionId,
-          versionNumber: t.contentVersions.versionNumber,
+          sub: t.contentSubmissions,
+          product: t.products,
+          submitter: t.users,
         })
-        .from(t.contentVersions)
-        .where(inArray(t.contentVersions.submissionId, subIds))
+        .from(t.contentSubmissions)
+        .innerJoin(t.products, eq(t.contentSubmissions.productId, t.products.id))
+        .innerJoin(t.users, eq(t.contentSubmissions.submittedBy, t.users.id))
+        .where(
+          and(
+            eq(t.contentSubmissions.tenantId, user.tenantId),
+            eq(t.contentSubmissions.status, "in_review"),
+            eq(t.contentSubmissions.currentStage, user.role),
+          ),
+        )
+        .orderBy(desc(t.contentSubmissions.createdAt))
     : [];
-  const stages = subIds.length
-    ? await db
-        .select()
-        .from(t.reviewStages)
-        .where(inArray(t.reviewStages.submissionId, subIds))
-        
-    : [];
+
+  // Both lists render the same row, so both need their version/stage lookups —
+  // a queued item may not be on the page being viewed. Bounded by page size
+  // plus the reviewer's own queue, never the tenant's whole history.
+  const rowIds = [...new Set([...subs, ...myQueue].map((s) => s.sub.id))];
+  const [versions, stages] = await Promise.all([
+    rowIds.length
+      ? db
+          // Only the version number is shown; selecting the whole row would
+          // pull every listed submission's uploaded file bytes with it.
+          .select({
+            submissionId: t.contentVersions.submissionId,
+            versionNumber: t.contentVersions.versionNumber,
+          })
+          .from(t.contentVersions)
+          .where(inArray(t.contentVersions.submissionId, rowIds))
+      : Promise.resolve([]),
+    rowIds.length
+      ? db
+          .select()
+          .from(t.reviewStages)
+          .where(inArray(t.reviewStages.submissionId, rowIds))
+      : Promise.resolve([]),
+  ]);
 
   const latestVersion = (subId: string) =>
     Math.max(0, ...versions.filter((v) => v.submissionId === subId).map((v) => v.versionNumber));
@@ -56,14 +96,6 @@ export default async function SubmissionsPage(props: PageProps<"/submissions">) 
     stages
       .filter((s) => s.submissionId === subId)
       .sort((a, b) => a.stageOrder - b.stageOrder);
-
-  const isReviewer = REVIEWER_ROLES.includes(user.role as (typeof REVIEWER_ROLES)[number]);
-  const canSubmit = SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number]);
-  const myQueue = isReviewer
-    ? subs.filter(
-        (s) => s.sub.status === "in_review" && s.sub.currentStage === user.role,
-      )
-    : [];
 
   const filters = ["all", "in_review", "changes_requested", "approved", "rejected"] as const;
 
@@ -178,7 +210,16 @@ export default async function SubmissionsPage(props: PageProps<"/submissions">) 
 
       <Card className="overflow-hidden">
         {subs.length ? (
-          <div className="divide-y divide-slate-100">{subs.map(row)}</div>
+          <>
+            <div className="divide-y divide-slate-100">{subs.map(row)}</div>
+            <Pager
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              hrefFor={(p) => pageHref("/submissions", sp, p)}
+              labels={dict.common}
+            />
+          </>
         ) : (
           <EmptyState
             icon={<Inbox className="size-8 text-slate-300" />}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { Download, FolderCheck, History, CopyPlus, FileText } from "lucide-react";
 import { db, t } from "@/lib/db";
 import { requireUser, SUBMITTER_ROLES } from "@/lib/auth";
@@ -7,40 +7,66 @@ import { getDict } from "@/lib/i18n-server";
 import { formatDate } from "@/lib/i18n";
 import { reuseApprovedContent } from "@/lib/actions";
 import { contentLifecycle } from "@/lib/content-expiry";
-import { Card, EmptyState, PageHeader, Chip } from "@/components/ui";
+import { PAGE_SIZE, offsetFor, pageHref, pageParam } from "@/lib/paging";
+import { Card, EmptyState, PageHeader, Pager, Chip } from "@/components/ui";
 import { LibraryLifecycle } from "@/components/library-lifecycle";
 import { DistributionTracker } from "@/components/distribution-tracker";
 
-export default async function LibraryPage() {
+export default async function LibraryPage(props: PageProps<"/library">) {
   const user = await requireUser();
   const { dict, locale } = await getDict();
+  const sp = await props.searchParams;
+  const page = pageParam(sp.page);
 
   // Withdrawn material stays listed (greyed, no reuse) — the library is the
   // audit-facing record of what has circulated, not just what may circulate.
-  const subs = await db
-    .select({ sub: t.contentSubmissions, product: t.products })
-    .from(t.contentSubmissions)
-    .innerJoin(t.products, eq(t.contentSubmissions.productId, t.products.id))
-    .where(
-      and(
-        eq(t.contentSubmissions.tenantId, user.tenantId),
-        inArray(t.contentSubmissions.status, ["approved", "withdrawn"]),
-      ),
-    )
-    .orderBy(desc(t.contentSubmissions.decidedAt));
+  const listWhere = and(
+    eq(t.contentSubmissions.tenantId, user.tenantId),
+    inArray(t.contentSubmissions.status, ["approved", "withdrawn"]),
+  );
 
+  const [subs, total] = await Promise.all([
+    db
+      .select({ sub: t.contentSubmissions, product: t.products })
+      .from(t.contentSubmissions)
+      .innerJoin(t.products, eq(t.contentSubmissions.productId, t.products.id))
+      .where(listWhere)
+      .orderBy(desc(t.contentSubmissions.decidedAt))
+      .limit(PAGE_SIZE)
+      .offset(offsetFor(page)),
+    db
+      .select({ n: count() })
+      .from(t.contentSubmissions)
+      .where(listWhere)
+      .then((r) => r[0].n),
+  ]);
+
+  // Both are scoped to the ids on this page, and independent of each other.
   const subIds = subs.map((s) => s.sub.id);
-  const versions = subIds.length
-    ? await db
-        .select({
-          id: t.contentVersions.id,
-          submissionId: t.contentVersions.submissionId,
-          versionNumber: t.contentVersions.versionNumber,
-          fileName: t.contentVersions.fileName,
-        })
-        .from(t.contentVersions)
-        .where(inArray(t.contentVersions.submissionId, subIds))
-    : [];
+  const [versions, distributions] = await Promise.all([
+    subIds.length
+      ? db
+          .select({
+            id: t.contentVersions.id,
+            submissionId: t.contentVersions.submissionId,
+            versionNumber: t.contentVersions.versionNumber,
+            fileName: t.contentVersions.fileName,
+          })
+          .from(t.contentVersions)
+          .where(inArray(t.contentVersions.submissionId, subIds))
+      : Promise.resolve([]),
+    subIds.length
+      ? db
+          .select()
+          .from(t.contentDistributions)
+          .where(
+            and(
+              inArray(t.contentDistributions.submissionId, subIds),
+              eq(t.contentDistributions.status, "live"),
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
 
   // The approved master is the highest (locked) version of each submission.
   const finalVersion = (subId: string) =>
@@ -51,18 +77,6 @@ export default async function LibraryPage() {
   const canSubmit = SUBMITTER_ROLES.includes(user.role as (typeof SUBMITTER_ROLES)[number]);
   const canManage = ["compliance_admin", "super_admin"].includes(user.role);
   const canDistribute = ["marketing", "compliance_admin", "super_admin"].includes(user.role);
-
-  const distributions = subIds.length
-    ? await db
-        .select()
-        .from(t.contentDistributions)
-        .where(
-          and(
-            inArray(t.contentDistributions.submissionId, subIds),
-            eq(t.contentDistributions.status, "live"),
-          ),
-        )
-    : [];
   const liveDistributionsFor = (subId: string) =>
     distributions
       .filter((d) => d.submissionId === subId)
@@ -211,6 +225,13 @@ export default async function LibraryPage() {
             text={dict.library.empty}
           />
         )}
+        <Pager
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          hrefFor={(p) => pageHref("/library", sp, p)}
+          labels={dict.common}
+        />
       </Card>
     </div>
   );
