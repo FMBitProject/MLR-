@@ -12,6 +12,7 @@ import {
   type PlanId,
 } from "@/lib/plans";
 import { BrandLogo } from "@/components/brand-logo";
+import { AeroHero } from "@/components/ui/aero-hero-3";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 
 const FEATURE_ICONS = [GitBranch, Sparkles, FileSearch, ShieldCheck];
@@ -25,59 +26,43 @@ export default async function Home() {
   const order: PlanId[] = ["starter", "growth", "enterprise"];
 
   return (
-    <div className="min-h-screen bg-[#f6f8fa]">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <BrandLogo appName={dict.appName} tagline={dict.tagline} />
+    <div className="relative min-h-screen bg-[#f6f8fa]">
+      <header className="absolute inset-x-0 top-0 z-30 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <BrandLogo appName={dict.appName} tagline={dict.tagline} variant="dark" />
         <div className="flex items-center gap-3">
           <LocaleSwitcher locale={locale} />
           <Link
             href="/login"
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200/60"
+            className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
           >
             {l.signIn}
           </Link>
           <Link
             href="/register"
-            className="rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800"
+            className="rounded-xl bg-brand-300 px-4 py-2 text-sm font-semibold text-brand-950 shadow-sm transition hover:bg-brand-200"
           >
             {l.register}
           </Link>
         </div>
       </header>
 
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-40 -top-40 size-[520px] rounded-full bg-brand-500/10 blur-3xl"
-        />
-        <div className="mx-auto max-w-6xl px-6 pb-20 pt-16 text-center">
-          <p className="mx-auto w-fit rounded-full bg-brand-50 px-3.5 py-1 text-[12.5px] font-semibold text-brand-800 ring-1 ring-inset ring-brand-200">
-            {l.heroBadge}
-          </p>
-          <h1 className="mx-auto mt-6 max-w-3xl text-[40px] font-semibold leading-[1.12] tracking-tight text-slate-900 sm:text-[48px]">
-            {l.heroTitle}
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-[16px] leading-relaxed text-slate-500">
-            {l.heroSubtitle}
-          </p>
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/register"
-              className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-6 py-3 text-[15px] font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99]"
-            >
-              {l.ctaPrimary}
-              <ArrowRight className="size-4" />
-            </Link>
-            <Link
-              href="/pricing"
-              className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-[15px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              {l.ctaSecondary}
-            </Link>
-          </div>
-          <p className="mt-6 text-[12.5px] text-slate-400">{l.footerCompliance}</p>
-        </div>
-      </section>
+      <AeroHero
+        eyebrow={l.heroBadge}
+        title={l.heroTitle}
+        subtitle={l.heroSubtitle}
+        ctaLabel={l.ctaPrimary}
+        ctaHref="/register"
+      />
+
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 pb-16 pt-10 text-center">
+        <Link
+          href="/pricing"
+          className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-[15px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          {l.ctaSecondary}
+        </Link>
+        <p className="text-[12.5px] text-slate-400">{l.footerCompliance}</p>
+      </div>
 
       <section className="mx-auto max-w-6xl px-6 pb-20">
         <h2 className="text-center text-[26px] font-semibold tracking-tight text-slate-900">

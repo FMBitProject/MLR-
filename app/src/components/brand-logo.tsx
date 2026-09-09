@@ -25,7 +25,7 @@ export function BrandLogo({
       />
       <p
         className={
-          "text-[11px] uppercase tracking-[0.18em] " +
+          "hidden text-[11px] uppercase tracking-[0.18em] sm:block " +
           (dark ? "text-brand-300/80" : "text-slate-400")
         }
       >

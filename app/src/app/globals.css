@@ -23,6 +23,99 @@
   --shadow-pop: 0 10px 30px -8px rgb(2 44 34 / 0.25);
 }
 
+/* ------------------------------------------------------------------
+   shadcn/ui token layer.
+   The generator's snippet for this component emitted broken references
+   (`var(----ring)`, a doubled prefix), so the mapping is written out
+   properly here and pointed at the brand palette above instead of
+   shadcn's default neutrals — that way `bg-primary`, `border-input`
+   and friends match the rest of the app rather than introducing a
+   second, competing colour system.
+   ------------------------------------------------------------------ */
+:root {
+  --background: #f6f8fa;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: var(--color-brand-700);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-slate-100);
+  --secondary-foreground: var(--color-slate-900);
+  --muted: var(--color-slate-100);
+  --muted-foreground: var(--color-slate-500);
+  --accent: var(--color-brand-50);
+  --accent-foreground: var(--color-brand-800);
+  --destructive: var(--color-rose-500);
+  --destructive-foreground: var(--color-rose-700);
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-700);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-700);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-amber-700);
+  --border: var(--color-slate-200);
+  --input: var(--color-slate-300);
+  --ring: var(--color-brand-500);
+}
+
+.dark {
+  --background: var(--color-ink-950);
+  --foreground: var(--color-slate-100);
+  --card: var(--color-slate-900);
+  --card-foreground: var(--color-slate-100);
+  --popover: var(--color-slate-900);
+  --popover-foreground: var(--color-slate-100);
+  --primary: var(--color-brand-400);
+  --primary-foreground: var(--color-brand-950);
+  --secondary: var(--color-slate-800);
+  --secondary-foreground: var(--color-slate-100);
+  --muted: var(--color-slate-800);
+  --muted-foreground: var(--color-slate-400);
+  --accent: var(--color-slate-800);
+  --accent-foreground: var(--color-brand-200);
+  --destructive: var(--color-rose-500);
+  --destructive-foreground: var(--color-rose-400);
+  --info: var(--color-blue-500);
+  --info-foreground: var(--color-blue-400);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-400);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-amber-400);
+  --border: var(--color-slate-700);
+  --input: var(--color-slate-700);
+  --ring: var(--color-brand-400);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
 body {
   background: #f6f8fa;
   color: #0f172a;
