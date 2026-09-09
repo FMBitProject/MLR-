@@ -26,7 +26,7 @@ export default async function Home() {
   const order: PlanId[] = ["starter", "growth", "enterprise"];
 
   return (
-    <div className="relative min-h-screen bg-[#f6f8fa]">
+    <div className="relative min-h-screen bg-brand-950 text-white">
       <header className="absolute inset-x-0 top-0 z-30 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <BrandLogo appName={dict.appName} tagline={dict.tagline} variant="dark" />
         <div className="flex items-center gap-3">
@@ -57,7 +57,7 @@ export default async function Home() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 pb-16 pt-10 text-center">
         <Link
           href="/pricing"
-          className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-[15px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+          className="rounded-xl border border-white/25 bg-white/5 px-6 py-3 text-[15px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
         >
           {l.ctaSecondary}
         </Link>
@@ -65,7 +65,7 @@ export default async function Home() {
       </div>
 
       <section className="mx-auto max-w-6xl px-6 pb-20">
-        <h2 className="text-center text-[26px] font-semibold tracking-tight text-slate-900">
+        <h2 className="text-center text-[26px] font-semibold tracking-tight text-white">
           {l.featuresTitle}
         </h2>
         <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -74,32 +74,32 @@ export default async function Home() {
             return (
               <div
                 key={f.title}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card"
+                className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm"
               >
-                <div className="flex size-10 items-center justify-center rounded-xl bg-brand-50 ring-1 ring-inset ring-brand-200">
-                  <Icon className="size-5 text-brand-700" />
+                <div className="flex size-10 items-center justify-center rounded-xl bg-brand-400/15 ring-1 ring-inset ring-brand-400/30">
+                  <Icon className="size-5 text-brand-300" />
                 </div>
-                <h3 className="mt-4 text-[15px] font-semibold text-slate-900">{f.title}</h3>
-                <p className="mt-1.5 text-[13.5px] leading-relaxed text-slate-500">{f.desc}</p>
+                <h3 className="mt-4 text-[15px] font-semibold text-white">{f.title}</h3>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-slate-300">{f.desc}</p>
               </div>
             );
           })}
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white">
+      <section className="border-y border-white/10 bg-white/[0.03]">
         <div className="mx-auto max-w-6xl px-6 py-16">
-          <h2 className="text-center text-[26px] font-semibold tracking-tight text-slate-900">
+          <h2 className="text-center text-[26px] font-semibold tracking-tight text-white">
             {l.howTitle}
           </h2>
           <ol className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3">
             {l.how.map((step, i) => (
               <li key={step.title} className="relative">
-                <span className="flex size-9 items-center justify-center rounded-full bg-brand-700 text-[14px] font-bold text-white">
+                <span className="flex size-9 items-center justify-center rounded-full bg-brand-400 text-[14px] font-bold text-brand-950">
                   {i + 1}
                 </span>
-                <h3 className="mt-4 text-[15.5px] font-semibold text-slate-900">{step.title}</h3>
-                <p className="mt-1.5 text-[13.5px] leading-relaxed text-slate-500">{step.desc}</p>
+                <h3 className="mt-4 text-[15.5px] font-semibold text-white">{step.title}</h3>
+                <p className="mt-1.5 text-[13.5px] leading-relaxed text-slate-300">{step.desc}</p>
               </li>
             ))}
           </ol>
@@ -107,7 +107,7 @@ export default async function Home() {
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-16">
-        <h2 className="text-center text-[26px] font-semibold tracking-tight text-slate-900">
+        <h2 className="text-center text-[26px] font-semibold tracking-tight text-white">
           {l.pricingTitle}
         </h2>
         <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-3">
@@ -120,20 +120,20 @@ export default async function Home() {
                 key={id}
                 href="/pricing"
                 className={
-                  "rounded-2xl border bg-white p-6 shadow-card transition hover:-translate-y-0.5 hover:shadow-lg " +
-                  (id === "growth" ? "border-brand-500" : "border-slate-200")
+                  "rounded-2xl border bg-white/5 p-6 backdrop-blur-sm transition hover:-translate-y-0.5 hover:bg-white/10 " +
+                  (id === "growth" ? "border-brand-400" : "border-white/10")
                 }
               >
-                <p className="text-[13px] font-bold uppercase tracking-wider text-slate-500">
+                <p className="text-[13px] font-bold uppercase tracking-wider text-brand-300">
                   {name}
                 </p>
                 <p className="mt-2">
                   {price === null ? (
-                    <span className="text-[22px] font-semibold tracking-tight text-slate-900">
+                    <span className="text-[22px] font-semibold tracking-tight text-white">
                       {p.customPrice}
                     </span>
                   ) : isFreePlan(plan) ? (
-                    <span className="text-[22px] font-semibold tracking-tight text-slate-900">
+                    <span className="text-[22px] font-semibold tracking-tight text-white">
                       {p.free}
                     </span>
                   ) : (
@@ -143,14 +143,14 @@ export default async function Home() {
                           {formatIdr(plan.monthlyPriceIdr)}
                         </span>
                       ) : null}
-                      <span className="text-[22px] font-semibold tracking-tight text-slate-900">
+                      <span className="text-[22px] font-semibold tracking-tight text-white">
                         {formatIdr(price)}
                       </span>
                       <span className="text-[12.5px] text-slate-400">{p.perMonth}</span>
                     </>
                   )}
                 </p>
-                <p className="mt-2 text-[13px] leading-relaxed text-slate-500">
+                <p className="mt-2 text-[13px] leading-relaxed text-slate-300">
                   {p.taglines[id]}
                 </p>
               </Link>
@@ -160,7 +160,7 @@ export default async function Home() {
         <p className="mt-8 text-center">
           <Link
             href="/pricing"
-            className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-brand-700 hover:text-brand-800"
+            className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-brand-300 hover:text-brand-200"
           >
             {l.pricingCta}
             <ArrowRight className="size-4" />
@@ -168,21 +168,21 @@ export default async function Home() {
         </p>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white">
+      <footer className="border-t border-white/10 bg-white/[0.03]">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-8 sm:flex-row">
-          <BrandLogo appName={dict.appName} tagline={dict.tagline} />
+          <BrandLogo appName={dict.appName} tagline={dict.tagline} variant="dark" />
           <div className="flex flex-col items-center gap-3 sm:items-end">
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[12.5px]">
-              <Link href="/pricing" className="text-slate-500 hover:text-brand-700">
+              <Link href="/pricing" className="text-slate-400 hover:text-brand-300">
                 {dict.legal.pricing}
               </Link>
-              <Link href="/faq" className="text-slate-500 hover:text-brand-700">
+              <Link href="/faq" className="text-slate-400 hover:text-brand-300">
                 {dict.legal.faq}
               </Link>
-              <Link href="/terms" className="text-slate-500 hover:text-brand-700">
+              <Link href="/terms" className="text-slate-400 hover:text-brand-300">
                 {dict.legal.terms}
               </Link>
-              <Link href="/privacy" className="text-slate-500 hover:text-brand-700">
+              <Link href="/privacy" className="text-slate-400 hover:text-brand-300">
                 {dict.legal.privacy}
               </Link>
             </nav>

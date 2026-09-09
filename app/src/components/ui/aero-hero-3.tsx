@@ -43,13 +43,20 @@ export function AeroHero({
         style={{ backgroundImage: `url(${backgroundImage})` }}
       >
         {/* Brand-teal wash over the photo, then a vertical scrim: together they
-            hold text contrast wherever the photo happens to be light. */}
+            hold text contrast wherever the photo happens to be light, and the
+            scrim's last stop is opaque brand-950 so the hero hands off to the
+            page ground with no visible edge. */}
         <div className="absolute inset-0 bg-brand-950/55" />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink-950/60 via-ink-950/25 to-ink-950/75" />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink-950/55 via-brand-950/20 to-brand-950" />
       </div>
 
-      {/* Decorative column rules, echoing the page's 12-column grid. */}
-      <div aria-hidden className="absolute inset-0 z-10 size-full">
+      {/* Decorative column rules, echoing the page's 12-column grid. Masked at
+          both ends so they dissolve along with the photograph instead of
+          stopping on a hard edge where the hero meets the page ground. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 z-10 size-full [mask-image:linear-gradient(to_bottom,transparent,black_15%,black_60%,transparent_95%)]"
+      >
         <div className="mx-auto grid h-full w-full max-w-6xl grid-cols-12 divide-x divide-white/10">
           <div className="col-span-1" />
           <div className="col-span-3" />
