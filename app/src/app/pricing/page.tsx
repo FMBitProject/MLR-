@@ -24,18 +24,18 @@ export default async function PricingPage() {
   const order: PlanId[] = ["starter", "growth", "enterprise"];
 
   return (
-    <div className="min-h-screen bg-[#f6f8fa] px-6 py-10">
+    <div className="min-h-screen bg-brand-950 px-6 py-10 text-white">
       <div className="mx-auto max-w-5xl">
         <div className="flex items-center justify-between">
-          <BrandLogo appName={dict.appName} tagline={dict.tagline} />
+          <BrandLogo appName={dict.appName} tagline={dict.tagline} variant="dark" />
           <LocaleSwitcher locale={locale} />
         </div>
 
         <div className="mt-12 text-center">
-          <h1 className="text-[32px] font-semibold tracking-tight text-slate-900">
+          <h1 className="text-[32px] font-semibold tracking-tight text-white">
             {p.title}
           </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+          <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-slate-300">
             {p.subtitle}
           </p>
         </div>
@@ -57,26 +57,26 @@ export default async function PricingPage() {
               <div
                 key={id}
                 className={
-                  "relative flex flex-col rounded-2xl border bg-white p-7 shadow-card " +
-                  (highlighted ? "border-brand-500 ring-4 ring-brand-500/10" : "border-slate-200")
+                  "relative flex flex-col rounded-2xl border bg-white/5 p-7 backdrop-blur-sm " +
+                  (highlighted ? "border-brand-400 ring-4 ring-brand-400/10" : "border-white/10")
                 }
               >
                 {highlighted ? (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-700 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-950">
                     {p.recommended}
                   </span>
                 ) : null}
 
-                <h2 className="text-[15px] font-bold uppercase tracking-wider text-slate-500">
+                <h2 className="text-[15px] font-bold uppercase tracking-wider text-brand-300">
                   {name}
                 </h2>
                 <p className="mt-3">
                   {plan.monthlyPriceIdr === null ? (
-                    <span className="text-[28px] font-semibold tracking-tight text-slate-900">
+                    <span className="text-[28px] font-semibold tracking-tight text-white">
                       {p.customPrice}
                     </span>
                   ) : isFreePlan(plan) ? (
-                    <span className="text-[28px] font-semibold tracking-tight text-slate-900">
+                    <span className="text-[28px] font-semibold tracking-tight text-white">
                       {p.free}
                     </span>
                   ) : (
@@ -86,7 +86,7 @@ export default async function PricingPage() {
                           {formatIdr(plan.monthlyPriceIdr)}
                         </span>
                       ) : null}
-                      <span className="text-[28px] font-semibold tracking-tight text-slate-900">
+                      <span className="text-[28px] font-semibold tracking-tight text-white">
                         {formatIdr(effectivePriceIdr(plan) ?? plan.monthlyPriceIdr)}
                       </span>
                       <span className="text-[13px] text-slate-400">{p.perMonth}</span>
@@ -94,25 +94,25 @@ export default async function PricingPage() {
                   )}
                 </p>
                 {promoActive(plan) && plan.promoEndsAt ? (
-                  <p className="mt-1 inline-flex w-fit rounded-full bg-amber-50 px-2.5 py-0.5 text-[11.5px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+                  <p className="mt-1 inline-flex w-fit rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11.5px] font-semibold text-amber-200 ring-1 ring-inset ring-amber-400/30">
                     {/* Noon UTC so the calendar date survives formatting in any server TZ */}
                     {p.promoUntil} {formatDate(new Date(`${plan.promoEndsAt}T12:00:00Z`), locale)}
                   </p>
                 ) : null}
-                <p className="mt-2 min-h-10 text-[13px] leading-relaxed text-slate-500">
+                <p className="mt-2 min-h-10 text-[13px] leading-relaxed text-slate-300">
                   {p.taglines[id]}
                 </p>
 
-                <ul className="mt-5 space-y-2.5 border-t border-slate-100 pt-5 text-[13.5px] text-slate-700">
+                <ul className="mt-5 space-y-2.5 border-t border-white/10 pt-5 text-[13.5px] text-slate-200">
                   {usage.map((line) => (
                     <li key={line} className="flex items-start gap-2.5 font-semibold">
-                      <Check className="mt-0.5 size-4 shrink-0 text-brand-600" />
+                      <Check className="mt-0.5 size-4 shrink-0 text-brand-300" />
                       {line}
                     </li>
                   ))}
                   {p.featureLists[id].map((line) => (
                     <li key={line} className="flex items-start gap-2.5">
-                      <Check className="mt-0.5 size-4 shrink-0 text-brand-600" />
+                      <Check className="mt-0.5 size-4 shrink-0 text-brand-300" />
                       {line}
                     </li>
                   ))}
@@ -126,8 +126,8 @@ export default async function PricingPage() {
                     className={
                       "block rounded-xl px-5 py-2.5 text-center text-sm font-semibold shadow-sm transition " +
                       (highlighted
-                        ? "bg-brand-700 text-white hover:bg-brand-800"
-                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50")
+                        ? "bg-brand-300 text-brand-950 hover:bg-brand-200"
+                        : "border border-white/25 bg-white/5 text-white hover:bg-white/10")
                     }
                   >
                     {isFreePlan(plan) ? p.startFreeCta : p.startCta}
@@ -135,7 +135,7 @@ export default async function PricingPage() {
                   {id === "enterprise" && salesEmail ? (
                     <a
                       href={`mailto:${salesEmail}`}
-                      className="mt-2 block text-center text-[12.5px] font-medium text-slate-500 hover:text-brand-700 hover:underline"
+                      className="mt-2 block text-center text-[12.5px] font-medium text-slate-400 hover:text-brand-300 hover:underline"
                     >
                       {p.contactSales}
                     </a>
@@ -147,9 +147,9 @@ export default async function PricingPage() {
         </div>
 
         <p className="mt-8 text-center text-[12.5px] text-slate-400">{p.footnote}</p>
-        <p className="mt-3 text-center text-[13px] text-slate-500">
+        <p className="mt-3 text-center text-[13px] text-slate-300">
           {p.haveWorkspace}{" "}
-          <Link href="/login" className="font-semibold text-brand-700 hover:underline">
+          <Link href="/login" className="font-semibold text-brand-300 hover:underline">
             {p.signIn}
           </Link>
         </p>
