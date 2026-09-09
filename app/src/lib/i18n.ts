@@ -496,7 +496,7 @@ const dictionaries = {
     landing: {
       signIn: "Masuk",
       register: "Daftar",
-      heroBadge: "Untuk perusahaan farmasi Indonesia",
+      heroBadge: "Untuk perusahaan farmasi di Indonesia",
       heroTitle: "Persetujuan konten promosi farmasi — cepat, tertib, siap audit.",
       heroSubtitle:
         "Intellibase MLR Flow menyatukan review Medical, Legal, dan Regulatory dalam satu alur kerja: AI claims check, review visual per halaman, dan jejak audit lengkap yang siap inspeksi BPOM.",
@@ -1109,7 +1109,7 @@ const dictionaries = {
     landing: {
       signIn: "Sign in",
       register: "Register",
-      heroBadge: "Built for Indonesian pharma companies",
+      heroBadge: "Built for pharma companies in Indonesia",
       heroTitle: "Pharma promotional content approval — fast, orderly, audit-ready.",
       heroSubtitle:
         "Intellibase MLR Flow unifies Medical, Legal, and Regulatory review in one workflow: AI claims check, visual page-by-page review, and a complete audit trail ready for BPOM inspection.",
