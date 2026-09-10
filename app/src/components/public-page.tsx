@@ -1,14 +1,13 @@
-import Link from "next/link";
-import { BrandLogo } from "@/components/brand-logo";
-import { LocaleSwitcher } from "@/components/locale-switcher";
+import { PublicHeader, PublicFooter, SHELL } from "@/components/public/chrome";
 import type { Dict, Locale } from "@/lib/i18n";
 
 /**
- * Shell for the public, unauthenticated pages (Terms, Privacy, FAQ) —
- * the ones a payment provider or a prospect reads before signing up.
+ * Shell for the public documents (Terms, Privacy, FAQ) that a payment
+ * provider or a prospect reads before signing up.
  *
- * Dark, on the same brand-950 ground as the landing page, so following a
- * footer link doesn't drop the reader onto a white document.
+ * Same header, footer and ink-950 ground as the landing page, so following a
+ * footer link never feels like arriving on a different site. The reading
+ * column is narrower than the landing grid because this is long-form prose.
  */
 export function PublicPage({
   dict,
@@ -26,39 +25,22 @@ export function PublicPage({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-brand-950 text-white">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <div className="flex items-center justify-between">
-          <BrandLogo appName={dict.appName} tagline={dict.tagline} variant="dark" />
-          <LocaleSwitcher locale={locale} />
+    <div className="min-h-screen bg-ink-950 text-white">
+      <PublicHeader dict={dict} locale={locale} />
+
+      <main className={`${SHELL} py-14 md:py-20`}>
+        <div className="max-w-[68ch]">
+          <h1 className="text-[30px] font-semibold tracking-tight text-white sm:text-[36px]">
+            {title}
+          </h1>
+          <p className="mt-4 text-[15.5px] leading-relaxed text-slate-300">{subtitle}</p>
+          {meta ? <p className="mt-3 text-[13px] text-slate-400">{meta}</p> : null}
+
+          <div className="mt-12">{children}</div>
         </div>
+      </main>
 
-        <header className="mt-12">
-          <h1 className="text-[30px] font-semibold tracking-tight text-white">{title}</h1>
-          <p className="mt-2 text-[15px] leading-relaxed text-slate-300">{subtitle}</p>
-          {meta ? <p className="mt-3 text-[12.5px] text-slate-400">{meta}</p> : null}
-        </header>
-
-        <div className="mt-10">{children}</div>
-
-        <nav className="mt-14 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-6 text-[13px]">
-          <Link href="/" className="font-medium text-slate-400 hover:text-brand-300">
-            {dict.legal.backHome}
-          </Link>
-          <Link href="/pricing" className="font-medium text-slate-400 hover:text-brand-300">
-            {dict.legal.pricing}
-          </Link>
-          <Link href="/terms" className="font-medium text-slate-400 hover:text-brand-300">
-            {dict.legal.terms}
-          </Link>
-          <Link href="/privacy" className="font-medium text-slate-400 hover:text-brand-300">
-            {dict.legal.privacy}
-          </Link>
-          <Link href="/faq" className="font-medium text-slate-400 hover:text-brand-300">
-            {dict.legal.faq}
-          </Link>
-        </nav>
-      </div>
+      <PublicFooter dict={dict} />
     </div>
   );
 }

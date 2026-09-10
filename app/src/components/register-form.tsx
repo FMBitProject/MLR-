@@ -5,19 +5,7 @@ import Link from "next/link";
 import { AlertCircle, Building2, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
 import { register, type RegisterField } from "@/lib/actions";
 import type { Dict } from "@/lib/i18n";
-
-const LABEL = "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.09em] text-slate-700";
-
-function fieldClass(invalid: boolean) {
-  return (
-    "w-full rounded-xl border bg-white py-2.5 pl-10 text-[14px] text-slate-900 placeholder:text-slate-400 " +
-    "shadow-sm outline-none transition duration-200 hover:border-slate-400 " +
-    "focus:ring-4 " +
-    (invalid
-      ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/15"
-      : "border-slate-300 focus:border-brand-600 focus:ring-brand-600/15")
-  );
-}
+import { CARD, TITLE, SUBTITLE, LABEL, SUBMIT, ERROR_BOX, fieldClass } from "@/components/public/field";
 
 const ICON =
   "pointer-events-none absolute left-3.5 top-1/2 size-[15px] -translate-y-1/2 text-slate-400";
@@ -29,16 +17,16 @@ export function RegisterForm({ dict }: { dict: Dict }) {
   if (state?.sent) {
     return (
       <div className="w-full max-w-[420px] animate-fade-up">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-8 text-center shadow-[0_1px_2px_rgb(15_23_42/0.04),0_12px_32px_-12px_rgb(15_23_42/0.12)]">
-          <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
+        <div className={`${CARD} text-center`}>
+          <h1 className={TITLE}>
             {dict.register.checkEmailTitle}
           </h1>
-          <p className="mt-3 text-[13.5px] leading-relaxed text-slate-600">
+          <p className="mt-3 text-[14px] leading-relaxed text-slate-300">
             {dict.register.checkEmailBody}
           </p>
           <Link
             href="/login"
-            className="mt-6 inline-block font-semibold text-brand-700 underline-offset-2 transition hover:text-brand-800 hover:underline"
+            className="mt-6 inline-block font-semibold text-brand-300 underline-offset-2 transition hover:text-brand-200 hover:underline"
           >
             {dict.register.signIn}
           </Link>
@@ -54,11 +42,11 @@ export function RegisterForm({ dict }: { dict: Dict }) {
 
   return (
     <div className="w-full max-w-[420px] animate-fade-up">
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-7 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_12px_32px_-12px_rgb(15_23_42/0.12)] sm:p-8">
-        <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-slate-900">
+      <div className={CARD}>
+        <h1 className={TITLE}>
           {dict.register.title}
         </h1>
-        <p className="mt-2 text-[13.5px] leading-relaxed text-slate-600">
+        <p className={SUBTITLE}>
           {dict.register.subtitle}
         </p>
 
@@ -143,7 +131,7 @@ export function RegisterForm({ dict }: { dict: Dict }) {
                 onClick={() => setShowPassword((v) => !v)}
                 aria-pressed={showPassword}
                 aria-label={showPassword ? dict.login.hidePassword : dict.login.showPassword}
-                className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300"
               >
                 <span className="relative block size-[17px]">
                   <Eye
@@ -163,7 +151,7 @@ export function RegisterForm({ dict }: { dict: Dict }) {
                 </span>
               </button>
             </div>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-slate-500">
+            <p className="mt-1.5 text-[12px] leading-relaxed text-slate-400">
               {dict.register.passwordHint}
             </p>
           </div>
@@ -172,7 +160,7 @@ export function RegisterForm({ dict }: { dict: Dict }) {
             <p
               id="register-error"
               role="alert"
-              className="animate-shake flex items-start gap-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[13px] leading-relaxed text-rose-800 ring-1 ring-inset ring-rose-200"
+              className={`animate-shake ${ERROR_BOX}`}
             >
               <AlertCircle aria-hidden className="mt-px size-4 shrink-0 text-rose-600" />
               <span>
@@ -188,7 +176,7 @@ export function RegisterForm({ dict }: { dict: Dict }) {
           <button
             type="submit"
             disabled={pending}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition duration-200 hover:bg-brand-800 hover:shadow-md active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-brand-700"
+            className={SUBMIT}
           >
             {pending ? (
               <>
@@ -201,12 +189,12 @@ export function RegisterForm({ dict }: { dict: Dict }) {
           </button>
         </form>
 
-        <div className="mt-6 space-y-2 text-center text-[13px] text-slate-600">
+        <div className="mt-6 space-y-2 text-center text-[13px] text-slate-400">
           <p>
             {dict.register.haveAccount}{" "}
             <Link
               href="/login"
-              className="font-semibold text-brand-700 underline-offset-2 transition hover:text-brand-800 hover:underline"
+              className="font-semibold text-brand-300 underline-offset-2 transition hover:text-brand-200 hover:underline"
             >
               {dict.register.signIn}
             </Link>
@@ -214,7 +202,7 @@ export function RegisterForm({ dict }: { dict: Dict }) {
           <p>
             <Link
               href="/pricing"
-              className="font-medium text-brand-700 underline-offset-2 transition hover:text-brand-800 hover:underline"
+              className="font-medium text-brand-300 underline-offset-2 transition hover:text-brand-200 hover:underline"
             >
               {dict.pricing.title}
             </Link>

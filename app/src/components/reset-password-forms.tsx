@@ -4,28 +4,30 @@ import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
 import { requestPasswordReset, resetPassword } from "@/lib/actions";
 import type { Dict } from "@/lib/i18n";
+import { TITLE, SUBTITLE, LABEL, SUBMIT, ERROR_BOX, NOTICE_BOX, fieldClass } from "@/components/public/field";
 
-const inputCls =
-  "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10";
+// Same dark field as /login and /register, minus the leading-icon padding:
+// these two forms have no in-field icons.
+const inputCls = fieldClass(false).replace("pl-10", "px-3.5");
 
 export function RequestResetForm({ dict }: { dict: Dict }) {
   const [state, formAction, pending] = useActionState(requestPasswordReset, null);
 
   return (
     <div className="w-full max-w-md animate-fade-up">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className={TITLE}>
         {dict.resetPassword.requestTitle}
       </h1>
-      <p className="mt-2 text-sm text-slate-500">{dict.resetPassword.requestBody}</p>
+      <p className={SUBTITLE}>{dict.resetPassword.requestBody}</p>
 
       {state?.sent ? (
-        <p className="mt-8 rounded-lg bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700 ring-1 ring-inset ring-emerald-200">
+        <p className={`mt-8 ${NOTICE_BOX}`}>
           {dict.resetPassword.sent}
         </p>
       ) : (
         <form action={formAction} className="mt-8 space-y-4">
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
+            <label className={LABEL}>
               {dict.resetPassword.email}
             </label>
             <input
@@ -38,14 +40,14 @@ export function RequestResetForm({ dict }: { dict: Dict }) {
             />
           </div>
           {state?.error ? (
-            <p className="rounded-lg bg-rose-50 px-3 py-2 text-[13px] text-rose-700 ring-1 ring-inset ring-rose-200">
+            <p className={ERROR_BOX}>
               {dict.resetPassword.throttled}
             </p>
           ) : null}
           <button
             type="submit"
             disabled={pending}
-            className="w-full rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99] disabled:opacity-60"
+            className={SUBMIT}
           >
             {pending ? dict.resetPassword.requestSubmitting : dict.resetPassword.requestSubmit}
           </button>
@@ -53,7 +55,7 @@ export function RequestResetForm({ dict }: { dict: Dict }) {
       )}
 
       <p className="mt-6 text-center text-[13px]">
-        <Link href="/login" className="font-medium text-brand-700 hover:text-brand-800">
+        <Link href="/login" className="font-semibold text-brand-300 transition hover:text-brand-200">
           {dict.resetPassword.backToLogin}
         </Link>
       </p>
@@ -89,17 +91,17 @@ export function SetNewPasswordForm({
 
   return (
     <div className="w-full max-w-md animate-fade-up">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className={TITLE}>
         {dict.resetPassword.setTitle}
       </h1>
-      <p className="mt-2 text-sm text-slate-500">
+      <p className={SUBTITLE}>
         {dict.resetPassword.setBody} <strong>{email}</strong>.
       </p>
 
       <form action={onSubmit} className="mt-8 space-y-4">
         <input type="hidden" name="token" value={token} />
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
+          <label className={LABEL}>
             {dict.resetPassword.password}
           </label>
           <input
@@ -113,14 +115,14 @@ export function SetNewPasswordForm({
           />
         </div>
         {error ? (
-          <p className="rounded-lg bg-rose-50 px-3 py-2 text-[13px] text-rose-700 ring-1 ring-inset ring-rose-200">
+          <p className={ERROR_BOX}>
             {error}
           </p>
         ) : null}
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99] disabled:opacity-60"
+          className={SUBMIT}
         >
           {pending ? dict.resetPassword.setSubmitting : dict.resetPassword.setSubmit}
         </button>

@@ -1,36 +1,32 @@
 import Link from "next/link";
 
-// Brand mark used on every public page (landing, login, register, pricing).
-// Always links back to the landing page. The logo image already bakes in the
-// full "IntelliBase MLR Flow" wordmark — `appName` is used only as its alt
-// text, `tagline` renders separately since it isn't part of the artwork.
+/**
+ * Brand mark for every public page. Always links back to the landing page.
+ *
+ * The artwork already bakes in the full "IntelliBase MLR Flow" wordmark, so
+ * `appName` is only its alt text and nothing is set beside it: the small
+ * uppercase tagline that used to sit here read as a decorative micro-label
+ * on every single page, which is the pattern the redesign is removing.
+ */
 export function BrandLogo({
   appName,
-  tagline,
   variant = "light",
 }: {
   appName: string;
-  tagline: string;
-  /** "dark" for the gradient brand panels, "light" for light backgrounds. */
+  /** "dark" for the ink-950 public surface, "light" for the app shell. */
   variant?: "light" | "dark";
 }) {
-  const dark = variant === "dark";
   return (
-    <Link href="/" className="group flex w-fit items-center gap-3">
+    <Link
+      href="/"
+      className="flex w-fit items-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={dark ? "/brand/logo-dark.png" : "/brand/logo.png"}
+        src={variant === "dark" ? "/brand/logo-dark.png" : "/brand/logo.png"}
         alt={appName}
-        className="h-8 w-auto shrink-0 transition group-hover:scale-105 sm:h-9"
+        className="h-8 w-auto shrink-0 sm:h-9"
       />
-      <p
-        className={
-          "hidden text-[11px] uppercase tracking-[0.18em] sm:block " +
-          (dark ? "text-brand-300/80" : "text-slate-400")
-        }
-      >
-        {tagline}
-      </p>
     </Link>
   );
 }

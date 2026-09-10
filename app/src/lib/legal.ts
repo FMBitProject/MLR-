@@ -491,7 +491,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
         items: [
           {
             q: `Apa itu ${COMPANY.productName}?`,
-            a: "Aplikasi untuk menjalankan proses persetujuan materi promosi farmasi — dari pengajuan oleh marketing, review Medical, Legal, dan Regulatory, sampai materi disetujui dan terkunci — menggantikan rantai email dan file yang berserakan.",
+            a: "Aplikasi untuk menjalankan proses persetujuan materi promosi farmasi, dari pengajuan oleh marketing, review Medical, Legal, dan Regulatory, sampai materi disetujui dan terkunci. Ini menggantikan rantai email dan file yang berserakan.",
           },
           {
             q: "Untuk siapa aplikasi ini?",
@@ -528,7 +528,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
           },
           {
             q: "Apa yang terjadi kalau saya telat bayar?",
-            a: `Workspace tetap berfungsi penuh selama masa tenggang ${GRACE_DAYS} hari. Setelah itu beralih ke mode baca-saja — semua data tetap bisa dibuka dan diunduh, hanya pengajuan baru yang dinonaktifkan. Data Anda tidak dihapus.`,
+            a: `Workspace tetap berfungsi penuh selama masa tenggang ${GRACE_DAYS} hari. Setelah itu beralih ke mode baca-saja: semua data tetap bisa dibuka dan diunduh, hanya pengajuan baru yang dinonaktifkan. Data Anda tidak dihapus.`,
           },
         ],
       },
@@ -541,7 +541,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
           },
           {
             q: "Bagaimana cara kerja AI claims check?",
-            a: "Setiap potongan teks pada materi dibandingkan dengan klaim yang sudah disetujui di Claims Library. Bagian yang tidak cocok ditandai agar diperiksa reviewer. AI hanya menandai — keputusan menyetujui atau menolak selalu di tangan manusia.",
+            a: "Setiap potongan teks pada materi dibandingkan dengan klaim yang sudah disetujui di Claims Library. Bagian yang tidak cocok ditandai agar diperiksa reviewer. AI hanya menandai. Keputusan menyetujui atau menolak selalu di tangan manusia.",
           },
           {
             q: "Apakah AI bisa menyetujui materi secara otomatis?",
@@ -574,7 +574,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
           },
           {
             q: "Apakah jejak audit bisa diubah atau dihapus?",
-            a: "Tidak dari dalam aplikasi. Jejak audit bersifat hanya-tambah, dan versi materi yang telah disetujui dikunci — justru sifat inilah yang membuatnya berguna saat inspeksi.",
+            a: "Tidak dari dalam aplikasi. Jejak audit bersifat hanya-tambah, dan versi materi yang telah disetujui dikunci. Justru sifat inilah yang membuatnya berguna saat inspeksi.",
           },
           {
             q: "Bisakah saya mengekspor data untuk keperluan audit?",
@@ -597,7 +597,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
         items: [
           {
             q: `What is ${COMPANY.productName}?`,
-            a: "An application for running pharmaceutical promotional material through approval — from marketing's submission, through Medical, Legal, and Regulatory review, to a locked approved version — replacing email chains and scattered files.",
+            a: "An application for running pharmaceutical promotional material through approval, from marketing's submission, through Medical, Legal, and Regulatory review, to a locked approved version. It replaces email chains and scattered files.",
           },
           {
             q: "Who is it for?",
@@ -614,7 +614,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
         items: [
           {
             q: "Is the Starter plan really free?",
-            a: `Yes — free forever, no credit card. It is limited to ${s.users} users, ${s.products} products, and ${s.submissionsPerMonth} content submissions per month, which is enough to run the full review workflow on your own material.`,
+            a: `Yes, free forever, no credit card. It is limited to ${s.users} users, ${s.products} products, and ${s.submissionsPerMonth} content submissions per month, which is enough to run the full review workflow on your own material.`,
           },
           {
             q: "What happens when the monthly quota runs out?",
@@ -634,7 +634,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
           },
           {
             q: "What happens if I pay late?",
-            a: `The workspace stays fully usable for a ${GRACE_DAYS}-day grace period. After that it becomes read-only — everything remains accessible and downloadable, only new submissions are disabled. Your data is not deleted.`,
+            a: `The workspace stays fully usable for a ${GRACE_DAYS}-day grace period. After that it becomes read-only: everything remains accessible and downloadable, only new submissions are disabled. Your data is not deleted.`,
           },
         ],
       },
@@ -647,7 +647,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
           },
           {
             q: "How does the AI claims check work?",
-            a: "Each piece of text in the material is compared against the approved claims in your Claims Library. Anything that does not match is flagged for a reviewer. The AI only flags — approving or rejecting is always a human decision.",
+            a: "Each piece of text in the material is compared against the approved claims in your Claims Library. Anything that does not match is flagged for a reviewer. The AI only flags. Approving or rejecting is always a human decision.",
           },
           {
             q: "Can the AI approve material automatically?",
@@ -680,7 +680,7 @@ export const FAQ: Record<Locale, FaqDoc> = {
           },
           {
             q: "Can the audit trail be edited or deleted?",
-            a: "Not from within the application. The audit trail is append-only and approved versions are locked — that property is exactly what makes it useful at an inspection.",
+            a: "Not from within the application. The audit trail is append-only and approved versions are locked. That property is exactly what makes it useful at an inspection.",
           },
           {
             q: "Can I export data for an audit?",

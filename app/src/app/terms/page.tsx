@@ -5,7 +5,7 @@ import { COMPANY } from "@/lib/company";
 import { PublicPage } from "@/components/public-page";
 import { LegalBody } from "@/components/legal-body";
 
-export const metadata = { title: "Syarat & Ketentuan — Intellibase MLR Flow" };
+export const metadata = { title: "Syarat & Ketentuan · Intellibase MLR Flow" };
 
 // Public, unauthenticated: payment providers and prospects need to read this
 // without an account, and Midtrans asks for the link during verification.

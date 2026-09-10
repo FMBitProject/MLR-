@@ -16,9 +16,9 @@ export default async function RegisterPage() {
 
       {/* pt-16 below lg keeps the absolutely-positioned locale switcher clear
           of the card; on lg the panel takes the top-left and there's room. */}
-      <main className="relative flex flex-1 items-center justify-center bg-[#f6f8fa] px-5 pb-10 pt-16 sm:px-8 lg:py-12">
+      <main className="relative flex flex-1 items-center justify-center bg-ink-950 px-5 pb-10 pt-16 sm:px-8 lg:py-12">
         <div className="absolute right-5 top-5 sm:right-6 sm:top-6">
-          <LocaleSwitcher locale={locale} />
+          <LocaleSwitcher locale={locale} variant="dark" />
         </div>
         <RegisterForm dict={dict} />
       </main>

@@ -1,8 +1,9 @@
+import { Plus } from "lucide-react";
 import { getDict } from "@/lib/i18n-server";
 import { FAQ } from "@/lib/legal";
 import { PublicPage } from "@/components/public-page";
 
-export const metadata = { title: "FAQ — Intellibase MLR Flow" };
+export const metadata = { title: "FAQ · Intellibase MLR Flow" };
 
 export default async function FaqPage() {
   const { dict, locale } = await getDict();
@@ -10,25 +11,28 @@ export default async function FaqPage() {
 
   return (
     <PublicPage dict={dict} locale={locale} title={doc.title} subtitle={doc.subtitle}>
-      <div className="space-y-10">
+      <div className="space-y-12">
         {doc.groups.map((group) => (
           <section key={group.name}>
-            <h2 className="text-[11.5px] font-bold uppercase tracking-[0.14em] text-brand-300">
+            {/* A plain heading, not an uppercase micro-label: the group name is
+                real navigation, so it should read like one. */}
+            <h2 className="text-[18px] font-semibold tracking-tight text-white">
               {group.name}
             </h2>
-            <div className="mt-3 divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+            {/* Accordion rather than a flat list: these groups run well past
+                five items, and collapsed rows keep the page scannable. */}
+            <div className="mt-4 divide-y divide-white/10 border-y border-white/10">
               {group.items.map((item) => (
-                <details key={item.q} className="group px-5 py-4 open:bg-white/[0.04]">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-[14.5px] font-medium text-white marker:content-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300">
+                <details key={item.q} className="group py-4">
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-4 text-[15px] font-medium text-white marker:content-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300">
                     {item.q}
-                    <span
+                    <Plus
                       aria-hidden
-                      className="mt-0.5 shrink-0 text-[18px] leading-none text-slate-400 transition group-open:rotate-45"
-                    >
-                      +
-                    </span>
+                      strokeWidth={1.75}
+                      className="mt-0.5 size-4 shrink-0 text-slate-400 transition group-open:rotate-45"
+                    />
                   </summary>
-                  <p className="mt-2.5 max-w-[62ch] text-[14px] leading-relaxed text-slate-300">
+                  <p className="mt-3 max-w-[62ch] text-[14.5px] leading-relaxed text-slate-300">
                     {item.a}
                   </p>
                 </details>
