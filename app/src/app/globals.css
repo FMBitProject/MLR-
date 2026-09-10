@@ -116,6 +116,24 @@
   --color-ring: var(--ring);
 }
 
+/* ------------------------------------------------------------------
+   Public surface (landing, pricing, FAQ, legal, auth).
+
+   One locked system, so the marketing pages read as a single site:
+
+     ground     bg-ink-950            the page, everywhere. One theme, dark.
+     surface    bg-white/[0.04]       panels and bento cells
+     hairline   border-white/10       every divider and panel edge
+     accent     brand-300 / brand-400 the ONLY accent. No second hue.
+     text       white / slate-300     headings / body
+     radius     rounded-xl  (12px)    anything interactive: buttons, inputs
+                rounded-2xl (16px)    surfaces: panels, cells, photo frames
+                rounded-full          status pills only
+
+   The app shell behind /login keeps its own light theme; these tokens are
+   for the unauthenticated pages only.
+   ------------------------------------------------------------------ */
+
 body {
   background: #f6f8fa;
   color: #0f172a;

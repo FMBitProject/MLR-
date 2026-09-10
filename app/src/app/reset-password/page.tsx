@@ -8,9 +8,9 @@ import type { Locale } from "@/lib/i18n";
 
 function Shell({ locale, children }: { locale: Locale; children: React.ReactNode }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#f6f8fa] px-6 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-ink-950 px-6 py-12">
       <div className="absolute right-6 top-6">
-        <LocaleSwitcher locale={locale} />
+        <LocaleSwitcher locale={locale} variant="dark" />
       </div>
       {children}
     </div>
@@ -42,7 +42,7 @@ export default async function ResetPasswordPage(props: PageProps<"/reset-passwor
           <p className="mt-2 text-sm text-slate-500">{dict.resetPassword.invalid}</p>
           <Link
             href="/reset-password"
-            className="mt-6 inline-block font-medium text-brand-700 hover:text-brand-800"
+            className="mt-6 inline-block font-medium text-brand-300 transition hover:text-brand-200"
           >
             {dict.resetPassword.requestTitle}
           </Link>

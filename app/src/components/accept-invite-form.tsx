@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { acceptInvite } from "@/lib/actions";
 import type { Dict } from "@/lib/i18n";
+import { TITLE, SUBTITLE, LABEL, SUBMIT, ERROR_BOX, fieldClass } from "@/components/public/field";
 
 export function AcceptInviteForm({
   dict,
@@ -32,17 +33,17 @@ export function AcceptInviteForm({
 
   return (
     <div className="w-full max-w-md animate-fade-up">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+      <h1 className={TITLE}>
         {dict.verifyEmail.inviteTitle}
       </h1>
-      <p className="mt-2 text-sm text-slate-500">
+      <p className={SUBTITLE}>
         {dict.verifyEmail.inviteBody} <strong>{tenantName}</strong>.
       </p>
 
       <form action={onSubmit} className="mt-8 space-y-4">
         <input type="hidden" name="token" value={token} />
         <div>
-          <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
+          <label className={LABEL}>
             {dict.verifyEmail.password}
           </label>
           <input
@@ -52,18 +53,18 @@ export function AcceptInviteForm({
             minLength={8}
             autoComplete="new-password"
             placeholder="••••••••"
-            className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10"
+            className={fieldClass(Boolean(error)).replace("pl-10", "px-3.5")}
           />
         </div>
         {error ? (
-          <p className="rounded-lg bg-rose-50 px-3 py-2 text-[13px] text-rose-700 ring-1 ring-inset ring-rose-200">
+          <p className={ERROR_BOX}>
             {error}
           </p>
         ) : null}
         <button
           type="submit"
           disabled={pending}
-          className="w-full rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 active:scale-[0.99] disabled:opacity-60"
+          className={SUBMIT}
         >
           {pending ? dict.verifyEmail.submitting : dict.verifyEmail.submit}
         </button>

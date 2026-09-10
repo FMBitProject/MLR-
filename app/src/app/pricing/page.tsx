@@ -10,11 +10,19 @@ import {
   isFreePlan,
   type PlanId,
 } from "@/lib/plans";
-import { BrandLogo } from "@/components/brand-logo";
-import { LocaleSwitcher } from "@/components/locale-switcher";
+import { PublicHeader, PublicFooter, SHELL, CTA } from "@/components/public/chrome";
 
-// Public marketing page — no auth. Numbers come from the PLANS catalog so
-// the page can never drift from what the app actually enforces.
+export const metadata = { title: "Paket & Harga · Intellibase MLR Flow" };
+
+/**
+ * Public marketing page, no auth. Every number comes from the PLANS catalog
+ * so the page can never drift from what the app actually enforces.
+ *
+ * The three plans sit in one hairline-divided panel rather than three floating
+ * cards: it is a comparison, and a shared grid makes rows line up across
+ * plans. The recommended plan is marked with a tint and a pill, not with a
+ * second accent hue.
+ */
 export default async function PricingPage() {
   const { dict, locale } = await getDict();
   const p = dict.pricing;
@@ -24,23 +32,18 @@ export default async function PricingPage() {
   const order: PlanId[] = ["starter", "growth", "enterprise"];
 
   return (
-    <div className="min-h-screen bg-brand-950 px-6 py-10 text-white">
-      <div className="mx-auto max-w-5xl">
-        <div className="flex items-center justify-between">
-          <BrandLogo appName={dict.appName} tagline={dict.tagline} variant="dark" />
-          <LocaleSwitcher locale={locale} />
-        </div>
+    <div className="min-h-screen bg-ink-950 text-white">
+      <PublicHeader dict={dict} locale={locale} />
 
-        <div className="mt-12 text-center">
-          <h1 className="text-[32px] font-semibold tracking-tight text-white">
+      <main className={`${SHELL} py-14 md:py-20`}>
+        <div className="max-w-[46ch]">
+          <h1 className="text-[30px] font-semibold tracking-tight text-white sm:text-[36px]">
             {p.title}
           </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-slate-300">
-            {p.subtitle}
-          </p>
+          <p className="mt-4 text-[15.5px] leading-relaxed text-slate-300">{p.subtitle}</p>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="mt-12 overflow-hidden rounded-2xl border border-white/10 lg:grid lg:grid-cols-3 lg:divide-x lg:divide-white/10">
           {order.map((id) => {
             const plan = PLANS[id];
             const highlighted = id === "growth";
@@ -57,26 +60,26 @@ export default async function PricingPage() {
               <div
                 key={id}
                 className={
-                  "relative flex flex-col rounded-2xl border bg-white/5 p-7 backdrop-blur-sm " +
-                  (highlighted ? "border-brand-400 ring-4 ring-brand-400/10" : "border-white/10")
+                  "flex flex-col border-t border-white/10 p-7 first:border-t-0 lg:border-t-0 " +
+                  (highlighted ? "bg-white/[0.05]" : "")
                 }
               >
-                {highlighted ? (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-950">
-                    {p.recommended}
-                  </span>
-                ) : null}
+                <div className="flex items-center gap-3">
+                  <h2 className="text-[17px] font-semibold text-white">{name}</h2>
+                  {highlighted ? (
+                    <span className="rounded-full bg-brand-300 px-2.5 py-0.5 text-[11.5px] font-semibold text-brand-950">
+                      {p.recommended}
+                    </span>
+                  ) : null}
+                </div>
 
-                <h2 className="text-[15px] font-bold uppercase tracking-wider text-brand-300">
-                  {name}
-                </h2>
-                <p className="mt-3">
+                <p className="mt-4">
                   {plan.monthlyPriceIdr === null ? (
-                    <span className="text-[28px] font-semibold tracking-tight text-white">
+                    <span className="text-[30px] font-semibold tracking-tight text-white">
                       {p.customPrice}
                     </span>
                   ) : isFreePlan(plan) ? (
-                    <span className="text-[28px] font-semibold tracking-tight text-white">
+                    <span className="text-[30px] font-semibold tracking-tight text-white">
                       {p.free}
                     </span>
                   ) : (
@@ -86,56 +89,66 @@ export default async function PricingPage() {
                           {formatIdr(plan.monthlyPriceIdr)}
                         </span>
                       ) : null}
-                      <span className="text-[28px] font-semibold tracking-tight text-white">
+                      <span className="text-[30px] font-semibold tracking-tight text-white">
                         {formatIdr(effectivePriceIdr(plan) ?? plan.monthlyPriceIdr)}
                       </span>
                       <span className="text-[13px] text-slate-400">{p.perMonth}</span>
                     </>
                   )}
                 </p>
-                {promoActive(plan) && plan.promoEndsAt ? (
-                  <p className="mt-1 inline-flex w-fit rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11.5px] font-semibold text-amber-200 ring-1 ring-inset ring-amber-400/30">
-                    {/* Noon UTC so the calendar date survives formatting in any server TZ */}
-                    {p.promoUntil} {formatDate(new Date(`${plan.promoEndsAt}T12:00:00Z`), locale)}
-                  </p>
-                ) : null}
-                <p className="mt-2 min-h-10 text-[13px] leading-relaxed text-slate-300">
+
+                {/* Fixed-height row whether or not there is a promo, so the
+                    feature lists start on the same baseline in all three
+                    columns of the shared panel. */}
+                <div className="mt-2 min-h-[26px]">
+                  {promoActive(plan) && plan.promoEndsAt ? (
+                    <p className="inline-flex w-fit rounded-full border border-brand-300/35 px-2.5 py-0.5 text-[11.5px] font-semibold text-brand-200">
+                      {/* Noon UTC so the calendar date survives formatting in any server TZ */}
+                      {p.promoUntil} {formatDate(new Date(`${plan.promoEndsAt}T12:00:00Z`), locale)}
+                    </p>
+                  ) : null}
+                </div>
+
+                <p className="mt-2 min-h-12 text-[13.5px] leading-relaxed text-slate-400">
                   {p.taglines[id]}
                 </p>
 
-                <ul className="mt-5 space-y-2.5 border-t border-white/10 pt-5 text-[13.5px] text-slate-200">
+                <ul className="mt-6 space-y-2.5 border-t border-white/10 pt-6 text-[13.5px] text-slate-300">
                   {usage.map((line) => (
-                    <li key={line} className="flex items-start gap-2.5 font-semibold">
-                      <Check className="mt-0.5 size-4 shrink-0 text-brand-300" />
+                    <li key={line} className="flex items-start gap-2.5 font-semibold text-white">
+                      <Check
+                        aria-hidden
+                        strokeWidth={1.75}
+                        className="mt-0.5 size-4 shrink-0 text-brand-300"
+                      />
                       {line}
                     </li>
                   ))}
                   {p.featureLists[id].map((line) => (
                     <li key={line} className="flex items-start gap-2.5">
-                      <Check className="mt-0.5 size-4 shrink-0 text-brand-300" />
+                      <Check
+                        aria-hidden
+                        strokeWidth={1.75}
+                        className="mt-0.5 size-4 shrink-0 text-brand-300"
+                      />
                       {line}
                     </li>
                   ))}
                 </ul>
 
-                <div className="mt-auto pt-7">
-                  {/* Every plan is self-serve now: sign up free, then upgrade
-                      from Settings whenever the team outgrows Starter. */}
+                <div className="mt-auto pt-8">
+                  {/* Every plan is self-serve: sign up free, then upgrade from
+                      Settings whenever the team outgrows Starter. */}
                   <Link
                     href="/register"
-                    className={
-                      "block rounded-xl px-5 py-2.5 text-center text-sm font-semibold shadow-sm transition " +
-                      (highlighted
-                        ? "bg-brand-300 text-brand-950 hover:bg-brand-200"
-                        : "border border-white/25 bg-white/5 text-white hover:bg-white/10")
-                    }
+                    className={`${highlighted ? CTA.primary : CTA.secondary} w-full`}
                   >
                     {isFreePlan(plan) ? p.startFreeCta : p.startCta}
                   </Link>
                   {id === "enterprise" && salesEmail ? (
                     <a
                       href={`mailto:${salesEmail}`}
-                      className="mt-2 block text-center text-[12.5px] font-medium text-slate-400 hover:text-brand-300 hover:underline"
+                      className="mt-3 block text-center text-[13px] font-medium text-slate-400 transition hover:text-brand-300"
                     >
                       {p.contactSales}
                     </a>
@@ -146,14 +159,21 @@ export default async function PricingPage() {
           })}
         </div>
 
-        <p className="mt-8 text-center text-[12.5px] text-slate-400">{p.footnote}</p>
-        <p className="mt-3 text-center text-[13px] text-slate-300">
+        <p className="mt-8 max-w-[70ch] text-[13px] leading-relaxed text-slate-400">
+          {p.footnote}
+        </p>
+        <p className="mt-4 text-[14px] text-slate-300">
           {p.haveWorkspace}{" "}
-          <Link href="/login" className="font-semibold text-brand-300 hover:underline">
+          <Link
+            href="/login"
+            className="font-semibold text-brand-300 underline-offset-4 transition hover:text-brand-200 hover:underline"
+          >
             {p.signIn}
           </Link>
         </p>
-      </div>
+      </main>
+
+      <PublicFooter dict={dict} />
     </div>
   );
 }

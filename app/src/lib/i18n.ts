@@ -16,17 +16,17 @@ const dictionaries = {
     },
     login: {
       title: "Masuk ke workspace Anda",
-      subtitle: "Satu alur kerja untuk persetujuan konten promosi — Medical, Legal, Regulatory.",
+      subtitle: "Satu alur kerja untuk persetujuan konten promosi: Medical, Legal, Regulatory.",
       email: "Email",
       password: "Kata sandi",
       submit: "Masuk",
-      demoHint: "Akun demo — klik untuk masuk (kata sandi: DemoMLR2026!)",
+      demoHint: "Akun demo, klik untuk masuk (kata sandi: DemoMLR2026!)",
       invalid: "Email atau kata sandi salah.",
       locked: "Terlalu banyak percobaan masuk. Tunggu 15 menit lalu coba lagi.",
       unverified: "Email Anda belum diverifikasi. Cek inbox Anda untuk tautan aktivasi.",
       resendVerification: "Kirim ulang email verifikasi",
-      verificationResent: "Email verifikasi terkirim — cek inbox Anda.",
-      compliance: "Audit-ready • Selaras Pedoman Promosi Obat",
+      verificationResent: "Email verifikasi terkirim. Cek inbox Anda.",
+      compliance: "Audit-ready, selaras Pedoman Promosi Obat",
       noAccount: "Perusahaan Anda belum punya workspace?",
       registerLink: "Daftar di sini",
       forgot: "Lupa kata sandi?",
@@ -42,7 +42,7 @@ const dictionaries = {
       eyebrow: "Platform Review MLR",
       loginHeadline: "Satu sumber kebenaran untuk persetujuan konten promosi farmasi.",
       registerHeadline:
-        "Workspace terpisah untuk setiap perusahaan — data Anda tidak pernah tercampur dengan tenant lain.",
+        "Workspace terpisah untuk setiap perusahaan. Data Anda tidak pernah tercampur dengan tenant lain.",
       badgesLabel: "Yang Anda dapatkan",
       badges: {
         workflow: { title: "Review Bertahap", body: "Medical → Legal → Regulatory dalam satu alur" },
@@ -58,7 +58,7 @@ const dictionaries = {
     },
     register: {
       title: "Daftarkan perusahaan Anda",
-      subtitle: "Buat workspace baru — data perusahaan Anda terisolasi penuh dari tenant lain.",
+      subtitle: "Buat workspace baru. Data perusahaan Anda terisolasi penuh dari tenant lain.",
       companyName: "Nama perusahaan",
       companyPlaceholder: "cth. Nusantara Pharma",
       yourName: "Nama Anda",
@@ -93,7 +93,7 @@ const dictionaries = {
       email: "Email",
       requestSubmit: "Kirim Tautan Reset",
       requestSubmitting: "Mengirim…",
-      sent: "Jika email tersebut terdaftar, tautan reset sudah terkirim — cek inbox Anda.",
+      sent: "Jika email tersebut terdaftar, tautan reset sudah terkirim. Cek inbox Anda.",
       throttled: "Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.",
       setTitle: "Buat kata sandi baru",
       setBody: "Masukkan kata sandi baru untuk akun",
@@ -497,35 +497,50 @@ const dictionaries = {
       signIn: "Masuk",
       register: "Daftar",
       heroBadge: "Untuk perusahaan farmasi di Indonesia",
-      heroTitle: "Persetujuan konten promosi farmasi — cepat, tertib, siap audit.",
+      heroImageAlt: "Tim review sedang memeriksa materi promosi farmasi",
+      heroTitle: "Persetujuan konten promosi farmasi: cepat, tertib, siap audit.",
       heroSubtitle:
-        "Intellibase MLR Flow menyatukan review Medical, Legal, dan Regulatory dalam satu alur kerja: AI claims check, review visual per halaman, dan jejak audit lengkap yang siap inspeksi BPOM.",
+        "Review Medical, Legal, dan Regulatory dalam satu alur kerja, dengan AI claims check dan jejak audit siap inspeksi BPOM.",
       ctaPrimary: "Buat Workspace",
       ctaSecondary: "Lihat Paket & Harga",
+      assurances: [
+        {
+          title: "Isolasi data per tenant",
+          body: "Workspace terpisah untuk setiap perusahaan.",
+        },
+        {
+          title: "Jejak audit hanya-tambah",
+          body: "Setiap keputusan dan versi tercatat permanen.",
+        },
+        {
+          title: "Antarmuka dwibahasa",
+          body: "Bahasa Indonesia dan Inggris, bisa ditukar kapan saja.",
+        },
+      ],
       featuresTitle: "Semua yang tim MLR Anda butuhkan",
       features: [
         {
           title: "Workflow multi-tahap",
-          desc: "Medical → Legal → Regulatory berjalan otomatis sesuai kanal — tak ada konten lolos tanpa tahap yang semestinya.",
+          desc: "Medical, Legal, lalu Regulatory berjalan otomatis sesuai kanal. Tak ada konten lolos tanpa tahap yang semestinya.",
         },
         {
           title: "AI claims check",
-          desc: "Setiap klaim di konten dicek terhadap Approved Claims Library — yang tak cocok langsung ditandai untuk reviewer.",
+          desc: "Setiap klaim dicek terhadap Approved Claims Library. Yang tak cocok langsung ditandai untuk reviewer.",
         },
         {
           title: "Review visual per halaman",
-          desc: "Komentar ter-pin tepat di elemen halaman — tidak ada lagi feedback lewat email yang tercecer.",
+          desc: "Komentar ter-pin tepat di elemen halaman, bukan tercecer di rantai email.",
         },
         {
           title: "Jejak audit lengkap",
-          desc: "Setiap keputusan, versi, dan komentar terekam — siap ditunjukkan saat inspeksi BPOM.",
+          desc: "Setiap keputusan, versi, dan komentar terekam dan siap ditunjukkan saat inspeksi BPOM.",
         },
       ],
       howTitle: "Cara kerjanya",
       how: [
         {
           title: "Ajukan konten",
-          desc: "Marketing mengunggah materi promosi (PDF/PPTX/DOCX) atau menempel naskah — sistem merendernya per halaman.",
+          desc: "Marketing mengunggah materi promosi (PDF/PPTX/DOCX) atau menempel naskah, lalu sistem merendernya per halaman.",
         },
         {
           title: "AI memeriksa klaim",
@@ -537,9 +552,10 @@ const dictionaries = {
         },
       ],
       pricingTitle: "Harga sederhana dan transparan",
-      pricingSubtitle: "Jauh di bawah tool enterprise — mulai dari",
+      pricingSubtitle: "Jauh di bawah tool enterprise, mulai dari",
       pricingCta: "Lihat detail paket",
-      footerCompliance: "Audit-ready • Selaras Pedoman Promosi Obat",
+      closingTitle: "Siap menertibkan alur review MLR Anda?",
+      footerCompliance: "Audit-ready, selaras Pedoman Promosi Obat",
     },
     legal: {
       terms: "Syarat & Ketentuan",
@@ -551,7 +567,7 @@ const dictionaries = {
     pricing: {
       title: "Paket & Harga",
       subtitle:
-        "Harga transparan, jauh di bawah tool enterprise — dengan alur kerja MLR inti yang benar-benar dipakai tim pharma menengah setiap hari.",
+        "Harga transparan, jauh di bawah tool enterprise, dengan alur kerja MLR inti yang benar-benar dipakai tim pharma menengah setiap hari.",
       perMonth: "/bulan",
       customPrice: "Harga khusus",
       promoUntil: "Harga promo hingga",
@@ -565,13 +581,13 @@ const dictionaries = {
       submissionsUnit: "pengajuan konten/bulan",
       unlimitedUsage: "Pengguna, produk & pengajuan tanpa batas",
       taglines: {
-        starter: "Gratis selamanya — coba alur MLR lengkap dengan materi asli Anda.",
+        starter: "Gratis selamanya. Coba alur MLR lengkap dengan materi asli Anda.",
         growth: "Untuk tim MLR aktif dengan banyak produk dan kanal.",
         enterprise: "Untuk organisasi besar dengan kebutuhan dan volume khusus.",
       },
       featureLists: {
         starter: [
-          "Workflow review standar 3 tahap (Medical → Legal → Regulatory)",
+          "Workflow review standar 3 tahap (Medical, Legal, Regulatory)",
           "AI claims check terhadap Approved Claims Library",
           "Approved Content Library",
           "Jejak audit lengkap, siap inspeksi BPOM",
@@ -591,7 +607,7 @@ const dictionaries = {
         ],
       },
       footnote:
-        "Harga belum termasuk PPN. Semua paket mencakup isolasi data penuh per tenant. Mulai dari paket Starter gratis tanpa kartu kredit — upgrade kapan saja dari menu Pengaturan.",
+        "Harga belum termasuk PPN. Semua paket mencakup isolasi data penuh per tenant. Mulai dari paket Starter gratis tanpa kartu kredit, upgrade kapan saja dari menu Pengaturan.",
       haveWorkspace: "Sudah punya workspace?",
       signIn: "Masuk",
     },
@@ -633,17 +649,17 @@ const dictionaries = {
     },
     login: {
       title: "Sign in to your workspace",
-      subtitle: "One shared workflow for promotional content approval — Medical, Legal, Regulatory.",
+      subtitle: "One shared workflow for promotional content approval: Medical, Legal, Regulatory.",
       email: "Email",
       password: "Password",
       submit: "Sign in",
-      demoHint: "Demo accounts — click to sign in (password: DemoMLR2026!)",
+      demoHint: "Demo accounts, click to sign in (password: DemoMLR2026!)",
       invalid: "Invalid email or password.",
       locked: "Too many sign-in attempts. Wait 15 minutes and try again.",
       unverified: "Your email isn't verified yet. Check your inbox for the activation link.",
       resendVerification: "Resend verification email",
-      verificationResent: "Verification email sent — check your inbox.",
-      compliance: "Audit-ready • Aligned with Pedoman Promosi Obat",
+      verificationResent: "Verification email sent. Check your inbox.",
+      compliance: "Audit-ready, aligned with Pedoman Promosi Obat",
       noAccount: "Your company doesn't have a workspace yet?",
       registerLink: "Register here",
       forgot: "Forgot your password?",
@@ -655,7 +671,7 @@ const dictionaries = {
       eyebrow: "MLR Review Platform",
       loginHeadline: "One source of truth for pharma promotional content approval.",
       registerHeadline:
-        "A separate workspace per company — your data never mixes with another tenant.",
+        "A separate workspace per company. Your data never mixes with another tenant.",
       badgesLabel: "What you get",
       badges: {
         workflow: { title: "Staged Review", body: "Medical → Legal → Regulatory in one flow" },
@@ -671,7 +687,7 @@ const dictionaries = {
     },
     register: {
       title: "Register your company",
-      subtitle: "Create a new workspace — your company's data is fully isolated from other tenants.",
+      subtitle: "Create a new workspace. Your company's data is fully isolated from other tenants.",
       companyName: "Company name",
       companyPlaceholder: "e.g. Nusantara Pharma",
       yourName: "Your name",
@@ -706,7 +722,7 @@ const dictionaries = {
       email: "Email",
       requestSubmit: "Send Reset Link",
       requestSubmitting: "Sending…",
-      sent: "If that email is registered, a reset link is on its way — check your inbox.",
+      sent: "If that email is registered, a reset link is on its way. Check your inbox.",
       throttled: "Too many requests. Wait a moment and try again.",
       setTitle: "Choose a new password",
       setBody: "Enter a new password for the account",
@@ -1110,35 +1126,50 @@ const dictionaries = {
       signIn: "Sign in",
       register: "Register",
       heroBadge: "Built for pharma companies in Indonesia",
-      heroTitle: "Pharma promotional content approval — fast, orderly, audit-ready.",
+      heroImageAlt: "A review team going through pharmaceutical promotional material",
+      heroTitle: "Pharma promotional content approval: fast, orderly, audit-ready.",
       heroSubtitle:
-        "Intellibase MLR Flow unifies Medical, Legal, and Regulatory review in one workflow: AI claims check, visual page-by-page review, and a complete audit trail ready for BPOM inspection.",
+        "Medical, Legal, and Regulatory review in one workflow, with an AI claims check and an audit trail ready for BPOM.",
       ctaPrimary: "Create a Workspace",
       ctaSecondary: "See Plans & Pricing",
+      assurances: [
+        {
+          title: "Per-tenant data isolation",
+          body: "A separate workspace for every company.",
+        },
+        {
+          title: "Append-only audit trail",
+          body: "Every decision and version is recorded permanently.",
+        },
+        {
+          title: "Bilingual interface",
+          body: "Indonesian and English, switchable at any time.",
+        },
+      ],
       featuresTitle: "Everything your MLR team needs",
       features: [
         {
           title: "Multi-stage workflow",
-          desc: "Medical → Legal → Regulatory runs automatically per channel — no content skips the stages it should pass.",
+          desc: "Medical, then Legal, then Regulatory runs automatically per channel. No content skips a stage it should pass.",
         },
         {
           title: "AI claims check",
-          desc: "Every claim in the content is checked against the Approved Claims Library — mismatches are flagged for reviewers instantly.",
+          desc: "Every claim is checked against the Approved Claims Library. Mismatches are flagged for reviewers instantly.",
         },
         {
           title: "Visual page-by-page review",
-          desc: "Comments pin to the exact page element — no more feedback scattered across email threads.",
+          desc: "Comments pin to the exact page element, not scattered across email threads.",
         },
         {
           title: "Complete audit trail",
-          desc: "Every decision, version, and comment is recorded — ready to show at a BPOM inspection.",
+          desc: "Every decision, version, and comment is recorded and ready to show at a BPOM inspection.",
         },
       ],
       howTitle: "How it works",
       how: [
         {
           title: "Submit content",
-          desc: "Marketing uploads promotional material (PDF/PPTX/DOCX) or pastes copy — the system renders it page by page.",
+          desc: "Marketing uploads promotional material (PDF/PPTX/DOCX) or pastes copy, and the system renders it page by page.",
         },
         {
           title: "AI checks the claims",
@@ -1150,9 +1181,10 @@ const dictionaries = {
         },
       ],
       pricingTitle: "Simple, transparent pricing",
-      pricingSubtitle: "Well below enterprise tools — starting from",
+      pricingSubtitle: "Well below enterprise tools, starting from",
       pricingCta: "See plan details",
-      footerCompliance: "Audit-ready • Aligned with Pedoman Promosi Obat",
+      closingTitle: "Ready to put your MLR review in order?",
+      footerCompliance: "Audit-ready, aligned with Pedoman Promosi Obat",
     },
     legal: {
       terms: "Terms & Conditions",
@@ -1164,7 +1196,7 @@ const dictionaries = {
     pricing: {
       title: "Plans & Pricing",
       subtitle:
-        "Transparent pricing, positioned well below enterprise tools — covering the core MLR workflow mid-size pharma teams actually use every day.",
+        "Transparent pricing, positioned well below enterprise tools, covering the core MLR workflow mid-size pharma teams actually use every day.",
       perMonth: "/month",
       customPrice: "Custom pricing",
       promoUntil: "Promo price until",
@@ -1178,13 +1210,13 @@ const dictionaries = {
       submissionsUnit: "content submissions/month",
       unlimitedUsage: "Unlimited users, products & submissions",
       taglines: {
-        starter: "Free forever — run the full MLR workflow on your own material.",
+        starter: "Free forever. Run the full MLR workflow on your own material.",
         growth: "For active MLR teams with multiple products and channels.",
         enterprise: "For large organizations with custom needs and volume.",
       },
       featureLists: {
         starter: [
-          "Standard 3-stage review workflow (Medical → Legal → Regulatory)",
+          "Standard 3-stage review workflow (Medical, Legal, Regulatory)",
           "AI claims check against the Approved Claims Library",
           "Approved Content Library",
           "Complete audit trail, BPOM inspection-ready",
@@ -1204,7 +1236,7 @@ const dictionaries = {
         ],
       },
       footnote:
-        "Prices exclude VAT. Every plan includes full per-tenant data isolation. Start on the free Starter plan with no credit card — upgrade any time from Settings.",
+        "Prices exclude VAT. Every plan includes full per-tenant data isolation. Start on the free Starter plan with no credit card, then upgrade any time from Settings.",
       haveWorkspace: "Already have a workspace?",
       signIn: "Sign in",
     },

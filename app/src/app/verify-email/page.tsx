@@ -8,6 +8,7 @@ import { verifyEmailToken } from "@/lib/actions";
 import { AcceptInviteForm } from "@/components/accept-invite-form";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import type { Locale } from "@/lib/i18n";
+import { TITLE, SUBTITLE } from "@/components/public/field";
 
 function Shell({
   locale,
@@ -17,9 +18,9 @@ function Shell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#f6f8fa] px-6 py-12">
+    <div className="relative flex min-h-screen items-center justify-center bg-ink-950 px-6 py-12">
       <div className="absolute right-6 top-6">
-        <LocaleSwitcher locale={locale} />
+        <LocaleSwitcher locale={locale} variant="dark" />
       </div>
       {children}
     </div>
@@ -37,14 +38,14 @@ export default async function VerifyEmailPage(props: PageProps<"/verify-email">)
     return (
       <Shell locale={locale}>
         <div className="w-full max-w-md animate-fade-up text-center">
-          <XCircle className="mx-auto size-10 text-rose-500" />
-          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900">
+          <XCircle aria-hidden strokeWidth={1.5} className="mx-auto size-10 text-rose-300" />
+          <h1 className={`mt-4 ${TITLE}`}>
             {dict.verifyEmail.invalidTitle}
           </h1>
-          <p className="mt-2 text-sm text-slate-500">{dict.verifyEmail.invalidBody}</p>
+          <p className={SUBTITLE}>{dict.verifyEmail.invalidBody}</p>
           <Link
             href="/login"
-            className="mt-6 inline-block font-medium text-brand-700 hover:text-brand-800"
+            className="mt-6 inline-block font-semibold text-brand-300 transition hover:text-brand-200"
           >
             {dict.verifyEmail.goToLogin}
           </Link>
@@ -72,24 +73,24 @@ export default async function VerifyEmailPage(props: PageProps<"/verify-email">)
       <div className="w-full max-w-md animate-fade-up text-center">
         {result.status === "ok" ? (
           <>
-            <CheckCircle2 className="mx-auto size-10 text-emerald-500" />
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900">
+            <CheckCircle2 aria-hidden strokeWidth={1.5} className="mx-auto size-10 text-brand-300" />
+            <h1 className={`mt-4 ${TITLE}`}>
               {dict.verifyEmail.verifiedTitle}
             </h1>
-            <p className="mt-2 text-sm text-slate-500">{dict.verifyEmail.verifiedBody}</p>
+            <p className={SUBTITLE}>{dict.verifyEmail.verifiedBody}</p>
           </>
         ) : (
           <>
-            <ShieldCheck className="mx-auto size-10 text-slate-300" />
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-900">
+            <ShieldCheck aria-hidden strokeWidth={1.5} className="mx-auto size-10 text-slate-400" />
+            <h1 className={`mt-4 ${TITLE}`}>
               {dict.verifyEmail.invalidTitle}
             </h1>
-            <p className="mt-2 text-sm text-slate-500">{dict.verifyEmail.invalidBody}</p>
+            <p className={SUBTITLE}>{dict.verifyEmail.invalidBody}</p>
           </>
         )}
         <Link
           href="/login"
-          className="mt-6 inline-block font-medium text-brand-700 hover:text-brand-800"
+          className="mt-6 inline-block font-semibold text-brand-300 transition hover:text-brand-200"
         >
           {dict.verifyEmail.goToLogin}
         </Link>
