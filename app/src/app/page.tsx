@@ -22,11 +22,24 @@ const FEATURE_ICONS = [GitBranch, Sparkles, FileSearch, ShieldCheck];
  * closing band. Nothing here repeats another section's shape, and the hero
  * eyebrow is the only uppercase micro-label on the page.
  *
- * TODO: both photographs are stock stand-ins. Replace them with brand
- * photography before launch.
  */
-const BENTO_IMAGE =
-  "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=900&h=700&q=80";
+/**
+ * One photograph per feature cell, in feature order. Each URL was checked to
+ * resolve before being used here: a 404 on Unsplash renders as bare alt text,
+ * which is how the previous placeholder shipped broken.
+ *
+ * TODO: stock stand-ins. Replace with brand photography before launch.
+ */
+const BENTO_IMAGES = [
+  // Multi-stage workflow: a pharmaceutical lab.
+  "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=900&h=760&q=80",
+  // AI claims check: a screen of data being read.
+  "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=760&h=760&q=80",
+  // Page-by-page review: a document being marked up by hand.
+  "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=760&h=620&q=80",
+  // Audit trail: an archive, kept in full.
+  "https://images.unsplash.com/photo-1568667256549-094345857637?auto=format&fit=crop&w=900&h=620&q=80",
+];
 
 export default async function Home() {
   const user = await getSessionUser();
@@ -66,9 +79,10 @@ export default async function Home() {
         </section>
 
         {/* Features. Four items, exactly four cells, rows of 7+5 then 5+7 so
-            the grid is asymmetric rather than a row of identical cards. Two
-            cells carry a real background (a photograph, a brand wash) so the
-            grid is not four text boxes. */}
+            the grid is asymmetric rather than a row of identical cards. Every
+            cell carries its own photograph under a scrim, and the AI cell adds
+            a brand wash on top so the two cells in a row are never the same
+            tone. */}
         <section className={`${SHELL} py-20 md:py-28`}>
           <h2 className="max-w-[32ch] text-[26px] font-semibold tracking-tight text-white sm:text-[32px]">
             {l.featuresTitle}
@@ -79,41 +93,41 @@ export default async function Home() {
               const Icon = FEATURE_ICONS[i] ?? ShieldCheck;
               // 0 and 3 take 7 columns, 1 and 2 take 5, giving 7+5 / 5+7.
               const wide = i === 0 || i === 3;
-              const hasPhoto = i === 0;
+              // The AI cell keeps a brand wash over its photograph, so the two
+              // cells in each row never read as the same tone.
               const hasWash = i === 1;
               return (
                 <article
                   key={f.title}
                   className={
-                    "relative overflow-hidden rounded-2xl border border-white/10 p-7 " +
+                    "relative flex min-h-[17rem] flex-col justify-end overflow-hidden rounded-2xl border border-white/10 p-7 " +
                     (wide ? "md:col-span-7 " : "md:col-span-5 ") +
-                    // The two cells in row 1 share a min-height and both sit
-                    // their text on the bottom edge, so the row has one
-                    // baseline instead of one headline floating at the top.
-                    (i < 2 ? "flex min-h-[19rem] flex-col justify-end md:min-h-[21rem] " : "") +
-                    (hasWash
-                      ? "bg-gradient-to-br from-brand-800/45 via-brand-900/25 to-transparent "
-                      : hasPhoto
-                        ? ""
-                        : "bg-white/[0.04] ")
+                    // Row 1 runs taller than row 2, which is what keeps the
+                    // grid from reading as four equal tiles.
+                    (i < 2 ? "md:min-h-[21rem] " : "md:min-h-[18rem] ")
                   }
                 >
-                  {hasPhoto ? (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={BENTO_IMAGE}
-                        alt=""
-                        aria-hidden
-                        className="absolute inset-0 size-full object-cover"
-                      />
-                      <div aria-hidden className="absolute inset-0 bg-brand-950/45" />
-                      <div
-                        aria-hidden
-                        className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/70 to-ink-950/10"
-                      />
-                    </>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={BENTO_IMAGES[i]}
+                    alt=""
+                    aria-hidden
+                    loading="lazy"
+                    className="absolute inset-0 size-full object-cover"
+                  />
+                  {/* Scrim, then the ink ground rising from the bottom, so the
+                      copy sits on solid colour rather than on the photograph. */}
+                  <div aria-hidden className="absolute inset-0 bg-brand-950/50" />
+                  {hasWash ? (
+                    <div
+                      aria-hidden
+                      className="absolute inset-0 bg-gradient-to-br from-brand-700/55 via-brand-900/45 to-ink-950/70"
+                    />
                   ) : null}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/75 to-ink-950/15"
+                  />
 
                   <div className="relative">
                     <Icon
