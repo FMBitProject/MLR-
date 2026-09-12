@@ -147,12 +147,15 @@ export default async function SubmissionDetailPage(
       ? db.select().from(t.approvedClaims).where(inArray(t.approvedClaims.id, claimIds))
       : Promise.resolve([]),
     priorElementIds.length
-      ? db.select().from(t.contentElements).where(inArray(t.contentElements.id, priorElementIds))
+      ? db.select().from(t.contentElements).where(and(
+          inArray(t.contentElements.id, priorElementIds),
+          inArray(t.contentElements.versionId, priorVersionIds),
+        ))
       : Promise.resolve([]),
   ]);
 
   const prevOpenComments = priorComments.map((c) => {
-    const el = c.elementId ? priorElements.find((e) => e.id === c.elementId) : null;
+    const el = c.elementId ? priorElements.find((e) => e.id === c.elementId && e.versionId === c.versionId) : null;
     const v = versions.find((x) => x.id === c.versionId);
     return {
       id: c.id,

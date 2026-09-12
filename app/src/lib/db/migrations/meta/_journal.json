@@ -57,6 +57,13 @@
       "when": 1788857064430,
       "tag": "0007_shocking_mysterio",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789108830069,
+      "tag": "0008_security_controls",
+      "breakpoints": true
     }
   ]
 }

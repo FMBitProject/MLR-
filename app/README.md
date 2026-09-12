@@ -17,7 +17,7 @@ docker run -d --name mlr-pg -e POSTGRES_PASSWORD=mlr -e POSTGRES_DB=mlr \
 # → DATABASE_URL=postgres://postgres:mlr@localhost:5433/mlr
 
 npm run db:migrate                # terapkan skema (drizzle-kit)
-npm run db:seed                   # isi data demo (idempotent; no-op jika sudah ada)
+npm run db:seed                   # isi data demo; wajib set DEMO_PASSWORD privat (≥16 karakter)
 npm run dev                       # http://localhost:3000
 # atau produksi:
 npm run build && npm start
@@ -28,27 +28,27 @@ Skema dikelola sebagai migrasi drizzle-kit di `src/lib/db/migrations/` (`npm run
 ### Deploy ke Vercel + Neon
 
 1. Buat database di [Neon](https://neon.tech), ambil **pooled connection string** (host berakhiran `-pooler`).
-2. Di Vercel set env: `DATABASE_URL` (pooled Neon), `AUTH_SECRET` (`openssl rand -hex 32`), `STORAGE_DRIVER=s3` + kredensial S3/R2 (lihat `.env.example`), dan (opsional) kunci provider AI.
-3. Jalankan migrasi terhadap Neon sekali: `DATABASE_URL=<neon> npm run db:migrate` (lokal atau sebagai deploy step), lalu `db:seed` bila ingin data demo.
+2. Di Vercel set env: `DATABASE_URL` (pooled Neon), `AUTH_SECRET` (`openssl rand -hex 32`), `APP_URL` (URL HTTPS publik), `STORAGE_DRIVER=db`, dan (opsional) kunci provider AI.
+3. Jalankan `npm run db:migrate` dengan `DATABASE_URL` tujuan yang sudah diatur (lokal atau sebagai deploy step). Seed demo sengaja ditolak di production. Untuk upgrade, baca [catatan keamanan](SECURITY-FIXES.md).
 
 ### Menjalankan dengan Docker
 
 Dari **root repo** (bukan folder `app/`):
 
 ```bash
-git pull                     # ambil kode terbaru dari GitHub
-docker compose up --build -d # build image + jalankan di http://localhost:3000
-docker compose logs -f       # lihat log
+export APP_HOST=mlr.example.com
+export POSTGRES_PASSWORD=$(openssl rand -hex 32)
+export AUTH_SECRET=$(openssl rand -hex 32)
+# Simpan ketiga nilai ini di secret manager dan muat kembali pada sesi berikutnya.
+# Untuk database yang sudah ada, gunakan POSTGRES_PASSWORD yang sudah berlaku.
+docker compose up --build -d
+docker compose logs -f       # gunakan environment yang sama
 docker compose down          # hentikan (data tetap tersimpan)
 ```
 
-Database & file upload bertahan di volume Docker `mlr-data` — `docker compose down` tidak menghapusnya (`down -v` baru menghapus). Untuk produksi, set secret sendiri lewat environment:
+Docker Compose sekarang ditujukan untuk deployment HTTPS: Caddy menerima koneksi publik pada port 80/443 dan meneruskan ke aplikasi yang tidak diekspos langsung. Set DNS `APP_HOST` ke host tersebut sebelum menjalankan Compose. Database dan file upload bertahan di volume `mlr-pgdata`.
 
-```bash
-AUTH_SECRET=$(openssl rand -hex 32) ANTHROPIC_API_KEY=sk-ant-... docker compose up -d
-```
-
-## Akun demo (kata sandi: `demo123`)
+## Akun demo lokal
 
 | Email | Peran |
 |---|---|
@@ -59,7 +59,14 @@ AUTH_SECRET=$(openssl rand -hex 32) ANTHROPIC_API_KEY=sk-ant-... docker compose 
 | sari@nusantara-pharma.co.id | Compliance / QA Admin |
 | rudi@nusantara-pharma.co.id | Company Admin |
 
-Halaman login menyediakan tombol quick-login untuk tiap persona.
+Demo tidak dibuat otomatis, tidak tersedia di production, dan tidak memiliki kata sandi bawaan. Untuk membuatnya pada database lokal kosong, set `DEMO_PASSWORD` acak minimal 16 karakter lalu jalankan `npm run db:seed`.
+
+```bash
+# Dari folder app, dengan DATABASE_URL menunjuk database lokal:
+export DEMO_PASSWORD=$(openssl rand -hex 24)
+npm run db:seed
+# Gunakan nilai DEMO_PASSWORD dari shell ini untuk login lokal.
+```
 
 ## Fitur (pemetaan ke PRD)
 
@@ -100,8 +107,8 @@ Status provider aktif tampil di halaman **Settings**.
 | Aspek | Demo ini | Produksi per PRD |
 |---|---|---|
 | Database | **PostgreSQL** (Drizzle ORM + node-postgres); Postgres lokal via Docker | **PostgreSQL Neon** (pooled) — kode identik, cukup ganti `DATABASE_URL`; pgvector menyusul |
-| File storage | **Driver storage** (`STORAGE_DRIVER=local`) di disk `.data/uploads` | `STORAGE_DRIVER=s3` → Cloudflare R2 / S3 dengan versioned keys (kode sama) |
-| Auth | Session cookie HMAC + scrypt | Better Auth |
+| File storage | `STORAGE_DRIVER=local` di disk `.data/uploads` untuk dev | `STORAGE_DRIVER=db` menyimpan upload di PostgreSQL; driver S3/R2 belum tersedia |
+| Auth | Sesi acak dengan digest di database, kedaluwarsa 7 hari; password scrypt | Cookie Secure melalui HTTPS, pencabutan sesi saat logout/reset password |
 | Rendering/OCR | Layout teks → SVG sinkron; file upload jadi placeholder | LibreOffice/unoconv + OCR sebagai job async (Inngest/Trigger.dev) |
 | Claims matching | Cosine leksikal + opsi LLM (Groq/xAI/OpenAI/Anthropic) | Embedding pgvector + LLM (eskalasi model lebih besar) |
 | Billing/Analytics | — | Xendit, PostHog |

@@ -8,6 +8,8 @@ import {
   jsonb,
   timestamp,
   customType,
+  unique,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 // Postgres bytea — drizzle-orm's pg-core has no built-in binary column type.
@@ -96,7 +98,7 @@ export const users = pgTable("users", {
 // address) and "invite" (an admin created the row with no usable password;
 // the recipient sets one when accepting).
 export const accountTokens = pgTable("account_tokens", {
-  token: text("token").primaryKey(),
+  tokenHash: text("token_hash").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
   purpose: text("purpose").notNull(), // verify | invite
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -215,7 +217,7 @@ export const contentVersions = pgTable("content_versions", {
   // Mandatory summary of what changed, required from v2 onward
   changeNote: text("change_note"),
   isLocked: boolean("is_locked").notNull().default(false),
-  processingStatus: text("processing_status").notNull().default("ready"), // processing | ready
+  processingStatus: text("processing_status").notNull().default("ready"), // processing | ready | failed
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   index("content_versions_submission_idx").on(table.submissionId),
@@ -251,6 +253,7 @@ export const contentElements = pgTable("content_elements", {
   requiresManualReview: boolean("requires_manual_review").notNull().default(false),
 }, (table) => [
   index("content_elements_version_idx").on(table.versionId),
+  unique("content_elements_id_version_unique").on(table.id, table.versionId),
 ]);
 
 export const reviewStages = pgTable("review_stages", {
@@ -281,6 +284,11 @@ export const reviewComments = pgTable("review_comments", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 }, (table) => [
   index("review_comments_version_idx").on(table.versionId),
+  foreignKey({
+    name: "review_comments_element_version_fk",
+    columns: [table.elementId, table.versionId],
+    foreignColumns: [contentElements.id, contentElements.versionId],
+  }),
 ]);
 
 export const claimFlags = pgTable("claim_flags", {
@@ -334,6 +342,17 @@ export const authThrottle = pgTable("auth_throttle", {
   attempts: integer("attempts").notNull().default(0),
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
 });
+
+// Only a keyed digest of the opaque browser token is stored. Expiry and
+// revocation are enforced by the server, including after password resets.
+export const sessions = pgTable("sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  index("sessions_user_idx").on(table.userId),
+  index("sessions_expiry_idx").on(table.expiresAt),
+]);
 
 // Tracks where an approved submission has actually been published, distinct
 // from contentSubmissions.channel (the intended channel at submission time).

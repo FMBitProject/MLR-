@@ -1,23 +1,11 @@
-import { createHmac } from "node:crypto";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { eq } from "drizzle-orm";
-import { db, t } from "./db";
+import { t } from "./db";
+import { issueSession, sessionUser, revokeSession, SESSION_TTL_SECONDS } from "./session-store";
 import { hashPassword, verifyPassword } from "./password";
 
 export { hashPassword, verifyPassword };
 
-// Fails fast in production if AUTH_SECRET is missing — silently falling back
-// to a hardcoded value would let anyone who's read this (public) repo forge
-// a valid session cookie for any user. Dev keeps the fallback for friction-free
-// `npm run dev` with no env setup.
-if (!process.env.AUTH_SECRET && process.env.NODE_ENV === "production") {
-  throw new Error(
-    "AUTH_SECRET is not set. Generate one with `openssl rand -hex 32` and " +
-      "set it in your deployment's environment variables.",
-  );
-}
-const SECRET = process.env.AUTH_SECRET ?? "mlr-demo-secret-change-in-production";
 const COOKIE = "mlr_session";
 
 export type SessionUser = typeof t.users.$inferSelect;
@@ -49,39 +37,31 @@ export const CLAIM_MANAGER_ROLES: Role[] = [
   "medical_reviewer",
 ];
 
-function sign(value: string): string {
-  return createHmac("sha256", SECRET).update(value).digest("hex");
-}
-
-export async function createSession(userId: string) {
+export async function createSession(userId: string, expectedPasswordHash: string) {
   const store = await cookies();
-  store.set(COOKIE, `${userId}.${sign(userId)}`, {
+  const token = await issueSession(userId, expectedPasswordHash);
+  const previous = store.get(COOKIE)?.value;
+  if (previous) await revokeSession(previous);
+  store.set(COOKIE, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: SESSION_TTL_SECONDS,
   });
 }
 
 export async function destroySession() {
   const store = await cookies();
+  const token = store.get(COOKIE)?.value;
+  if (token) await revokeSession(token);
   store.delete(COOKIE);
 }
 
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const store = await cookies();
   const raw = store.get(COOKIE)?.value;
-  if (!raw) return null;
-  const dot = raw.lastIndexOf(".");
-  if (dot < 0) return null;
-  const userId = raw.slice(0, dot);
-  // TODO(security, minor): plain !== comparison is not constant-time, unlike
-  // verifyPassword's timingSafeEqual in password.ts. Theoretical timing-attack
-  // surface for forging the signature; low practical risk over a network, but
-  // worth switching to a timing-safe compare for consistency.
-  if (sign(userId) !== raw.slice(dot + 1)) return null;
-  const user = (await db.select().from(t.users).where(eq(t.users.id, userId)))[0];
-  return user ?? null;
+  return raw ? sessionUser(raw) : null;
 });
 
 export async function requireUser(): Promise<SessionUser> {

@@ -1,10 +1,6 @@
 import { getSessionUser } from "@/lib/auth";
 import { queryAudit } from "@/lib/audit-query";
-
-function csvEscape(v: unknown): string {
-  const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-}
+import { csvEscape } from "@/lib/csv";
 
 export async function GET(req: Request) {
   const user = await getSessionUser();

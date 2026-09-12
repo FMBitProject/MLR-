@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "./schema";
 import { seed } from "./seed";
+import { requireDemoPassword } from "./demo-safety";
 
 /**
  * Seeds a self-contained demo workspace: one account per review role,
@@ -20,10 +21,8 @@ import { seed } from "./seed";
 const TENANT_ID = "tn-demo";
 const PREFIX = "demo-";
 
-// This file is committed to a public repo, so the default password is only a
-// convenience for a throwaway tenant of fake data. Set DEMO_PASSWORD (and
-// re-run with --reset) to give every demo account a credential that isn't public.
-const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "DemoMLR2026!";
+// Demo credentials must be supplied explicitly and are rejected in production.
+const DEMO_PASSWORD = requireDemoPassword();
 const DEMO_DOMAIN = "mlrflow-demo.id";
 
 export const DEMO_USERS = [
@@ -76,6 +75,7 @@ const TABLES_IN_DELETE_ORDER = [
   "audit_log",
   "invoices",
   "account_tokens",
+  "sessions",
   "users",
 ] as const;
 
@@ -97,6 +97,8 @@ async function reset(pool: Pool) {
       "delete from content_versions where submission_id in (select id from content_submissions where tenant_id = $1)",
     account_tokens:
       "delete from account_tokens where user_id in (select id from users where tenant_id = $1)",
+    sessions:
+      "delete from sessions where user_id in (select id from users where tenant_id = $1)",
   };
   // One transaction: a reset that dies halfway would otherwise leave the
   // workspace stripped of its content but still holding a tenants row.
@@ -173,7 +175,7 @@ async function main() {
 
   await pool.end();
   console.log(
-    `Demo workspace ready. Password for every account: ${DEMO_PASSWORD}\n` +
+    "Demo workspace ready. Use the password supplied through DEMO_PASSWORD.\n" +
       DEMO_USERS.map((u) => `  ${u.role.padEnd(20)} ${u.email}`).join("\n") +
       `\n  Plan: enterprise (through ${PLAN_ACTIVE_UNTIL.toISOString().slice(0, 10)})`,
   );

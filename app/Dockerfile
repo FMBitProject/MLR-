@@ -19,12 +19,10 @@ COPY . .
 # dynamic). These are never used at runtime — docker-compose's `environment:`
 # supplies the real values to the running container.
 ARG DATABASE_URL=postgres://build:build@localhost:5432/build
-ARG AUTH_SECRET=build-time-placeholder-not-used-at-runtime
 ENV DATABASE_URL=${DATABASE_URL} \
-    AUTH_SECRET=${AUTH_SECRET} \
     NEXT_TELEMETRY_DISABLED=1 \
     BUILD_STANDALONE=1
-RUN npm run build
+RUN AUTH_SECRET="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")" npm run build
 
 FROM node:22-slim AS runner
 WORKDIR /app

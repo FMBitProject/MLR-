@@ -25,6 +25,8 @@ const nextConfig: NextConfig = {
         "*.githubpreview.dev",
         "*.gitpod.io",
       ],
+      // TODO(security, minor): restrict this development proxy allowlist by
+      // environment before a deployment that does not use these services.
     },
   },
 };
