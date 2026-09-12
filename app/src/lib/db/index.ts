@@ -33,6 +33,7 @@ const pool =
 globalThis.__mlrPool = pool;
 
 export const db: DB = globalThis.__mlrDb ?? drizzle(pool, { schema });
+export type DbExecutor = Pick<DB, "select" | "insert" | "update" | "delete">;
 globalThis.__mlrDb = db;
 
 export * as t from "./schema";

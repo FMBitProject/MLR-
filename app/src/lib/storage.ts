@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { and, eq, isNotNull } from "drizzle-orm";
-import { db, t } from "./db";
+import { db, t, type DbExecutor } from "./db";
 
 // Storage for uploaded content files, behind a driver interface so the app
 // code never touches the filesystem or database column directly.
@@ -21,9 +21,9 @@ import { db, t } from "./db";
 // Keys are content version ids.
 
 export interface Storage {
-  put(key: string, data: Buffer, contentType?: string): Promise<void>;
+  put(key: string, data: Buffer, contentType?: string, executor?: DbExecutor): Promise<void>;
   get(key: string): Promise<Buffer | null>;
-  exists(key: string): Promise<boolean>;
+  exists(key: string, executor?: DbExecutor): Promise<boolean>;
 }
 
 const LOCAL_DIR = path.join(process.cwd(), ".data", "uploads");
@@ -54,8 +54,8 @@ const localStorage: Storage = {
 // version row is inserted (see createVersionWithPipeline), so an update here
 // is safe — the row always already exists.
 const dbStorage: Storage = {
-  async put(key, data) {
-    await db.update(t.contentVersions).set({ fileData: data }).where(eq(t.contentVersions.id, key));
+  async put(key, data, _contentType, executor = db) {
+    await executor.update(t.contentVersions).set({ fileData: data }).where(eq(t.contentVersions.id, key));
   },
   async get(key) {
     const row = (
@@ -66,12 +66,12 @@ const dbStorage: Storage = {
     )[0];
     return row?.fileData ?? null;
   },
-  async exists(key) {
+  async exists(key, executor = db) {
     // Existence-only check — select a cheap column, not fileData itself
     // (up to 4MB), which get() and put() already handle when the bytes are
     // actually needed.
     const row = (
-      await db
+      await executor
         .select({ id: t.contentVersions.id })
         .from(t.contentVersions)
         .where(and(eq(t.contentVersions.id, key), isNotNull(t.contentVersions.fileData)))

@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: mlr
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong database password}
       POSTGRES_DB: mlr
     volumes:
       - mlr-pgdata:/var/lib/postgresql/data
@@ -14,29 +14,35 @@ services:
       retries: 20
     restart: unless-stopped
 
-  # One-shot: apply migrations + seed demo data, then exit. The app waits for it.
+  # Production startup applies migrations only. Demo data is opt-in, local only.
   migrate:
     build:
       context: ./app
       target: build
     environment:
-      DATABASE_URL: postgres://mlr:${POSTGRES_PASSWORD:-mlr}@postgres:5432/mlr
-    command: sh -c "npm run db:migrate && npm run db:seed"
+      DATABASE_URL: postgres://mlr:${POSTGRES_PASSWORD:?Set a strong database password}@postgres:5432/mlr
+      NODE_ENV: production
+    command: npm run db:migrate
     depends_on:
       postgres:
         condition: service_healthy
 
   mlr-flow:
     build: ./app
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
-      DATABASE_URL: postgres://mlr:${POSTGRES_PASSWORD:-mlr}@postgres:5432/mlr
+      DATABASE_URL: postgres://mlr:${POSTGRES_PASSWORD:?Set a strong database password}@postgres:5432/mlr
       # Uploaded files are stored inline in Postgres (default "db" driver) —
       # persisted in the mlr-pgdata volume above, no separate volume needed.
       # Ganti dengan secret acak Anda sendiri di produksi:
       #   openssl rand -hex 32
-      AUTH_SECRET: ${AUTH_SECRET:-mlr-demo-secret-change-in-production}
+      AUTH_SECRET: ${AUTH_SECRET:?Generate a random AUTH_SECRET with openssl rand -hex 32}
+      APP_URL: https://${APP_HOST:?Set the public hostname for HTTPS}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Intellibase MLR Flow <onboarding@resend.dev>}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      CRON_SECRET: ${CRON_SECRET:-}
       # Opsional — isi salah satu untuk mengaktifkan penilaian AI.
       # GROQ_API_KEY gratis (console.groq.com); provider terdeteksi otomatis.
       GROQ_API_KEY: ${GROQ_API_KEY:-}
@@ -48,5 +54,22 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  https:
+    image: caddy:2-alpine
+    environment:
+      APP_HOST: ${APP_HOST:?Set the public hostname for HTTPS}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - mlr-flow
+    restart: unless-stopped
+
 volumes:
   mlr-pgdata:
+  caddy-data:
+  caddy-config:

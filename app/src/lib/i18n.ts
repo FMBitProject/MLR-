@@ -20,7 +20,7 @@ const dictionaries = {
       email: "Email",
       password: "Kata sandi",
       submit: "Masuk",
-      demoHint: "Akun demo, klik untuk masuk (kata sandi: DemoMLR2026!)",
+      demoHint: "Akun demo hanya tersedia bila dibuat secara lokal dengan kredensial privat.",
       invalid: "Email atau kata sandi salah.",
       locked: "Terlalu banyak percobaan masuk. Tunggu 15 menit lalu coba lagi.",
       unverified: "Email Anda belum diverifikasi. Cek inbox Anda untuk tautan aktivasi.",
@@ -262,6 +262,7 @@ const dictionaries = {
       rerunCheck: "Ulangi cek",
       rerunCheckHint:
         "Hitung ulang flag AI terhadap Claims Library terkini (dipakai setelah klaim di library diperbaiki).",
+      checkFailed: "Pemeriksaan gagal. Jalankan ulang pemeriksaan sebelum menyetujui materi.",
       checkRunning:
         "AI claims check sedang berjalan di latar belakang — hasil muncul otomatis dalam beberapa saat.",
       similarity: "kemiripan",
@@ -653,7 +654,7 @@ const dictionaries = {
       email: "Email",
       password: "Password",
       submit: "Sign in",
-      demoHint: "Demo accounts, click to sign in (password: DemoMLR2026!)",
+      demoHint: "Demo accounts are available only when locally created with private credentials.",
       invalid: "Invalid email or password.",
       locked: "Too many sign-in attempts. Wait 15 minutes and try again.",
       unverified: "Your email isn't verified yet. Check your inbox for the activation link.",
@@ -891,6 +892,7 @@ const dictionaries = {
       rerunCheck: "Re-run check",
       rerunCheckHint:
         "Recompute AI flags against the current Claims Library (use after fixing library claims).",
+      checkFailed: "The check failed. Run the check again before approving this material.",
       checkRunning:
         "The AI claims check is running in the background — results appear automatically shortly.",
       similarity: "similarity",

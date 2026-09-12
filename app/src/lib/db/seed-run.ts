@@ -4,10 +4,12 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";
 import { seed } from "./seed";
+import { requireDemoPassword } from "./demo-safety";
 
 // Seeds the demo tenant (PT Nusantara Pharma) into an empty database.
 // Run with `npm run db:seed` after `npm run db:migrate`. No-ops if data exists.
 async function main() {
+  requireDemoPassword();
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set");
 

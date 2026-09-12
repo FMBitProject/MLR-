@@ -12,6 +12,7 @@ docker run -d --name mlr-verify-pg -e POSTGRES_USER=mlr -e POSTGRES_PASSWORD=mlr
   -e POSTGRES_DB=mlr -p 55432:5432 postgres:16-alpine
 cd app
 export DATABASE_URL=postgres://mlr:mlr@localhost:55432/mlr
+export DEMO_PASSWORD=$(openssl rand -hex 24)
 npm run db:migrate && npm run db:seed   # shell DATABASE_URL wins over .env.local (dotenvx does not override)
 DATABASE_URL=$DATABASE_URL GROQ_API_KEY= RESEND_API_KEY= APP_URL=http://localhost:3100 \
   npm run dev -- -p 3100   # run in background; first page compile can take ~45s
@@ -21,19 +22,17 @@ DATABASE_URL=$DATABASE_URL GROQ_API_KEY= RESEND_API_KEY= APP_URL=http://localhos
   `[dev email] to=... subject=...` followed by the HTML body — grep that to verify email flows.
 - Empty `GROQ_API_KEY` keeps the background AI claims check from calling out.
 
-## Seed accounts (password `demo123`, all verified, tenant "Nusantara Pharma")
+## Seed accounts (password from `DEMO_PASSWORD`, all verified, tenant "Nusantara Pharma")
 
 dewi@ (marketing), budi@ (medical_reviewer), ratna@ (legal_reviewer),
 agus@ (regulatory_reviewer), sari@ (compliance_admin), rudi@ (super_admin)
 — all `@nusantara-pharma.co.id`.
 
 This is `db:seed`'s tenant (`tn-nusantara`, plan `growth`) — separate from
-`db:demo`'s tenant (`tn-demo`, plan `enterprise`, unlimited), which is the one
-seeded into *production* and linked from the public login page's demo
-buttons. Same six-role cast, same password pattern, different domain
-(`@mlrflow-demo.id`) and password (`DemoMLR2026!` by default, or `$DEMO_PASSWORD`).
-Don't run `db:demo` against the local verify DB — it's meant for a real,
-durable Postgres, not the throwaway container above.
+`db:demo`'s tenant (`tn-demo`, plan `enterprise`, unlimited). Both seed commands
+require a private `DEMO_PASSWORD` of at least 16 characters and reject production.
+There are no public quick-login buttons or default passwords. Use only the
+throwaway local database for either seed command; `db:demo` resets demo data.
 
 ## Driving the UI (playwright-core in app/node_modules; Chromium already in ~/.cache/ms-playwright)
 

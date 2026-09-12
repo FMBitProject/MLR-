@@ -1,26 +1,11 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { login, resendVerificationEmail } from "@/lib/actions";
 import type { Dict } from "@/lib/i18n";
 import { CARD, TITLE, SUBTITLE, LABEL, SUBMIT, ERROR_BOX, NOTICE_BOX, fieldClass } from "@/components/public/field";
-
-// One account per review role in the demo workspace (tn-demo), so the full
-// submit → review → approve flow can be walked through — see db/seed-demo.ts.
-const DEMO_ACCOUNTS: Array<{ email: string; roleKey: keyof Dict["roles"]; name: string }> = [
-  { email: "dewi@mlrflow-demo.id", roleKey: "marketing", name: "Dewi Lestari" },
-  { email: "budi@mlrflow-demo.id", roleKey: "medical_reviewer", name: "dr. Budi Santoso" },
-  { email: "ratna@mlrflow-demo.id", roleKey: "legal_reviewer", name: "Ratna Wijaya" },
-  { email: "agus@mlrflow-demo.id", roleKey: "regulatory_reviewer", name: "Agus Prasetyo" },
-  { email: "sari@mlrflow-demo.id", roleKey: "compliance_admin", name: "Sari Handayani" },
-  { email: "rudi@mlrflow-demo.id", roleKey: "super_admin", name: "Rudi Hartono" },
-];
-
-const DEMO_PASSWORD = "DemoMLR2026!";
-
-
 
 export function LoginForm({ dict }: { dict: Dict }) {
   const [state, formAction, pending] = useActionState(login, null);
@@ -28,8 +13,6 @@ export function LoginForm({ dict }: { dict: Dict }) {
     resendVerificationEmail,
     null,
   );
-  const emailRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   // Bumped on every attempt so the shake replays on a repeat failure — two
@@ -48,13 +31,6 @@ export function LoginForm({ dict }: { dict: Dict }) {
   // "unverified" renders its own box below the form, not #login-error — so
   // pointing at that id would leave a reference to an element that isn't there.
   const errorId = credentialError ? "login-error" : undefined;
-
-  const fill = (address: string) => {
-    if (emailRef.current) emailRef.current.value = address;
-    if (passwordRef.current) passwordRef.current.value = DEMO_PASSWORD;
-    setEmail(address);
-    emailRef.current?.form?.requestSubmit();
-  };
 
   return (
     <div className="w-full max-w-[420px] animate-fade-up">
@@ -76,7 +52,6 @@ export function LoginForm({ dict }: { dict: Dict }) {
               />
               <input
                 id="login-email"
-                ref={emailRef}
                 name="email"
                 type="email"
                 required
@@ -111,7 +86,6 @@ export function LoginForm({ dict }: { dict: Dict }) {
               />
               <input
                 id="login-password"
-                ref={passwordRef}
                 name="password"
                 type={showPassword ? "text" : "password"}
                 required
@@ -225,27 +199,6 @@ export function LoginForm({ dict }: { dict: Dict }) {
         </div>
       </div>
 
-      <div className="mt-6">
-        <p className="text-[12.5px] font-medium text-slate-400">
-          {dict.login.demoHint}
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {DEMO_ACCOUNTS.map((a) => (
-            <button
-              key={a.email}
-              type="button"
-              disabled={pending}
-              onClick={() => fill(a.email)}
-              className="group rounded-xl border border-white/12 bg-white/[0.04] px-3 py-2 text-left transition duration-200 hover:border-brand-300/50 hover:bg-white/[0.08] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:opacity-60"
-            >
-              <span className="block text-[13px] font-medium text-white">
-                {a.name}
-              </span>
-              <span className="block text-[11px] text-slate-400">{dict.roles[a.roleKey]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

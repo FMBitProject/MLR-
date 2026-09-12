@@ -212,7 +212,8 @@ export function ReviewWorkspace({
   // then refresh the server components once so the flags appear. (Refreshing
   // on a blind interval doesn't work: the router coalesces repeated
   // refreshes, so a poll → single refresh is both cheaper and reliable.)
-  const processing = currentVersion.processingStatus !== "ready";
+  const processing = currentVersion.processingStatus === "processing";
+  const reviewNotReady = currentVersion.processingStatus !== "ready";
   useEffect(() => {
     if (!processing) return;
     let cancelled = false;
@@ -223,7 +224,7 @@ export function ReviewWorkspace({
         });
         if (!res.ok) return;
         const { processingStatus } = (await res.json()) as { processingStatus: string };
-        if (processingStatus === "ready" && !cancelled) {
+        if (processingStatus !== "processing" && !cancelled) {
           clearInterval(id);
           router.refresh();
           // If the refreshed payload doesn't re-render us (this effect
@@ -905,7 +906,7 @@ export function ReviewWorkspace({
                       name="decision"
                       value="approved"
                       disabled={
-                        pending || data.prevOpenComments.length > 0 || !signPassword
+                        pending || reviewNotReady || data.prevOpenComments.length > 0 || !signPassword
                       }
                       title={
                         data.prevOpenComments.length > 0 ? dict.detail.approveBlocked : undefined
@@ -979,6 +980,11 @@ export function ReviewWorkspace({
                 </form>
               ) : null}
             </div>
+            {currentVersion.processingStatus === "failed" ? (
+              <p className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-[12px] text-rose-800">
+                {dict.detail.checkFailed}
+              </p>
+            ) : null}
             {processing ? (
               <p className="mb-4 flex items-center gap-2 rounded-lg bg-sky-50 px-3 py-2 text-[12px] text-sky-800 ring-1 ring-inset ring-sky-200">
                 <span className="size-2 animate-pulse rounded-full bg-sky-500" />

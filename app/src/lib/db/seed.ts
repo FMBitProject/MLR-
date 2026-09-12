@@ -2,6 +2,7 @@ import type { drizzle } from "drizzle-orm/node-postgres";
 import * as t from "./schema";
 import { renderTextPages } from "../svg";
 import { hashPassword } from "../password";
+import { requireDemoPassword } from "./demo-safety";
 
 // Only `insert` is needed, which lets callers hand in either the db handle or
 // a transaction — seeding a whole tenant must be all-or-nothing, otherwise a
@@ -48,7 +49,7 @@ export const DEFAULT_SEED: SeedOptions = {
   planActiveUntil: new Date(now + 14 * 86_400_000),
   prefix: "",
   users: DEFAULT_USERS,
-  password: "demo123",
+  password: "",
 };
 
 /** Resolved seed context handed to each submission seeder: config plus the
@@ -108,7 +109,8 @@ export const SEED_CLAIM_REFERENCES: Record<string, t.ClaimReference[]> = {
 };
 
 export async function seed(db: DB, options: Partial<SeedOptions> = {}) {
-  const ctx = context({ ...DEFAULT_SEED, ...options });
+  const password = requireDemoPassword(options.password || undefined);
+  const ctx = context({ ...DEFAULT_SEED, ...options, password });
   const { id, userFor } = ctx;
 
   await db.insert(t.tenants).values({

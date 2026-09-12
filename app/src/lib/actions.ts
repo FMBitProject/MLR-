@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { after } from "next/server";
-import { db, t } from "./db";
+import { db, t, type DbExecutor } from "./db";
 import { storage } from "./storage";
 import { mimeForFileName } from "./mime";
 import {
@@ -29,12 +29,12 @@ import { renderTextPages, renderSlidePages, renderFilePlaceholderPage } from "./
 import { extractPptxSlides, extractDocxParagraphs } from "./office";
 import { consumeAttempt, clearThrottle } from "./throttle";
 import { planLimits, planHas, upgradeOptionsFor, type PlanId } from "./plans";
-import { submissionQuota } from "./usage";
+import { insertSubmissionWithinQuota } from "./usage";
 import { assertTenantWritable, ensureRenewalInvoice } from "./billing";
 import { MAX_UPLOAD_BYTES } from "./upload";
 import { sendVerificationEmail, sendInviteEmail, sendPasswordResetEmail } from "./email";
 import { notifyCurrentStageReviewers, notifySubmitterDecision } from "./notify";
-import { createAccountToken, findAccountToken, consumeAccountToken } from "./account-tokens";
+import { createAccountToken, redeemAccountToken } from "./account-tokens";
 import { getDict } from "./i18n-server";
 
 async function clientIp(): Promise<string> {
@@ -74,6 +74,8 @@ export async function login(_prev: { error: string } | null, formData: FormData)
 
   const user = (await db.select().from(t.users).where(eq(t.users.email, email)))[0];
   if (!user) return { error: "invalid" };
+  // TODO(security, minor): return the same public response for unknown and
+  // unverified accounts. The current message can enumerate activation state.
   // Checked before the password so an invited-but-not-yet-activated account
   // (which has no usable password yet) gets an actionable message instead
   // of a generic "wrong password".
@@ -81,7 +83,7 @@ export async function login(_prev: { error: string } | null, formData: FormData)
   if (!verifyPassword(password, user.passwordHash)) return { error: "invalid" };
 
   await clearThrottle(`login:${email}`);
-  await createSession(user.id);
+  await createSession(user.id, user.passwordHash);
   await logAudit({
     tenantId: user.tenantId,
     entityType: "user",
@@ -135,6 +137,8 @@ export async function register(
   if (!(await consumeAttempt(`register:${await clientIp()}`, 5, 60 * 60_000))) {
     return { error: "throttled" };
   }
+  // TODO(security, minor): this explicit email_taken response discloses
+  // account existence. Preserve it for now because registration UX relies on it.
   if ((await db.select().from(t.users).where(eq(t.users.email, email)))[0]) {
     return { error: "email_taken", field: "email" as const };
   }
@@ -212,14 +216,9 @@ export async function resendVerificationEmail(
 export async function verifyEmailToken(
   token: string,
 ): Promise<{ status: "ok" | "invalid" }> {
-  const found = await findAccountToken(token);
-  if (!found || found.purpose !== "verify") return { status: "invalid" };
+  const found = await redeemAccountToken(token, "verify");
+  if (!found) return { status: "invalid" };
 
-  await db
-    .update(t.users)
-    .set({ emailVerifiedAt: new Date() })
-    .where(eq(t.users.id, found.userId));
-  await consumeAccountToken(token);
   await logAudit({
     tenantId: found.user.tenantId,
     entityType: "user",
@@ -260,14 +259,8 @@ export async function resetPassword(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   if (password.length < 8) return { error: "VALIDATION" };
 
-  const found = await findAccountToken(token);
-  if (!found || found.purpose !== "reset") return { error: "INVALID_TOKEN" };
-
-  await db
-    .update(t.users)
-    .set({ passwordHash: hashPassword(password) })
-    .where(eq(t.users.id, found.userId));
-  await consumeAccountToken(token);
+  const found = await redeemAccountToken(token, "reset", password);
+  if (!found) return { error: "INVALID_TOKEN" };
   // A successful reset proves control of the inbox — lift any login lockout
   // so the owner isn't stuck behind their attacker's failed attempts.
   await clearThrottle(`login:${found.user.email}`);
@@ -279,7 +272,7 @@ export async function resetPassword(formData: FormData) {
     performedBy: found.userId,
   });
 
-  await createSession(found.userId);
+  await createSession(found.userId, found.user.passwordHash);
   redirect("/dashboard");
 }
 
@@ -298,8 +291,8 @@ export async function setLocale(locale: "id" | "en") {
 
 const DEFAULT_STAGES = ["medical_reviewer", "legal_reviewer", "regulatory_reviewer"];
 
-async function stagesForChannel(tenantId: string, channel: string): Promise<string[]> {
-  const wf = (await db
+async function stagesForChannel(tenantId: string, channel: string, executor: DbExecutor = db): Promise<string[]> {
+  const wf = (await executor
     .select()
     .from(t.workflowTemplates)
     .where(
@@ -312,8 +305,8 @@ async function stagesForChannel(tenantId: string, channel: string): Promise<stri
   return wf?.stages ?? DEFAULT_STAGES;
 }
 
-async function defaultAssignee(tenantId: string, role: string): Promise<string | null> {
-  const u = (await db
+async function defaultAssignee(tenantId: string, role: string, executor: DbExecutor = db): Promise<string | null> {
+  const u = (await executor
     .select()
     .from(t.users)
     .where(and(eq(t.users.tenantId, tenantId), eq(t.users.role, role)))
@@ -331,9 +324,9 @@ async function createVersionWithPipeline(opts: {
   text: string | null;
   fileName: string | null;
   fileData: Buffer | null;
-}): Promise<{ versionId: string; flags: number }> {
+}, executor: DbExecutor = db): Promise<{ versionId: string; flags: number }> {
   const versionId = crypto.randomUUID();
-  await db.insert(t.contentVersions)
+  await executor.insert(t.contentVersions)
     .values({
       id: versionId,
       submissionId: opts.submissionId,
@@ -354,7 +347,7 @@ async function createVersionWithPipeline(opts: {
   ) => {
     const offset = insertedPages;
     for (const p of pages) {
-      await db.insert(t.contentVersionPages)
+      await executor.insert(t.contentVersionPages)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -365,7 +358,7 @@ async function createVersionWithPipeline(opts: {
         });
     }
     for (const el of elements) {
-      await db.insert(t.contentElements)
+      await executor.insert(t.contentElements)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -427,14 +420,14 @@ async function createVersionWithPipeline(opts: {
       await insertRendered(rendered.pages, rendered.elements);
       // Store extracted text so version diffs work for deck revisions too
       if (!opts.text && extractedText) {
-        await db.update(t.contentVersions)
+        await executor.update(t.contentVersions)
           .set({ textContent: extractedText })
           .where(eq(t.contentVersions.id, versionId));
       }
     } else {
       const page = renderFilePlaceholderPage(opts.fileName, opts.title);
       const pageNumber = insertedPages + 1;
-      await db.insert(t.contentVersionPages)
+      await executor.insert(t.contentVersionPages)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -443,7 +436,7 @@ async function createVersionWithPipeline(opts: {
           width: page.width,
           height: page.height,
         });
-      await db.insert(t.contentElements)
+      await executor.insert(t.contentElements)
         .values({
           id: crypto.randomUUID(),
           versionId,
@@ -474,6 +467,7 @@ function scheduleClaimsCheck(opts: {
   auditAction?: "claims_check_completed" | "claims_check_rerun";
 }) {
   after(async () => {
+    let processingStatus = "failed";
     try {
       const flags = await runClaimsCheck({
         versionId: opts.versionId,
@@ -488,6 +482,7 @@ function scheduleClaimsCheck(opts: {
         performedBy: opts.performedBy,
         details: { version: opts.versionLabel, flags },
       });
+      processingStatus = "ready";
     } catch (e) {
       // A failed check must never leave the version stuck in "processing" —
       // reviewers can re-run it manually from the workspace.
@@ -495,7 +490,7 @@ function scheduleClaimsCheck(opts: {
     } finally {
       await db
         .update(t.contentVersions)
-        .set({ processingStatus: "ready" })
+        .set({ processingStatus })
         .where(eq(t.contentVersions.id, opts.versionId));
     }
   });
@@ -531,18 +526,10 @@ export async function createSubmission(formData: FormData) {
     )[0];
   if (!product) throw new Error("NOT_FOUND");
 
-  // Plan quota (PRD §12): monthly submission cap. The form disables itself
-  // when the quota is full; this closes the race for concurrent submitters.
-  const tenant = (await db.select().from(t.tenants).where(eq(t.tenants.id, user.tenantId)))[0];
-  assertTenantWritable(tenant);
-  const quota = await submissionQuota(user.tenantId, tenant?.plan);
-  if (quota.used >= quota.limit) throw new Error("PLAN_LIMIT");
-
   const submissionId = crypto.randomUUID();
   const stageRoles = await stagesForChannel(user.tenantId, channel);
 
-  await db.insert(t.contentSubmissions)
-    .values({
+  const versionId = await insertSubmissionWithinQuota({
       id: submissionId,
       tenantId: user.tenantId,
       productId,
@@ -553,45 +540,46 @@ export async function createSubmission(formData: FormData) {
       status: "in_review",
       currentStage: stageRoles[0],
       createdAt: new Date(),
-    });
+    }, async (tx) => {
+    for (const [i, role] of stageRoles.entries()) {
+      await tx.insert(t.reviewStages)
+        .values({
+          id: crypto.randomUUID(),
+          submissionId,
+          stageOrder: i + 1,
+          reviewerRole: role,
+          assignedTo: await defaultAssignee(user.tenantId, role, tx),
+          status: i === 0 ? "in_progress" : "pending",
+        });
+    }
 
-  for (const [i, role] of stageRoles.entries()) {
-    await db.insert(t.reviewStages)
-      .values({
-        id: crypto.randomUUID(),
-        submissionId,
-        stageOrder: i + 1,
-        reviewerRole: role,
-        assignedTo: await defaultAssignee(user.tenantId, role),
-        status: i === 0 ? "in_progress" : "pending",
-      });
-  }
+    const { versionId } = await createVersionWithPipeline({
+      tenantId: user.tenantId,
+      submissionId,
+      productId,
+      versionNumber: 1,
+      title,
+      subtitle: `${product.name} — ${channel}`,
+      text,
+      fileName,
+      fileData,
+    }, tx);
 
-  const { versionId } = await createVersionWithPipeline({
-    tenantId: user.tenantId,
-    submissionId,
-    productId,
-    versionNumber: 1,
-    title,
-    subtitle: `${product.name} — ${channel}`,
-    text,
-    fileName,
-    fileData,
-  });
+    // Persist the original upload (keyed by version id) so the approved master
+    // can be downloaded later. Storage driver: local disk in dev, S3/R2 in prod.
+    if (fileData) {
+      await storage.put(versionId, fileData, mimeForFileName(fileName), tx);
+    }
 
-  // Persist the original upload (keyed by version id) so the approved master
-  // can be downloaded later. Storage driver: local disk in dev, S3/R2 in prod.
-  if (fileData) {
-    await storage.put(versionId, fileData, mimeForFileName(fileName));
-  }
-
-  await logAudit({
-    tenantId: user.tenantId,
-    entityType: "submission",
-    entityId: submissionId,
-    action: "submitted",
-    performedBy: user.id,
-    details: { version: "v1", title },
+    await logAudit({
+      tenantId: user.tenantId,
+      entityType: "submission",
+      entityId: submissionId,
+      action: "submitted",
+      performedBy: user.id,
+      details: { version: "v1", title },
+    }, tx);
+    return versionId;
   });
 
   scheduleClaimsCheck({
@@ -633,74 +621,77 @@ export async function resubmitVersion(formData: FormData) {
   assertUploadWithinLimit(fileData);
   await requireWritableTenant(user.tenantId);
 
-  const sub = (await db
-    .select()
-    .from(t.contentSubmissions)
-    .where(
-      and(
-        eq(t.contentSubmissions.id, submissionId),
-        eq(t.contentSubmissions.tenantId, user.tenantId),
-      ),
-    )
-    )[0];
-  if (!sub) throw new Error("NOT_FOUND");
-  if (sub.status === "approved") throw new Error("LOCKED");
+  const { sub, nextVersion, versionId } = await db.transaction(async (tx) => {
+    const sub = (await tx
+      .select()
+      .from(t.contentSubmissions)
+      .where(
+        and(
+          eq(t.contentSubmissions.id, submissionId),
+          eq(t.contentSubmissions.tenantId, user.tenantId),
+        ),
+      )
+      .for("update"))[0];
+    if (!sub) throw new Error("NOT_FOUND");
+    if (["approved", "withdrawn"].includes(sub.status)) throw new Error("LOCKED");
 
-  const versions = await db
-    .select({ versionNumber: t.contentVersions.versionNumber })
-    .from(t.contentVersions)
-    .where(eq(t.contentVersions.submissionId, submissionId));
-  const nextVersion = Math.max(...versions.map((v) => v.versionNumber)) + 1;
+    const versions = await tx
+      .select({ versionNumber: t.contentVersions.versionNumber })
+      .from(t.contentVersions)
+      .where(eq(t.contentVersions.submissionId, submissionId));
+    const nextVersion = Math.max(...versions.map((v) => v.versionNumber)) + 1;
 
-  const product = (await db.select().from(t.products).where(eq(t.products.id, sub.productId)))[0];
+    const product = (await tx.select().from(t.products).where(eq(t.products.id, sub.productId)))[0];
 
-  const { versionId } = await createVersionWithPipeline({
-    tenantId: user.tenantId,
-    submissionId,
-    productId: sub.productId,
-    versionNumber: nextVersion,
-    title: sub.title,
-    subtitle: `${product?.name ?? ""} — ${sub.channel ?? ""} — v${nextVersion}`,
-    text,
-    fileName,
-    fileData,
-  });
-  await db.update(t.contentVersions)
-    .set({ changeNote })
-    .where(eq(t.contentVersions.id, versionId));
+    const { versionId } = await createVersionWithPipeline({
+      tenantId: user.tenantId,
+      submissionId,
+      productId: sub.productId,
+      versionNumber: nextVersion,
+      title: sub.title,
+      subtitle: `${product?.name ?? ""} — ${sub.channel ?? ""} — v${nextVersion}`,
+      text,
+      fileName,
+      fileData,
+    }, tx);
+    await tx.update(t.contentVersions)
+      .set({ changeNote })
+      .where(eq(t.contentVersions.id, versionId));
 
-  // Persist the revised upload (keyed by version id), same as v1: the
-  // approved master must always be downloadable for the audit package.
-  if (fileData) {
-    await storage.put(versionId, fileData, mimeForFileName(fileName));
-  }
+    // Persist the revised upload (keyed by version id), same as v1: the
+    // approved master must always be downloadable for the audit package.
+    if (fileData) {
+      await storage.put(versionId, fileData, mimeForFileName(fileName), tx);
+    }
 
-  // Reset the review workflow: fresh stages from the tenant template
-  await db.delete(t.reviewStages).where(eq(t.reviewStages.submissionId, submissionId));
-  const stageRoles = await stagesForChannel(user.tenantId, sub.channel ?? "print");
-  for (const [i, role] of stageRoles.entries()) {
-    await db.insert(t.reviewStages)
-      .values({
-        id: crypto.randomUUID(),
-        submissionId,
-        stageOrder: i + 1,
-        reviewerRole: role,
-        assignedTo: await defaultAssignee(user.tenantId, role),
-        status: i === 0 ? "in_progress" : "pending",
-      });
-  }
+    // Reset the review workflow: fresh stages from the tenant template
+    await tx.delete(t.reviewStages).where(eq(t.reviewStages.submissionId, submissionId));
+    const stageRoles = await stagesForChannel(user.tenantId, sub.channel ?? "print", tx);
+    for (const [i, role] of stageRoles.entries()) {
+      await tx.insert(t.reviewStages)
+        .values({
+          id: crypto.randomUUID(),
+          submissionId,
+          stageOrder: i + 1,
+          reviewerRole: role,
+          assignedTo: await defaultAssignee(user.tenantId, role, tx),
+          status: i === 0 ? "in_progress" : "pending",
+        });
+    }
 
-  await db.update(t.contentSubmissions)
-    .set({ status: "in_review", currentStage: stageRoles[0], decidedAt: null })
-    .where(eq(t.contentSubmissions.id, submissionId));
+    await tx.update(t.contentSubmissions)
+      .set({ status: "in_review", currentStage: stageRoles[0], decidedAt: null })
+      .where(eq(t.contentSubmissions.id, submissionId));
 
-  await logAudit({
-    tenantId: user.tenantId,
-    entityType: "submission",
-    entityId: submissionId,
-    action: "resubmitted",
-    performedBy: user.id,
-    details: { version: `v${nextVersion}`, changeNote },
+    await logAudit({
+      tenantId: user.tenantId,
+      entityType: "submission",
+      entityId: submissionId,
+      action: "resubmitted",
+      performedBy: user.id,
+      details: { version: `v${nextVersion}`, changeNote },
+    }, tx);
+    return { sub, nextVersion, versionId };
   });
 
   scheduleClaimsCheck({
@@ -787,8 +778,7 @@ export async function reuseApprovedContent(formData: FormData) {
   const submissionId = crypto.randomUUID();
   const stageRoles = await stagesForChannel(user.tenantId, channel);
 
-  await db.insert(t.contentSubmissions)
-    .values({
+  const versionId = await insertSubmissionWithinQuota({
       id: submissionId,
       tenantId: user.tenantId,
       productId: source.productId,
@@ -799,46 +789,47 @@ export async function reuseApprovedContent(formData: FormData) {
       status: "in_review",
       currentStage: stageRoles[0],
       createdAt: new Date(),
-    });
+    }, async (tx) => {
+    for (const [i, role] of stageRoles.entries()) {
+      await tx.insert(t.reviewStages)
+        .values({
+          id: crypto.randomUUID(),
+          submissionId,
+          stageOrder: i + 1,
+          reviewerRole: role,
+          assignedTo: await defaultAssignee(user.tenantId, role, tx),
+          status: i === 0 ? "in_progress" : "pending",
+        });
+    }
 
-  for (const [i, role] of stageRoles.entries()) {
-    await db.insert(t.reviewStages)
-      .values({
-        id: crypto.randomUUID(),
-        submissionId,
-        stageOrder: i + 1,
-        reviewerRole: role,
-        assignedTo: await defaultAssignee(user.tenantId, role),
-        status: i === 0 ? "in_progress" : "pending",
-      });
-  }
-
-  const { versionId } = await createVersionWithPipeline({
-    tenantId: user.tenantId,
-    submissionId,
-    productId: source.productId,
-    versionNumber: 1,
-    title,
-    subtitle: `${product?.name ?? ""} — ${channel}`,
-    text,
-    fileName,
-    fileData,
-  });
-  if (fileData) {
-    await storage.put(versionId, fileData, mimeForFileName(fileName));
-  }
-
-  await logAudit({
-    tenantId: user.tenantId,
-    entityType: "submission",
-    entityId: submissionId,
-    action: "reused_from_library",
-    performedBy: user.id,
-    details: {
+    const { versionId } = await createVersionWithPipeline({
+      tenantId: user.tenantId,
+      submissionId,
+      productId: source.productId,
+      versionNumber: 1,
       title,
-      sourceSubmissionId: sourceId,
-      sourceVersion: `v${finalVersion.versionNumber}`,
-    },
+      subtitle: `${product?.name ?? ""} — ${channel}`,
+      text,
+      fileName,
+      fileData,
+    }, tx);
+    if (fileData) {
+      await storage.put(versionId, fileData, mimeForFileName(fileName), tx);
+    }
+
+    await logAudit({
+      tenantId: user.tenantId,
+      entityType: "submission",
+      entityId: submissionId,
+      action: "reused_from_library",
+      performedBy: user.id,
+      details: {
+        title,
+        sourceSubmissionId: sourceId,
+        sourceVersion: `v${finalVersion.versionNumber}`,
+      },
+    }, tx);
+    return versionId;
   });
 
   scheduleClaimsCheck({
@@ -889,103 +880,164 @@ export async function decideStage(formData: FormData) {
   }
   await clearThrottle(`sign:${user.id}`);
 
-  const stage = (await db.select().from(t.reviewStages).where(eq(t.reviewStages.id, stageId)))[0];
-  if (!stage) throw new Error("NOT_FOUND");
-
-  const sub = (await db
-    .select()
-    .from(t.contentSubmissions)
-    .where(
-      and(
-        eq(t.contentSubmissions.id, stage.submissionId),
-        eq(t.contentSubmissions.tenantId, user.tenantId),
-      ),
-    )
-    )[0];
-  if (!sub) throw new Error("NOT_FOUND");
-
-  const canDecide =
-    user.role === stage.reviewerRole ||
-    user.role === "super_admin" ||
-    user.role === "compliance_admin";
-  if (!canDecide || stage.status === "approved") throw new Error("FORBIDDEN");
-
-  const versions = await db
-    .select({
-      id: t.contentVersions.id,
-      versionNumber: t.contentVersions.versionNumber,
-    })
-    .from(t.contentVersions)
-    .where(eq(t.contentVersions.submissionId, sub.id))
-    .orderBy(asc(t.contentVersions.versionNumber));
-  const currentVersion = versions[versions.length - 1];
-
-  // Follow-up enforcement: a stage cannot be approved while comments from
-  // previous versions are still unresolved (the reviewer must verify each
-  // piece of feedback was actually addressed).
-  if (decision === "approved" && versions.length > 1) {
-    const prevIds = versions.slice(0, -1).map((v) => v.id);
-    const openPrev = (
-      await db
-        .select()
-        .from(t.reviewComments)
-        .where(inArray(t.reviewComments.versionId, prevIds))
-    ).filter((c) => !c.resolved).length;
-    if (openPrev > 0) throw new Error("PREV_COMMENTS_OPEN");
-  }
-
-  const signedAt = new Date();
-  await db.update(t.reviewStages)
-    .set({ status: decision, decidedAt: signedAt, decisionNote: note, decidedBy: user.id })
-    .where(eq(t.reviewStages.id, stageId));
-
-  if (decision === "approved") {
-    const stages = await db
+  const candidate = (await db.select({ submissionId: t.reviewStages.submissionId })
+    .from(t.reviewStages).where(eq(t.reviewStages.id, stageId)))[0];
+  if (!candidate) throw new Error("NOT_FOUND");
+  const postCommit: Array<() => Promise<void>> = [];
+  await db.transaction(async (tx) => {
+    const sub = (await tx
       .select()
-      .from(t.reviewStages)
-      .where(eq(t.reviewStages.submissionId, sub.id))
-      .orderBy(asc(t.reviewStages.stageOrder));
-    const next = stages.find((s) => s.status === "pending");
-    if (next) {
-      await db.update(t.reviewStages)
-        .set({ status: "in_progress" })
-        .where(eq(t.reviewStages.id, next.id));
-      await db.update(t.contentSubmissions)
-        .set({ currentStage: next.reviewerRole })
+      .from(t.contentSubmissions)
+      .where(
+        and(
+          eq(t.contentSubmissions.id, candidate.submissionId),
+          eq(t.contentSubmissions.tenantId, user.tenantId),
+        ),
+      )
+      .for("update"))[0];
+    if (!sub) throw new Error("NOT_FOUND");
+
+    const stagesBefore = await tx.select().from(t.reviewStages)
+      .where(eq(t.reviewStages.submissionId, sub.id)).orderBy(asc(t.reviewStages.stageOrder));
+    const stage = stagesBefore.find((s) => s.id === stageId);
+    if (!stage || sub.status !== "in_review" || stage.status !== "in_progress" ||
+        sub.currentStage !== stage.reviewerRole ||
+        stagesBefore.some((s) => s.stageOrder < stage.stageOrder && s.status !== "approved") ||
+        stagesBefore.some((s) => s.id !== stage.id && s.status === "in_progress")) {
+      throw new Error("FORBIDDEN");
+    }
+
+    const canDecide =
+      user.role === stage.reviewerRole ||
+      user.role === "super_admin" ||
+      user.role === "compliance_admin";
+    if (!canDecide) throw new Error("FORBIDDEN");
+
+    const versions = await tx
+      .select({
+        id: t.contentVersions.id,
+        versionNumber: t.contentVersions.versionNumber,
+        isLocked: t.contentVersions.isLocked,
+        processingStatus: t.contentVersions.processingStatus,
+        fileName: t.contentVersions.fileName,
+      })
+      .from(t.contentVersions)
+      .where(eq(t.contentVersions.submissionId, sub.id))
+      .orderBy(asc(t.contentVersions.versionNumber));
+    const currentVersion = versions[versions.length - 1];
+    if (!currentVersion || currentVersion.isLocked) throw new Error("LOCKED");
+    if (decision === "approved") {
+      if (currentVersion.processingStatus !== "ready") throw new Error("VERSION_NOT_READY");
+      const [page] = await tx.select({ id: t.contentVersionPages.id }).from(t.contentVersionPages)
+        .where(eq(t.contentVersionPages.versionId, currentVersion.id)).limit(1);
+      const [element] = await tx.select({ id: t.contentElements.id }).from(t.contentElements)
+        .where(eq(t.contentElements.versionId, currentVersion.id)).limit(1);
+      if (!page || !element || (currentVersion.fileName && !(await storage.exists(currentVersion.id, tx)))) {
+        throw new Error("VERSION_INCOMPLETE");
+      }
+    }
+
+    // Follow-up enforcement: a stage cannot be approved while comments from
+    // previous versions are still unresolved (the reviewer must verify each
+    // piece of feedback was actually addressed).
+    if (decision === "approved" && versions.length > 1) {
+      const prevIds = versions.slice(0, -1).map((v) => v.id);
+      const openPrev = (
+        await tx
+          .select()
+          .from(t.reviewComments)
+          .where(inArray(t.reviewComments.versionId, prevIds))
+      ).filter((c) => !c.resolved).length;
+      if (openPrev > 0) throw new Error("PREV_COMMENTS_OPEN");
+    }
+
+    const signedAt = new Date();
+    const updatedStage = await tx.update(t.reviewStages)
+      .set({ status: decision, decidedAt: signedAt, decisionNote: note, decidedBy: user.id })
+      .where(and(eq(t.reviewStages.id, stageId), eq(t.reviewStages.status, "in_progress")))
+      .returning({ id: t.reviewStages.id });
+    if (!updatedStage.length) throw new Error("FORBIDDEN");
+
+    if (decision === "approved") {
+      const stages = await tx
+        .select()
+        .from(t.reviewStages)
+        .where(eq(t.reviewStages.submissionId, sub.id))
+        .orderBy(asc(t.reviewStages.stageOrder));
+      const next = stages.find((s) => s.status === "pending");
+      if (next) {
+        await tx.update(t.reviewStages)
+          .set({ status: "in_progress" })
+          .where(eq(t.reviewStages.id, next.id));
+        await tx.update(t.contentSubmissions)
+          .set({ currentStage: next.reviewerRole })
+          .where(eq(t.contentSubmissions.id, sub.id));
+        postCommit.push(() =>
+          notifyCurrentStageReviewers({
+            tenantId: user.tenantId,
+            submissionId: sub.id,
+            kind: "advanced",
+            versionLabel: `v${currentVersion.versionNumber}`,
+            actorId: user.id,
+          }),
+        );
+      } else {
+        if (!stages.every((s) => s.status === "approved")) throw new Error("FORBIDDEN");
+        // Final approval: lock the version (immutability NFR) and start the
+        // one-year market shelf life (compliance can adjust it in the library).
+        const expiresAt = new Date(signedAt);
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+        await tx.update(t.contentSubmissions)
+          .set({ status: "approved", currentStage: null, decidedAt: signedAt, expiresAt })
+          .where(eq(t.contentSubmissions.id, sub.id));
+        await tx.update(t.contentVersions)
+          .set({ isLocked: true })
+          .where(eq(t.contentVersions.id, currentVersion.id));
+        await tx.insert(t.auditLog).values({
+          id: crypto.randomUUID(), createdAt: new Date(),
+          tenantId: user.tenantId,
+          entityType: "version",
+          entityId: currentVersion.id,
+          action: "version_locked",
+          performedBy: user.id,
+          details: { version: `v${currentVersion.versionNumber}` },
+        });
+        postCommit.push(() =>
+          notifySubmitterDecision({
+            tenantId: user.tenantId,
+            submissionId: sub.id,
+            decision: "approved",
+            stageRole: stage.reviewerRole,
+            note,
+            versionLabel: `v${currentVersion.versionNumber}`,
+            actorId: user.id,
+          }),
+        );
+      }
+    } else if (decision === "changes_requested") {
+      await tx.update(t.contentSubmissions)
+        .set({ status: "changes_requested" })
         .where(eq(t.contentSubmissions.id, sub.id));
-      after(() =>
-        notifyCurrentStageReviewers({
+      postCommit.push(() =>
+        notifySubmitterDecision({
           tenantId: user.tenantId,
           submissionId: sub.id,
-          kind: "advanced",
+          decision: "changes_requested",
+          stageRole: stage.reviewerRole,
+          note,
           versionLabel: `v${currentVersion.versionNumber}`,
           actorId: user.id,
         }),
       );
     } else {
-      // Final approval: lock the version (immutability NFR) and start the
-      // one-year market shelf life (compliance can adjust it in the library).
-      const expiresAt = new Date(signedAt);
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-      await db.update(t.contentSubmissions)
-        .set({ status: "approved", currentStage: null, decidedAt: signedAt, expiresAt })
+      await tx.update(t.contentSubmissions)
+        .set({ status: "rejected", currentStage: null, decidedAt: new Date() })
         .where(eq(t.contentSubmissions.id, sub.id));
-      await db.update(t.contentVersions)
-        .set({ isLocked: true })
-        .where(eq(t.contentVersions.id, currentVersion.id));
-      await logAudit({
-        tenantId: user.tenantId,
-        entityType: "version",
-        entityId: currentVersion.id,
-        action: "version_locked",
-        performedBy: user.id,
-        details: { version: `v${currentVersion.versionNumber}` },
-      });
-      after(() =>
+      postCommit.push(() =>
         notifySubmitterDecision({
           tenantId: user.tenantId,
           submissionId: sub.id,
-          decision: "approved",
+          decision: "rejected",
           stageRole: stage.reviewerRole,
           note,
           versionLabel: `v${currentVersion.versionNumber}`,
@@ -993,60 +1045,33 @@ export async function decideStage(formData: FormData) {
         }),
       );
     }
-  } else if (decision === "changes_requested") {
-    await db.update(t.contentSubmissions)
-      .set({ status: "changes_requested" })
-      .where(eq(t.contentSubmissions.id, sub.id));
-    after(() =>
-      notifySubmitterDecision({
-        tenantId: user.tenantId,
-        submissionId: sub.id,
-        decision: "changes_requested",
-        stageRole: stage.reviewerRole,
-        note,
-        versionLabel: `v${currentVersion.versionNumber}`,
-        actorId: user.id,
-      }),
-    );
-  } else {
-    await db.update(t.contentSubmissions)
-      .set({ status: "rejected", currentStage: null, decidedAt: new Date() })
-      .where(eq(t.contentSubmissions.id, sub.id));
-    after(() =>
-      notifySubmitterDecision({
-        tenantId: user.tenantId,
-        submissionId: sub.id,
-        decision: "rejected",
-        stageRole: stage.reviewerRole,
-        note,
-        versionLabel: `v${currentVersion.versionNumber}`,
-        actorId: user.id,
-      }),
-    );
-  }
 
-  await logAudit({
-    tenantId: user.tenantId,
-    entityType: "submission",
-    entityId: sub.id,
-    action: decision,
-    performedBy: user.id,
-    details: {
-      version: `v${currentVersion.versionNumber}`,
-      stage: stage.reviewerRole,
-      note: note ?? undefined,
-      // E-signature manifest: identity captured at signing time plus the
-      // meaning of the signature, per Part 11-style expectations.
-      signature: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        meaning: `${decision} as ${stage.reviewerRole} for v${currentVersion.versionNumber}`,
-        method: "password_reentry",
-        signedAt: signedAt.toISOString(),
+    await tx.insert(t.auditLog).values({
+          id: crypto.randomUUID(), createdAt: new Date(),
+      tenantId: user.tenantId,
+      entityType: "submission",
+      entityId: sub.id,
+      action: decision,
+      performedBy: user.id,
+      details: {
+        version: `v${currentVersion.versionNumber}`,
+        stage: stage.reviewerRole,
+        note: note ?? undefined,
+        // E-signature manifest: identity captured at signing time plus the
+        // meaning of the signature, per Part 11-style expectations.
+        signature: {
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          meaning: `${decision} as ${stage.reviewerRole} for v${currentVersion.versionNumber}`,
+          method: "password_reentry",
+          signedAt: signedAt.toISOString(),
+        },
       },
-    },
+    });
+
   });
+  for (const notify of postCommit) after(notify);
 
   revalidatePath("/", "layout");
 }
@@ -1067,6 +1092,12 @@ export async function addComment(formData: FormData) {
     )
     )[0];
   if (!version) throw new Error("NOT_FOUND");
+
+  if (elementId) {
+    const [element] = await db.select({ id: t.contentElements.id }).from(t.contentElements)
+      .where(and(eq(t.contentElements.id, elementId), eq(t.contentElements.versionId, versionId)));
+    if (!element) throw new Error("NOT_FOUND");
+  }
 
   const id = crypto.randomUUID();
   await db.insert(t.reviewComments)
@@ -1163,34 +1194,38 @@ export async function rerunClaimsCheck(formData: FormData) {
   const allowed = [...REVIEWER_ROLES, "compliance_admin", "super_admin"];
   if (!allowed.includes(user.role as (typeof allowed)[number])) throw new Error("FORBIDDEN");
 
-  const sub = (await db
-    .select()
-    .from(t.contentSubmissions)
-    .where(
-      and(
-        eq(t.contentSubmissions.id, submissionId),
-        eq(t.contentSubmissions.tenantId, user.tenantId),
-      ),
-    )
-    )[0];
-  if (!sub) throw new Error("NOT_FOUND");
+  const { sub, latest } = await db.transaction(async (tx) => {
+    const sub = (await tx
+      .select()
+      .from(t.contentSubmissions)
+      .where(
+        and(
+          eq(t.contentSubmissions.id, submissionId),
+          eq(t.contentSubmissions.tenantId, user.tenantId),
+        ),
+      ).for("update"))[0];
+    if (!sub) throw new Error("NOT_FOUND");
 
-  const versions = await db
-    .select({
-      id: t.contentVersions.id,
-      versionNumber: t.contentVersions.versionNumber,
-      isLocked: t.contentVersions.isLocked,
-    })
-    .from(t.contentVersions)
-    .where(eq(t.contentVersions.submissionId, submissionId));
-  const latest = versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
-  if (!latest || latest.isLocked) throw new Error("LOCKED");
+    const versions = await tx
+      .select({
+        id: t.contentVersions.id,
+        versionNumber: t.contentVersions.versionNumber,
+        isLocked: t.contentVersions.isLocked,
+        processingStatus: t.contentVersions.processingStatus,
+      })
+      .from(t.contentVersions)
+      .where(eq(t.contentVersions.submissionId, submissionId));
+    const latest = versions.sort((a, b) => b.versionNumber - a.versionNumber)[0];
+    if (!latest || latest.isLocked) throw new Error("LOCKED");
+    if (latest.processingStatus === "processing") throw new Error("VERSION_NOT_READY");
 
-  await db.delete(t.claimFlags).where(eq(t.claimFlags.versionId, latest.id));
-  await db
-    .update(t.contentVersions)
-    .set({ processingStatus: "processing" })
-    .where(eq(t.contentVersions.id, latest.id));
+    await tx.delete(t.claimFlags).where(eq(t.claimFlags.versionId, latest.id));
+    await tx
+      .update(t.contentVersions)
+      .set({ processingStatus: "processing" })
+      .where(eq(t.contentVersions.id, latest.id));
+    return { sub, latest };
+  });
   scheduleClaimsCheck({
     versionId: latest.id,
     productId: sub.productId,
@@ -1846,14 +1881,8 @@ export async function acceptInvite(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   if (password.length < 8) return { error: "VALIDATION" };
 
-  const found = await findAccountToken(token);
-  if (!found || found.purpose !== "invite") return { error: "INVALID_TOKEN" };
-
-  await db
-    .update(t.users)
-    .set({ passwordHash: hashPassword(password), emailVerifiedAt: new Date() })
-    .where(eq(t.users.id, found.userId));
-  await consumeAccountToken(token);
+  const found = await redeemAccountToken(token, "invite", password);
+  if (!found) return { error: "INVALID_TOKEN" };
   await logAudit({
     tenantId: found.user.tenantId,
     entityType: "user",
@@ -1862,7 +1891,7 @@ export async function acceptInvite(formData: FormData) {
     performedBy: found.userId,
   });
 
-  await createSession(found.userId);
+  await createSession(found.userId, found.user.passwordHash);
   redirect("/dashboard");
 }
 
